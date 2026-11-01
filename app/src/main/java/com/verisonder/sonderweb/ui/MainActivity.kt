@@ -110,6 +110,22 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun onStart() {
         super.onStart()
         ownScreen = false
+        wake()
+    }
+
+    /**
+     * Back in the app: the system threw away the page's drawing surface while you were away.
+     * Re-activating the tab makes the engine paint it again, instead of leaving it black.
+     */
+    private fun wake() {
+        val t = Browser.current ?: return
+        if (!t.ready || !t.session.isOpen) return
+        t.session.setActive(true)
+        t.session.setFocused(true)
+        if (::geckoView.isInitialized) {
+            geckoView.requestLayout()
+            geckoView.invalidate()
+        }
     }
 
     override fun onDestroy() {
@@ -120,6 +136,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun onStop() {
         super.onStop()
         Browser.saveTabs()
+        // Paused while you're away (saves battery); woken again in onStart.
+        Browser.current?.let { t -> if (t.ready && t.session.isOpen && !isChangingConfigurations) t.session.setActive(false) }
         if (!ownScreen && !isChangingConfigurations) Browser.leftApp()
     }
 
