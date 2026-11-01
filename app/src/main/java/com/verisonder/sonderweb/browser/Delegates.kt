@@ -45,7 +45,8 @@ object Delegates {
             hasUserGesture: Boolean,
         ) {
             // about:blank is the start page, not a site.
-            tab.url = if (url == null || url == "about:blank") "" else url
+            // A restored tab that hasn't loaded yet keeps showing the address it will open.
+            tab.url = if (url == null || url == "about:blank") tab.pendingUrl ?: "" else url
             tab.blockedBadge = ""
             Browser.saveTabs()
         }

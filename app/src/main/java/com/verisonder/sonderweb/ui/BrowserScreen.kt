@@ -95,6 +95,9 @@ class UiState {
     var findQuery by mutableStateOf("")
     var findResult by mutableStateOf("")
     var themeVersion by mutableStateOf(0)
+
+    /** The tab switcher is showing the Private list. */
+    var tabsPrivate by mutableStateOf(false)
 }
 
 @Composable
@@ -119,7 +122,7 @@ fun BrowserScreen(activity: MainActivity) {
 
     // Private tabs never end up in screenshots, screen recordings or the recent-apps preview.
     val secure = !Browser.privateScreenshots &&
-        (tab?.isPrivate == true || (ui.panel == Panel.Tabs && Browser.privateTabsOpen()))
+        (tab?.isPrivate == true || (ui.panel == Panel.Tabs && ui.tabsPrivate && Browser.privateTabsOpen()))
     LaunchedEffect(secure) { activity.setSecure(secure) }
 
     // Show the current tab in the engine view.

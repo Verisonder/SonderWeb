@@ -49,6 +49,9 @@ import com.verisonder.sonderweb.core.UrlText
 fun TabsScreen(ui: UiState) {
     val p = LocalPalette.current
     var privateMode by remember { mutableStateOf(Browser.current?.isPrivate ?: false) }
+    // Screenshots are only blocked while the Private list itself is on screen.
+    androidx.compose.runtime.LaunchedEffect(privateMode) { ui.tabsPrivate = privateMode }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { ui.tabsPrivate = false } }
     val list = Browser.tabs.filter { it.isPrivate == privateMode }
     val accent = if (privateMode) PrivatePalette.accent else p.accent
 
