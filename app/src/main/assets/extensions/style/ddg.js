@@ -18,6 +18,21 @@
   set("1", "-1");
   set("ae", dark || incognito ? "d" : "-1");
 
+  // The tab you're on (All, Images, …) in the accent colour. DuckDuckGo only marks it with
+  // generated class names, so it's found by the link's own address.
+  let queued = false;
+  const mark = () => {
+    queued = false;
+    const here = new URLSearchParams(location.search).get("ia") || "web";
+    document.querySelectorAll("#react-duckbar a[href]").forEach((a) => {
+      const ia = new URL(a.href, location.href).searchParams.get("ia");
+      a.classList.toggle("sw-on", ia === here);
+    });
+  };
+  new MutationObserver(() => {
+    if (!queued) { queued = true; requestAnimationFrame(mark); }
+  }).observe(document, { childList: true, subtree: true });
+
   // Inter, like the rest of the browser.
   const face = new FontFace("SonderInter", "url(" + browser.runtime.getURL("fonts/inter_regular.ttf") + ")", { weight: "400" });
   const bold = new FontFace("SonderInter", "url(" + browser.runtime.getURL("fonts/inter_semibold.ttf") + ")", { weight: "600" });

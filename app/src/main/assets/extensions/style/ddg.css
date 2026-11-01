@@ -62,13 +62,20 @@ html.sw-look [data-testid="duckbar"] * {
 html.sw-look [data-testid="duckbar"] *::before,
 html.sw-look [data-testid="duckbar"] *::after { background: none !important; box-shadow: none !important; }
 html.sw-look [data-testid="duckbar"] a { color: var(--sw-mute) !important; }
-html.sw-look [data-testid="duckbar"] a[aria-current],
-html.sw-look [data-testid="duckbar"] a.is-active,
-html.sw-look [data-testid="duckbar"] a[class*="active"] {
+html.sw-look [data-testid="duckbar"] a.sw-on {
   color: var(--sw-accent) !important;
   border-bottom: 2px solid var(--sw-accent) !important;
 }
 html.sw-look [data-testid="duckbar"] button { display: none !important; }
+
+/* DuckDuckGo darkens the tab row with masks and filters; none of that here. */
+html.sw-look #react-duckbar, html.sw-look #react-duckbar * {
+  backdrop-filter: none !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
 
 /* Results: plain rounded cards. */
 html.sw-look article[data-testid="result"] {
@@ -103,5 +110,6 @@ html.sw-look [data-testid="result-extras-site-search-link"] > div {
 }
 
 /* Everything else DuckDuckGo draws in its own greys follows the browser's palette. */
-html.sw-look section, html.sw-look [data-testid="mainline"] { background: transparent !important; }
+html.sw-look section, html.sw-look [data-testid="mainline"],
+html.sw-look ol.react-results--main > li { background: transparent !important; }
 html.sw-look a { color: var(--sw-accent); }
