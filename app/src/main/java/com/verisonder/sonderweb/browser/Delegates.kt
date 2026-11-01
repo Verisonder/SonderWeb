@@ -27,8 +27,11 @@ object Delegates {
             override fun onScrollChanged(session: GeckoSession, scrollX: Int, scrollY: Int) {
                 Bar.onScroll(tab, scrollY)
                 // Once scrolling settles, pick up the colours now at the page's edges.
+                // Again a moment later: sites often slide their own header back in after you stop.
                 Browser.main.removeCallbacks(resample)
+                Browser.main.removeCallbacks(resampleLate)
                 Browser.main.postDelayed(resample, 220)
+                Browser.main.postDelayed(resampleLate, 900)
             }
         })
         Extensions.attach(tab)
@@ -110,6 +113,8 @@ object Delegates {
                 Browser.db.visit(tab.url, tab.title)
             }
             capture(tab)
+            // Pages often finish drawing their header just after loading.
+            Browser.main.postDelayed({ if (Browser.current === tab) capture(tab, thumbnail = false) }, 800)
         }
 
         override fun onProgressChange(session: GeckoSession, progress: Int) {
@@ -122,6 +127,7 @@ object Delegates {
     }
 
     private val resample = Runnable { Browser.current?.let { capture(it, thumbnail = false) } }
+    private val resampleLate = Runnable { Browser.current?.let { capture(it, thumbnail = false) } }
 
     private fun content(tab: Tab) = object : ContentDelegate {
         override fun onFirstContentfulPaint(session: GeckoSession) {
@@ -195,6 +201,7 @@ object Delegates {
                 if (bmp == null || bmp.width < 2 || bmp.height < 4) return@accept
                 val top = runCatching { edgeColor(bmp, 1) }.getOrNull()
                 val bottom = runCatching { edgeColor(bmp, bmp.height - 2) }.getOrNull()
+                val topKnown = top != null
                 // No pictures of private pages, not even in memory: only the two colours.
                 val small = if (thumbnail && !tab.isPrivate) {
                     val w = 360
@@ -204,7 +211,8 @@ object Delegates {
                     null
                 }
                 Browser.main.post {
-                    if (top != null) tab.edgeTop = top
+                    // A busy edge (a picture, not a header bar): plain page colour instead.
+                    tab.edgeTop = if (topKnown) top else null
                     if (bottom != null) tab.edgeBottom = bottom
                     if (small != null) tab.thumbnail = small.asImageBitmap()
                 }
@@ -213,8 +221,11 @@ object Delegates {
     }
 
     /** The colour most of a pixel row has (a few points across it), fully opaque. */
-    private fun edgeColor(bmp: Bitmap, y: Int): Int {
-        val points = (1..9).map { i -> bmp.getPixel((bmp.width - 1) * i / 10, y) or 0xFF000000.toInt() }
-        return points.groupingBy { it }.eachCount().maxByOrNull { it.value }!!.key
+    private fun edgeColor(bmp: Bitmap, y: Int): Int? {
+        val points = (1..15).map { i -> bmp.getPixel((bmp.width - 1) * i / 16, y) or 0xFF000000.toInt() }
+        // Near-identical shades count as one; the colour must cover most of the row.
+        val groups = points.groupBy { it and 0xFFF8F8F8.toInt() }
+        val best = groups.maxByOrNull { it.value.size }!!.value
+        return if (best.size * 10 >= points.size * 7) best.first() else null
     }
 }
