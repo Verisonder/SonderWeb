@@ -344,7 +344,7 @@ private fun BoxScope.BarArea(
     val barScale = remember(ui.themeVersion) { Browser.prefs.barSize / 100f }
     if (hideMode == Bar.BUTTON) {
         val saved = remember(ui.themeVersion) { Browser.prefs.buttonCorner }
-        var corner by remember(saved, barTop) { mutableStateOf(if (saved in 0..3) saved else if (barTop) 0 else 2) }
+        var corner by remember(saved, barTop) { mutableStateOf(if (saved in 0..3) saved else if (barTop) 1 else 3) }
         val right = corner == 1 || corner == 3
         // The bar shrinks towards the button's corner while the button grows out of it.
         if (morph < 1f) {

@@ -68,7 +68,7 @@ class Prefs(context: Context) {
         set(v) = sp.edit().putInt("bar_hide", v).apply()
 
     /** Where the small bar button sits: 0 top left, 1 top right, 2 bottom left, 3 bottom right.
-     *  -1 = the left corner on the bar's side (until you drag it somewhere). */
+     *  -1 = the right corner on the bar's side (until you drag it somewhere). */
     var buttonCorner: Int
         get() = sp.getInt("button_corner", -1)
         set(v) = sp.edit().putInt("button_corner", v).apply()
