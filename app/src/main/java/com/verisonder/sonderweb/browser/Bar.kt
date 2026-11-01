@@ -20,6 +20,9 @@ object Bar {
     var hidden by mutableStateOf(false)
         private set
 
+    /** The small button tucked away at the bottom edge (long-press), until you tap its handle. Kept until then. */
+    val tuckedState = mutableStateOf(false)
+
     var mode = SLIDE
         private set
 

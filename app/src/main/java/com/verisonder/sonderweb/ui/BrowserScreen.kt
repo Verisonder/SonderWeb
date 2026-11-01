@@ -48,6 +48,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.layout.WindowInsets
@@ -453,6 +455,9 @@ private fun BoxScope.DraggableBarButton(
     }
     val drag = remember { androidx.compose.animation.core.Animatable(androidx.compose.ui.geometry.Offset.Zero, androidx.compose.ui.geometry.Offset.VectorConverter) }
     var held by remember { mutableStateOf(false) }
+    // Long-press tucks the button away at the bottom edge until you tap its handle.
+    var tucked by Bar.tuckedState
+    val tuck by animateFloatAsState(if (tucked) 1f else 0f, spring(dampingRatio = 0.8f, stiffness = 420f), label = "tuck")
     val lift by animateFloatAsState(if (held) 1.1f else 1f, spring(dampingRatio = 0.6f, stiffness = 600f), label = "lift")
     // Read while laying out, together with the drag, so a change of corner never shows a jump.
     var at by remember { mutableStateOf(corner) }
@@ -506,14 +511,59 @@ private fun BoxScope.DraggableBarButton(
             }
             .graphicsLayer {
                 val m = morph()
+                val t = tuck
                 compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
-                val k = (0.6f + 0.4f * m) * lift
+                val k = (0.6f + 0.4f * m) * lift * (1f - 0.4f * t)
                 scaleX = k
                 scaleY = k
-                alpha = ((m - 0.3f) / 0.7f).coerceIn(0f, 1f)
+                // Tucked away: it drops down past the bottom edge.
+                translationY = t * (area.height - base(at).y + size * 0.4f)
+                alpha = ((m - 0.3f) / 0.7f).coerceIn(0f, 1f) * (1f - t)
             },
+        onLongClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            tucked = true
+        },
         onClick = onClick,
     )
+
+    // While tucked: a slim handle at the bottom edge, under where the button was. Tap it to bring the button back.
+    if (tuck > 0.01f) {
+        val handleW = with(density) { 44.dp.roundToPx() }
+        val touchH = with(density) { 30.dp.roundToPx() }
+        Box(
+            Modifier
+                .offset {
+                    val b = base(at)
+                    IntOffset(
+                        (b.x + size / 2f - handleW / 2f).roundToInt(),
+                        area.height - bottomInset - touchH,
+                    )
+                }
+                .size(width = 44.dp, height = 30.dp)
+                .graphicsLayer {
+                    alpha = tuck
+                    scaleX = 0.4f + 0.6f * tuck
+                }
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                    enabled = tucked,
+                ) {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    tucked = false
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                Modifier
+                    .size(width = 40.dp, height = 5.dp)
+                    .shadow(3.dp, RoundedCornerShape(3.dp))
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(LocalPalette.current.text.copy(alpha = 0.7f)),
+            )
+        }
+    }
 }
 
 /** Swipe the bar left or right to put it away; it follows your finger and springs back if you don't go far. */
@@ -632,7 +682,13 @@ fun leavePrivate(ui: UiState) {
 
 /** The small round button the bar shrinks into. Tap it to bring the bar back. */
 @Composable
-fun BarButton(tab: com.verisonder.sonderweb.browser.Tab?, sizeDp: Int, modifier: Modifier, onClick: () -> Unit) {
+fun BarButton(
+    tab: com.verisonder.sonderweb.browser.Tab?,
+    sizeDp: Int,
+    modifier: Modifier,
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     val p = LocalPalette.current
     Box(
         modifier
@@ -640,7 +696,7 @@ fun BarButton(tab: com.verisonder.sonderweb.browser.Tab?, sizeDp: Int, modifier:
             .shadow(6.dp, CircleShape)
             .clip(CircleShape)
             .background(p.field)
-            .clickable(onClick = onClick),
+            .combinedClickable(onLongClick = onLongClick, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         MarkLines((sizeDp * 0.67f).roundToInt(), p.text)
