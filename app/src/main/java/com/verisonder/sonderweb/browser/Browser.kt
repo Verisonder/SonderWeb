@@ -61,6 +61,7 @@ object Browser {
         prefs = Prefs(app)
         db = Db(app)
         privateScreenshots = prefs.privateScreenshots
+        privateLocked = prefs.privateLock
 
         val blocking = ContentBlocking.Settings.Builder()
             .antiTracking(antiTracking())
@@ -165,6 +166,8 @@ object Browser {
             old.session.setActive(false)
             runCatching { runtime.webExtensionController.setTabActive(old.session, false) }
         }
+        // Leaving the private tabs locks them again: coming back needs your fingerprint.
+        if (old?.isPrivate == true && !tab.isPrivate && prefs.privateLock) privateLocked = true
         current = tab
         Bar.show()
         if (tab.ready) activate(tab)

@@ -67,11 +67,13 @@ val LightPalette = Palette(
     danger = Color(0xFFD93025),
 )
 
-/** Private tabs: always dark, like an incognito window. */
+/** Private tabs: pure black, nothing shared with the normal look. */
 val PrivatePalette = DarkPalette.copy(
-    bg = Color(0xFF292A2D),
-    bar = Color(0xFF292A2D),
-    field = Color(0xFF3C4043),
+    bg = Color(0xFF000000),
+    bar = Color(0xFF000000),
+    field = Color(0xFF1C1C1E),
+    card = Color(0xFF111113),
+    line = Color(0xFF2C2C2E),
     accent = Color(0xFFC58AF9),
 )
 

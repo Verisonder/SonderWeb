@@ -60,6 +60,8 @@ fun IncognitoKeyboard(on: Boolean, content: @Composable () -> Unit) {
 /** What covers the private tabs after you've left the app, until you unlock them. */
 @Composable
 fun PrivateLock(modifier: Modifier = Modifier, onLeave: (() -> Unit)?) {
+    // Ask straight away; the button is there if you cancel.
+    androidx.compose.runtime.LaunchedEffect(Unit) { Browser.host?.unlockPrivate() }
     Box(
         modifier
             .fillMaxSize()

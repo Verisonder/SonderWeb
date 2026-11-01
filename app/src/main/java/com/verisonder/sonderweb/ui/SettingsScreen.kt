@@ -331,7 +331,7 @@ private fun PrivacyPage(onClear: () -> Unit) {
     }
     GroupTitle("Private tabs")
     Group {
-        Toggle("Lock private tabs", "Ask for your fingerprint or screen lock when you come back to the app.", lock) {
+        Toggle("Lock private tabs", "Ask for your fingerprint or screen lock every time you open private tabs or come back to the app.", lock) {
             lock = it
             prefs.privateLock = it
             if (!it) Browser.privateLocked = false

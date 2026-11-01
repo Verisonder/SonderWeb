@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -128,12 +129,65 @@ fun MarkLines(size: Int, color: Color) {
     }
 }
 
+/** A private tab's start page: no clock, name, weather, place or shortcuts, just a search box. */
+@Composable
+private fun PrivateStart(ui: UiState, tab: com.verisonder.sonderweb.browser.Tab) {
+    val p = LocalPalette.current
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(p.bg)
+            .padding(horizontal = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Spacer(Modifier.height(64.dp))
+        Box(
+            Modifier
+                .size(72.dp)
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .background(p.field),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Outlined.VisibilityOff, null, tint = p.accent, modifier = Modifier.size(32.dp))
+        }
+        Spacer(Modifier.height(22.dp))
+        Text("Private tab", color = p.text, fontSize = 24.sp, fontWeight = FontWeight.Light)
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Nothing you do here is kept: no history, cookies or site data once you close it. " +
+                "It doesn't see your history, bookmarks or shortcuts, and stays locked behind your fingerprint.",
+            color = p.faint,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(30.dp))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(p.field)
+                .clickable { startEditing(ui, tab) }
+                .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.Search, "Search", tint = p.faint, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
 /** What a new tab shows: the time, a greeting, the weather, a search box and your shortcuts. */
 @Composable
 fun StartPage(ui: UiState) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
     val tab = Browser.current ?: return
+    if (tab.isPrivate) {
+        PrivateStart(ui, tab)
+        return
+    }
     val prefs = Browser.prefs
     // Settings bump themeVersion; reading it here redraws the page with the new choices.
     if (ui.themeVersion < 0) return
@@ -182,16 +236,7 @@ fun StartPage(ui: UiState) {
                 Text(date, color = p.text, fontSize = 16.sp)
                 Spacer(Modifier.height(34.dp))
             }
-            if (tab.isPrivate) {
-                Text("Private tab", color = p.text, fontSize = 27.sp, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Nothing from this tab is kept once you close it.",
-                    color = p.mute,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center,
-                )
-            } else if (prefs.showGreeting) {
+            if (prefs.showGreeting) {
                 Text(
                     WeatherCodes.greeting(hour, prefs.userName),
                     color = p.text,

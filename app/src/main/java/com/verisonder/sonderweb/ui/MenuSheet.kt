@@ -138,18 +138,21 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
             Browser.newTab(null, isPrivate = true)
             close()
         }
-        Divider()
-        Item("History", Icons.Outlined.History) {
-            ui.panel = Panel.History
-            close()
-        }
-        Item("Downloads", Icons.Outlined.Download) {
-            ui.panel = Panel.Downloads
-            close()
-        }
-        Item("Bookmarks", Icons.Outlined.Collections) {
-            ui.panel = Panel.Bookmarks
-            close()
+        // Private tabs stay apart: no way into your normal history, downloads or bookmarks from here.
+        if (!tab.isPrivate) {
+            Divider()
+            Item("History", Icons.Outlined.History) {
+                ui.panel = Panel.History
+                close()
+            }
+            Item("Downloads", Icons.Outlined.Download) {
+                ui.panel = Panel.Downloads
+                close()
+            }
+            Item("Bookmarks", Icons.Outlined.Collections) {
+                ui.panel = Panel.Bookmarks
+                close()
+            }
         }
         if (web) {
             Divider()

@@ -497,7 +497,8 @@ fun Suggestions(ui: UiState, tab: Tab, top: Boolean) {
     val text = ui.query.text
     val resolved = remember(text) { AddressInput.resolve(text, Browser.prefs.engine()) }
     val rows = remember(text, tab.isPrivate) {
-        if (text.isBlank()) emptyList() else Browser.db.suggest(text)
+        // Private tabs are kept apart from your normal history and bookmarks.
+        if (text.isBlank() || tab.isPrivate) emptyList() else Browser.db.suggest(text)
     }
     val bangHints = remember(text) {
         val first = text.trimStart()

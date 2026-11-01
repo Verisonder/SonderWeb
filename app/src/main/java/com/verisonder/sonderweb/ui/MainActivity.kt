@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
     private var ownScreen = false
 
     private val confirmLock = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        authenticating = false
         if (r.resultCode == Activity.RESULT_OK) Browser.privateLocked = false
     }
 
@@ -104,6 +105,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun onResume() {
         super.onResume()
         Browser.host = this
+        if (unlockOnResume && Browser.privateLocked) unlockPrivate()
     }
 
     override fun onStart() {
@@ -219,7 +221,19 @@ class MainActivity : ComponentActivity(), Browser.Host {
         }
     }
 
+    /** Asked while the app wasn't on screen: ask once it is. */
+    private var unlockOnResume = false
+
+    /** A fingerprint / screen lock prompt is already up: don't stack a second one. */
+    private var authenticating = false
+
     override fun unlockPrivate() {
+        if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+            unlockOnResume = true
+            return
+        }
+        unlockOnResume = false
+        if (authenticating) return
         val km = getSystemService(KeyguardManager::class.java)
         // No screen lock on the phone: nothing to check against.
         if (km == null || !km.isDeviceSecure) {
@@ -241,17 +255,20 @@ class MainActivity : ComponentActivity(), Browser.Host {
             else -> b.setNegativeButton("Use screen lock", mainExecutor) { _, _ -> confirmScreenLock(km) }
         }
         ownScreen = true
+        authenticating = true
         b.build().authenticate(
             CancellationSignal(),
             mainExecutor,
             object : android.hardware.biometrics.BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: android.hardware.biometrics.BiometricPrompt.AuthenticationResult?) {
                     ownScreen = false
+                    authenticating = false
                     Browser.privateLocked = false
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
                     ownScreen = false
+                    authenticating = false
                     // Android 9 without a fingerprint: fall back to the PIN / pattern.
                     if (Build.VERSION.SDK_INT == 28 && errorCode in NO_BIOMETRICS) confirmScreenLock(km)
                 }
@@ -267,7 +284,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
             return
         }
         ownScreen = true
-        runCatching { confirmLock.launch(i) }
+        authenticating = true
+        runCatching { confirmLock.launch(i) }.onFailure { authenticating = false }
     }
 
     /** Ask for the screen's fastest refresh rate (120 Hz on the 12T); some phones keep apps at 60 Hz otherwise. */
