@@ -9,7 +9,10 @@ val ublockVersion: String = libs.versions.ublock.get()
 
 android {
     namespace = "com.verisonder.sonderweb"
-    compileSdk = 37
+    // GeckoView 159 needs Android API 37.2 (same form Mozilla uses for Firefox).
+    compileSdk {
+        version = release(37) { minorApiLevel = 2 }
+    }
 
     defaultConfig {
         applicationId = "com.verisonder.sonderweb"
