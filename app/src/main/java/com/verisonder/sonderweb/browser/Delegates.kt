@@ -38,7 +38,8 @@ object Delegates {
             perms: MutableList<PermissionDelegate.ContentPermission>,
             hasUserGesture: Boolean,
         ) {
-            tab.url = url ?: ""
+            // about:blank is the start page, not a site.
+            tab.url = if (url == null || url == "about:blank") "" else url
             tab.blockedBadge = ""
             Browser.saveTabs()
         }
@@ -83,6 +84,7 @@ object Delegates {
 
     private fun progress(tab: Tab) = object : ProgressDelegate {
         override fun onPageStart(session: GeckoSession, url: String) {
+            if (url == "about:blank") return
             if (tab === Browser.current) Bar.show()
             tab.loading = true
             tab.progress = 5

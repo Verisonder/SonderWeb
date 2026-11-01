@@ -36,6 +36,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("restore_tabs", true)
         set(v) = sp.edit().putBoolean("restore_tabs", v).apply()
 
+    /** Address bar at the top (like Chromium) or at the bottom. */
+    var barOnTop: Boolean
+        get() = sp.getBoolean("bar_top", true)
+        set(v) = sp.edit().putBoolean("bar_top", v).apply()
+
     /** 0 = follow the system, 1 = light, 2 = dark. */
     var theme: Int
         get() = sp.getInt("theme", 0)

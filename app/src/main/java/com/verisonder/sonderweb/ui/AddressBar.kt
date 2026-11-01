@@ -22,6 +22,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.History
@@ -75,78 +79,87 @@ fun submit(ui: UiState, text: String) {
 }
 
 @Composable
-fun AddressBar(ui: UiState, tab: Tab?) {
+fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
     val p = LocalPalette.current
     Column(Modifier.fillMaxWidth().background(p.bar)) {
-        if (tab != null && tab.loading && !ui.editing) LoadLine(tab.progress, p.accent) else Spacer(Modifier.height(2.dp))
+        val showLoad = tab != null && tab.loading && !ui.editing
+        if (!top) {
+            if (showLoad) LoadLine(tab!!.progress, p.accent) else Spacer(Modifier.height(2.dp))
+        }
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 8.dp),
+                .height(56.dp)
+                .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                Modifier
-                    .weight(1f)
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(p.field)
-                    .then(
-                        if (ui.editing) Modifier.border(1.5.dp, p.accent, RoundedCornerShape(22.dp)) else Modifier,
-                    )
-                    .clickable(enabled = !ui.editing) { startEditing(ui, tab) }
-                    .padding(start = 14.dp, end = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (ui.editing) {
-                    Icon(Icons.Outlined.Search, null, tint = p.mute, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(10.dp))
+            if (ui.editing) {
+                IconButtonSmall(Icons.AutoMirrored.Outlined.ArrowBack, "Cancel", size = 44) { ui.editing = false }
+                Row(
+                    Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(p.field)
+                        .padding(start = 16.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     EditField(ui, Modifier.weight(1f))
                     if (ui.query.text.isNotEmpty()) {
-                        IconButtonSmall(Icons.Outlined.Close, "Clear") { ui.query = TextFieldValue("") }
-                    }
-                } else {
-                    val icon = when {
-                        tab == null || tab.isBlank -> if (tab?.isPrivate == true) Icons.Outlined.VisibilityOff else Icons.Outlined.Search
-                        tab.isPrivate -> Icons.Outlined.VisibilityOff
-                        tab.secure -> Icons.Outlined.Lock
-                        else -> Icons.Outlined.Language
-                    }
-                    Icon(icon, null, tint = if (tab?.isPrivate == true) p.accent else p.mute, modifier = Modifier.size(17.dp))
-                    Spacer(Modifier.width(10.dp))
-                    val host = UrlText.host(tab?.url)
-                    Text(
-                        host.ifEmpty { if (tab?.isPrivate == true) "Private search or address" else "Search or type address" },
-                        color = if (host.isEmpty()) p.faint else p.text,
-                        fontSize = 15.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (tab != null && !tab.isBlank && Ublock.extension != null) {
-                        ShieldButton(tab)
+                        IconButtonSmall(Icons.Outlined.Close, "Clear", size = 32, tint = p.faint) { ui.query = TextFieldValue("") }
                     }
                 }
-            }
-            if (ui.editing) {
-                Text(
-                    "Cancel",
-                    color = p.text,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { ui.editing = false }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                )
+                Spacer(Modifier.width(8.dp))
             } else {
+                IconButtonSmall(Icons.Outlined.Home, "Home", size = 44, tint = p.mute) { tab?.let { Browser.home(it) } }
+                Omnibox(ui, tab, Modifier.weight(1f))
                 TabCountButton(Browser.tabs.count { it.isPrivate == (tab?.isPrivate ?: false) }) {
                     tab?.let { Delegates.capture(it) }
                     ui.panel = Panel.Tabs
                 }
-                IconButtonSmall(Icons.Outlined.MoreVert, "Menu", size = 44) { ui.menu = true }
+                Box {
+                    IconButtonSmall(Icons.Outlined.MoreVert, "Menu", size = 44, tint = p.mute) { ui.menu = true }
+                    if (tab != null) BrowserMenu(ui, tab)
+                }
             }
         }
+        if (top) {
+            if (showLoad) LoadLine(tab!!.progress, p.accent) else Spacer(Modifier.height(2.dp))
+        }
+    }
+}
+
+/** The rounded address field when not typing: site lock, the site's name, uBlock Origin's count. */
+@Composable
+private fun Omnibox(ui: UiState, tab: Tab?, modifier: Modifier) {
+    val p = LocalPalette.current
+    Row(
+        modifier
+            .height(40.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(p.field)
+            .clickable { startEditing(ui, tab) }
+            .padding(start = 14.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val icon = when {
+            tab == null || tab.isBlank -> if (tab?.isPrivate == true) Icons.Outlined.VisibilityOff else Icons.Outlined.Search
+            tab.isPrivate -> Icons.Outlined.VisibilityOff
+            tab.secure -> Icons.Outlined.Lock
+            else -> Icons.Outlined.Info
+        }
+        Icon(icon, null, tint = p.faint, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(10.dp))
+        val host = UrlText.host(tab?.url)
+        Text(
+            host.ifEmpty { "Search or type address" },
+            color = if (host.isEmpty()) p.faint else p.text,
+            fontSize = 15.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (tab != null && !tab.isBlank && Ublock.extension != null) ShieldButton(tab)
     }
 }
 
@@ -155,41 +168,52 @@ private fun EditField(ui: UiState, modifier: Modifier) {
     val p = LocalPalette.current
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
-    BasicTextField(
-        value = ui.query,
-        onValueChange = { ui.query = it },
-        singleLine = true,
-        textStyle = TextStyle(color = p.text, fontSize = 15.sp),
-        cursorBrush = SolidColor(p.accent),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Uri,
-            imeAction = ImeAction.Go,
-            autoCorrectEnabled = false,
-        ),
-        keyboardActions = KeyboardActions(onGo = { submit(ui, ui.query.text) }),
-        modifier = modifier.focusRequester(focus),
-    )
+    Box(modifier, contentAlignment = Alignment.CenterStart) {
+        if (ui.query.text.isEmpty()) Text("Search or type address", color = p.faint, fontSize = 15.sp, maxLines = 1)
+        BasicTextField(
+            value = ui.query,
+            onValueChange = { ui.query = it },
+            singleLine = true,
+            textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 15.sp),
+            cursorBrush = SolidColor(p.accent),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Uri,
+                imeAction = ImeAction.Go,
+                autoCorrectEnabled = false,
+            ),
+            keyboardActions = KeyboardActions(onGo = { submit(ui, ui.query.text) }),
+            modifier = Modifier.fillMaxWidth().focusRequester(focus),
+        )
+    }
 }
 
-/** uBlock Origin's button: a shield with the number of things it blocked on this page. */
+/** uBlock Origin's button: a small shield and the number it blocked on this page. */
 @Composable
 private fun ShieldButton(tab: Tab) {
     val p = LocalPalette.current
     Row(
         Modifier
+            .height(32.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable { Ublock.showPopup(tab) }
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Outlined.Shield, "uBlock Origin", tint = p.accent, modifier = Modifier.size(18.dp))
+        Icon(Icons.Outlined.Shield, "uBlock Origin", tint = p.mute, modifier = Modifier.size(16.dp))
         if (tab.blockedBadge.isNotEmpty()) {
             Spacer(Modifier.width(4.dp))
-            Text(tab.blockedBadge, color = p.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                tab.blockedBadge,
+                color = p.mute,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                style = TextStyle(lineHeight = 12.sp, lineHeightStyle = Centered),
+            )
         }
     }
 }
 
+/** Chromium's tab button: a rounded square with the number of tabs, centred. */
 @Composable
 private fun TabCountButton(count: Int, onClick: () -> Unit) {
     val p = LocalPalette.current
@@ -202,15 +226,17 @@ private fun TabCountButton(count: Int, onClick: () -> Unit) {
     ) {
         Box(
             Modifier
-                .size(22.dp)
-                .border(1.8.dp, p.text, RoundedCornerShape(6.dp)),
+                .size(20.dp)
+                .border(1.8.dp, p.mute, RoundedCornerShape(5.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 if (count > 99) ":D" else count.toString(),
-                color = p.text,
-                fontSize = 11.sp,
+                color = p.mute,
+                fontSize = if (count > 9) 9.sp else 11.sp,
                 fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                style = TextStyle(lineHeight = 11.sp, lineHeightStyle = Centered),
             )
         }
     }
@@ -232,7 +258,7 @@ fun IconButtonSmall(icon: ImageVector, label: String, size: Int = 36, tint: andr
 
 /** What typing in the bar offers: the search itself, !bangs, bookmarks and history. */
 @Composable
-fun Suggestions(ui: UiState, tab: Tab) {
+fun Suggestions(ui: UiState, tab: Tab, top: Boolean) {
     val p = LocalPalette.current
     val text = ui.query.text
     val resolved = remember(text) { AddressInput.resolve(text, Browser.prefs.engine()) }
@@ -254,7 +280,7 @@ fun Suggestions(ui: UiState, tab: Tab) {
                 .fillMaxSize()
                 .background(p.bg)
                 .clickable(interactionSource = null, indication = null) { },
-            reverseLayout = true,
+            reverseLayout = !top,
             verticalArrangement = Arrangement.Top,
         ) {
             if (resolved != null) {
@@ -321,7 +347,7 @@ private fun SuggestionRow(
                 .background(if (accent) p.accent else p.field),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, null, tint = if (accent) androidx.compose.ui.graphics.Color.White else p.mute, modifier = Modifier.size(16.dp))
+            Icon(icon, null, tint = if (accent) p.onAccent else p.mute, modifier = Modifier.size(16.dp))
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {

@@ -220,6 +220,16 @@ object Browser {
         if (current !== tab) select(tab)
     }
 
+    /** Home: the start page in this tab (back returns to the page you were on). */
+    fun home(tab: Tab) {
+        if (tab.isBlank) return
+        tab.url = ""
+        tab.title = ""
+        tab.loading = false
+        tab.pendingUrl = null
+        if (tab.ready) tab.session.loadUri("about:blank")
+    }
+
     fun setDesktop(tab: Tab, on: Boolean) {
         tab.desktop = on
         val s = tab.session.settings

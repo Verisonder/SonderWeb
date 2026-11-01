@@ -20,6 +20,9 @@ import com.verisonder.sonderweb.browser.Bar
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -94,6 +97,7 @@ fun BrowserScreen(activity: MainActivity) {
     }
 
     // ---- The sliding bar ----
+    val barTop = remember(ui.themeVersion) { Browser.prefs.barOnTop }
     var barPx by remember { mutableIntStateOf(0) }
     val barDp = with(LocalDensity.current) { barPx.toDp() }
     val pinned = ui.editing || ui.menu || tab == null || tab.isBlank || activity.inFullscreen
@@ -136,8 +140,11 @@ fun BrowserScreen(activity: MainActivity) {
                     .imePadding()
                     .clipToBounds(),
             ) {
-                // The page fills everything; the bar floats over its bottom edge and slides away
-                // while you scroll down. The engine is told how much of the page the bar covers.
+                // The page fills everything; the bar floats over its edge and slides away while
+                // you scroll down. The engine is told how much of the page the bar covers.
+                // Top bar: the page sits just under the visible part of the bar (its bottom
+                // runs off-screen by the same amount, which the engine accounts for).
+                val barSpace = if (barTop) PaddingValues(top = barDp) else PaddingValues(bottom = barDp)
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -145,23 +152,31 @@ fun BrowserScreen(activity: MainActivity) {
                 ) {
                     AndroidView(
                         factory = { activity.geckoView },
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .then(
+                                if (barTop && !activity.inFullscreen) {
+                                    Modifier.offset { IntOffset(0, (barPx - barOffset).roundToInt()) }
+                                } else {
+                                    Modifier
+                                },
+                            ),
                     )
                     if (tab != null && tab.isBlank) {
-                        Box(Modifier.fillMaxSize().padding(bottom = barDp)) { StartPage(ui) }
+                        Box(Modifier.fillMaxSize().padding(barSpace)) { StartPage(ui) }
                     }
                     if (ui.editing && tab != null) {
-                        Box(Modifier.fillMaxSize().padding(bottom = barDp)) { Suggestions(ui, tab) }
+                        Box(Modifier.fillMaxSize().padding(barSpace)) { Suggestions(ui, tab, barTop) }
                     }
                 }
                 if (!activity.inFullscreen) {
                     Box(
                         Modifier
-                            .align(Alignment.BottomCenter)
+                            .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
                             .onSizeChanged { barPx = it.height }
-                            .graphicsLayer { translationY = barOffset },
+                            .graphicsLayer { translationY = if (barTop) -barOffset else barOffset },
                     ) {
-                        AddressBar(ui, tab)
+                        AddressBar(ui, tab, barTop)
                     }
                 }
             }
@@ -171,7 +186,7 @@ fun BrowserScreen(activity: MainActivity) {
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(bottom = 72.dp),
+                    .padding(bottom = if (barTop) 16.dp else 72.dp),
             ) { data ->
                 Snackbar(
                     data,
@@ -205,7 +220,6 @@ fun BrowserScreen(activity: MainActivity) {
                 }
             }
 
-            if (ui.menu && tab != null) MenuSheet(ui, tab)
             ContextMenu.request?.let { ContextSheet(it) }
             Ublock.popup?.let { UblockSheet(it) }
             Prompts.queue.firstOrNull { it.tab === tab }?.let { PromptDialog(it) }

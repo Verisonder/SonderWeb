@@ -1,43 +1,36 @@
 package com.verisonder.sonderweb.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddCircleOutline
-import androidx.compose.material.icons.outlined.Bookmark
-import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Collections
-import androidx.compose.material.icons.outlined.Computer
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,7 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verisonder.sonderweb.browser.Browser
@@ -57,79 +49,77 @@ import com.verisonder.sonderweb.browser.Ublock
 import com.verisonder.sonderweb.core.UrlText
 import com.verisonder.sonderweb.data.Shortcut
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** The ⋮ menu, Chromium style: a row of page actions, then a plain list. */
 @Composable
-fun MenuSheet(ui: UiState, tab: Tab) {
+fun BrowserMenu(ui: UiState, tab: Tab) {
     val p = LocalPalette.current
-    val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val web = UrlText.isWeb(tab.url)
-    var bookmarked by remember(tab.url) { mutableStateOf(web && Browser.db.isBookmarked(tab.url)) }
+    var bookmarked by remember(tab.url, ui.menu) { mutableStateOf(web && Browser.db.isBookmarked(tab.url)) }
     val close = { ui.menu = false }
 
-    ModalBottomSheet(
+    DropdownMenu(
+        expanded = ui.menu,
         onDismissRequest = close,
-        sheetState = state,
-        containerColor = p.bar,
-        contentColor = p.text,
-        dragHandle = null,
+        shape = RoundedCornerShape(8.dp),
+        containerColor = p.card,
+        modifier = Modifier.widthIn(min = 240.dp),
     ) {
-        Column(Modifier.navigationBarsPadding().padding(bottom = 8.dp)) {
-            if (web) {
-                Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 6.dp)) {
-                    Text(tab.displayTitle, color = p.text, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(UrlText.host(tab.url), color = p.faint, fontSize = 12.sp, maxLines = 1)
-                }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            TopAction(Icons.AutoMirrored.Outlined.ArrowForward, "Forward", tab.canGoForward) {
+                tab.session.goForward()
+                close()
             }
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+            TopAction(
+                if (bookmarked) Icons.Outlined.Star else Icons.Outlined.StarBorder,
+                if (bookmarked) "Remove bookmark" else "Bookmark",
+                web && !tab.isPrivate,
+                tint = if (bookmarked) p.accent else null,
             ) {
-                QuickAction(Icons.AutoMirrored.Outlined.ArrowBack, "Back", tab.canGoBack) {
-                    tab.session.goBack()
-                    close()
-                }
-                QuickAction(Icons.AutoMirrored.Outlined.ArrowForward, "Forward", tab.canGoForward) {
-                    tab.session.goForward()
-                    close()
-                }
-                QuickAction(
-                    if (tab.loading) Icons.Outlined.Close else Icons.Outlined.Refresh,
-                    if (tab.loading) "Stop" else "Reload",
-                    !tab.isBlank,
-                ) {
-                    if (tab.loading) tab.session.stop() else tab.session.reload()
-                    close()
-                }
-                QuickAction(
-                    if (bookmarked) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
-                    if (bookmarked) "Saved" else "Bookmark",
-                    web && !tab.isPrivate,
-                    tint = if (bookmarked) p.accent else null,
-                ) {
-                    if (bookmarked) Browser.db.removeBookmark(tab.url) else Browser.db.addBookmark(tab.url, tab.title)
-                    bookmarked = !bookmarked
-                }
-                QuickAction(Icons.Outlined.Share, "Share", web) {
-                    Browser.host?.share(tab.url, tab.title)
-                    close()
-                }
+                if (bookmarked) Browser.db.removeBookmark(tab.url) else Browser.db.addBookmark(tab.url, tab.title)
+                bookmarked = !bookmarked
             }
-            Spacer(Modifier.height(4.dp))
-            Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(1.dp).background(p.line))
-            Spacer(Modifier.height(4.dp))
-
-            MenuRow(Icons.Outlined.Add, "New tab") {
-                Browser.newTab(null, isPrivate = false)
+            TopAction(Icons.Outlined.Share, "Share", web) {
+                Browser.host?.share(tab.url, tab.title)
                 close()
             }
-            MenuRow(Icons.Outlined.VisibilityOff, "New private tab") {
-                Browser.newTab(null, isPrivate = true)
+            TopAction(
+                if (tab.loading) Icons.Outlined.Close else Icons.Outlined.Refresh,
+                if (tab.loading) "Stop" else "Reload",
+                !tab.isBlank,
+            ) {
+                if (tab.loading) tab.session.stop() else tab.session.reload()
                 close()
             }
-            if (web && !tab.isPrivate) {
-                MenuRow(Icons.Outlined.AddCircleOutline, "Add to start page") {
+        }
+        HorizontalDivider(color = p.line)
+        Item("New tab") {
+            Browser.newTab(null, isPrivate = false)
+            close()
+        }
+        Item("New private tab") {
+            Browser.newTab(null, isPrivate = true)
+            close()
+        }
+        HorizontalDivider(color = p.line)
+        Item("History", Icons.Outlined.History) {
+            ui.panel = Panel.History
+            close()
+        }
+        Item("Downloads", Icons.Outlined.Download) {
+            ui.panel = Panel.Downloads
+            close()
+        }
+        Item("Bookmarks", Icons.Outlined.Collections) {
+            ui.panel = Panel.Bookmarks
+            close()
+        }
+        if (web) {
+            HorizontalDivider(color = p.line)
+            if (!tab.isPrivate) {
+                Item("Add to start page", Icons.Outlined.AddCircleOutline) {
                     val list = Browser.prefs.shortcuts
                     if (list.none { UrlText.host(it.url) == UrlText.host(tab.url) }) {
                         Browser.prefs.shortcuts = list + Shortcut(tab.url, tab.title.take(24).ifBlank { UrlText.host(tab.url) })
@@ -140,52 +130,44 @@ fun MenuSheet(ui: UiState, tab: Tab) {
                     close()
                 }
             }
-            MenuRow(Icons.Outlined.Collections, "Bookmarks") {
-                ui.panel = Panel.Bookmarks
-                close()
-            }
-            MenuRow(Icons.Outlined.History, "History") {
-                ui.panel = Panel.History
-                close()
-            }
-            MenuRow(Icons.Outlined.Download, "Downloads") {
-                ui.panel = Panel.Downloads
-                close()
-            }
-            if (web) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { Browser.setDesktop(tab, !tab.desktop) }
-                        .padding(horizontal = 20.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Outlined.Computer, null, tint = p.mute, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(18.dp))
-                    Text("Desktop site", color = p.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                    Switch(
-                        checked = tab.desktop,
-                        onCheckedChange = { Browser.setDesktop(tab, it) },
-                        colors = SwitchDefaults.colors(checkedTrackColor = p.accent),
+            DropdownMenuItem(
+                text = { Text("Desktop site", fontSize = 15.sp, color = p.text) },
+                onClick = { Browser.setDesktop(tab, !tab.desktop) },
+                trailingIcon = {
+                    Checkbox(
+                        tab.desktop,
+                        { Browser.setDesktop(tab, it) },
+                        colors = CheckboxDefaults.colors(checkedColor = p.accent),
                     )
-                }
-            }
-            if (Ublock.extension != null) {
-                MenuRow(Icons.Outlined.Shield, "uBlock Origin settings") {
-                    Ublock.openDashboard()
-                    close()
-                }
-            }
-            MenuRow(Icons.Outlined.Settings, "Settings") {
-                ui.panel = Panel.Settings
+                },
+            )
+        }
+        HorizontalDivider(color = p.line)
+        if (Ublock.extension != null) {
+            Item("uBlock Origin", Icons.Outlined.Shield) {
+                Ublock.openDashboard()
                 close()
             }
+        }
+        Item("Settings", Icons.Outlined.Settings) {
+            ui.panel = Panel.Settings
+            close()
         }
     }
 }
 
 @Composable
-private fun QuickAction(
+private fun Item(label: String, icon: ImageVector? = null, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    DropdownMenuItem(
+        text = { Text(label, fontSize = 15.sp, color = p.text) },
+        onClick = onClick,
+        leadingIcon = icon?.let { { Icon(it, null, tint = p.mute, modifier = Modifier.size(20.dp)) } },
+    )
+}
+
+@Composable
+private fun TopAction(
     icon: ImageVector,
     label: String,
     enabled: Boolean,
@@ -193,29 +175,19 @@ private fun QuickAction(
     onClick: () -> Unit,
 ) {
     val p = LocalPalette.current
-    Column(
+    Box(
         Modifier
-            .width(64.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .size(48.dp)
+            .clip(RoundedCornerShape(24.dp))
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 8.dp)
             .alpha(if (enabled) 1f else 0.35f),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(p.field),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, label, tint = tint ?: p.text, modifier = Modifier.size(21.dp))
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(label, color = p.mute, fontSize = 11.sp, maxLines = 1)
+        Icon(icon, label, tint = tint ?: p.mute, modifier = Modifier.size(22.dp))
     }
 }
 
+/** A plain menu row with an icon (used by the long-press sheet). */
 @Composable
 fun MenuRow(icon: ImageVector, label: String, tint: androidx.compose.ui.graphics.Color? = null, onClick: () -> Unit) {
     val p = LocalPalette.current

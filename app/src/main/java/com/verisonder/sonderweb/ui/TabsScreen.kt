@@ -129,9 +129,9 @@ fun TabsScreen(ui: UiState) {
                     .padding(horizontal = 18.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Outlined.Add, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Add, null, tint = p.onAccent, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(if (privateMode) "Private tab" else "New tab", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (privateMode) "Private tab" else "New tab", color = p.onAccent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -222,7 +222,7 @@ fun Segmented(options: List<String>, selected: Int, accent: Color, onSelect: (In
             val on = i == selected
             Text(
                 label,
-                color = if (on) Color.White else p.mute,
+                color = if (on) p.onAccent else p.mute,
                 fontSize = 13.sp,
                 fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
                 modifier = Modifier

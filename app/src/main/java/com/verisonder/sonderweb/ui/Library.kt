@@ -92,7 +92,7 @@ fun PageHeader(
                         query,
                         onQuery,
                         singleLine = true,
-                        textStyle = TextStyle(color = p.text, fontSize = 15.sp),
+                        textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 15.sp),
                         cursorBrush = SolidColor(p.accent),
                         modifier = Modifier.fillMaxWidth(),
                     )

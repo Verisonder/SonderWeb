@@ -66,6 +66,7 @@ fun SettingsScreen(ui: UiState) {
     var history by remember { mutableStateOf(prefs.saveHistory) }
     var restore by remember { mutableStateOf(prefs.restoreTabs) }
     var theme by remember { mutableStateOf(prefs.theme) }
+    var barTop by remember { mutableStateOf(prefs.barOnTop) }
     var clearing by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
@@ -104,7 +105,7 @@ fun SettingsScreen(ui: UiState) {
                                 prefs.customSearch = it
                             },
                             singleLine = true,
-                            textStyle = TextStyle(color = p.text, fontSize = 14.sp),
+                            textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 14.sp),
                             cursorBrush = SolidColor(p.accent),
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -153,6 +154,17 @@ fun SettingsScreen(ui: UiState) {
             Hint("Tap the shield in the address bar to see what a page blocked, or to turn blocking off for that site.")
 
             Section("Look")
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Address bar", color = p.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                Segmented(listOf("Top", "Bottom"), if (barTop) 0 else 1, p.accent) {
+                    barTop = it == 0
+                    prefs.barOnTop = barTop
+                    ui.themeVersion++
+                }
+            }
             Choice("Follow the system", theme == 0) { theme = 0; prefs.theme = 0; Browser.applySettings(); ui.themeVersion++ }
             Choice("Light", theme == 1) { theme = 1; prefs.theme = 1; Browser.applySettings(); ui.themeVersion++ }
             Choice("Dark", theme == 2) { theme = 2; prefs.theme = 2; Browser.applySettings(); ui.themeVersion++ }
@@ -279,7 +291,7 @@ private fun Choice(label: String, on: Boolean, onClick: () -> Unit) {
                 .background(if (on) p.accent else p.field),
             contentAlignment = Alignment.Center,
         ) {
-            if (on) Box(Modifier.size(8.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.White))
+            if (on) Box(Modifier.size(8.dp).clip(CircleShape).background(p.onAccent))
         }
     }
 }
@@ -411,7 +423,7 @@ private fun SettingsField(value: String, placeholder: String, onChange: (String)
             value,
             onChange,
             singleLine = true,
-            textStyle = TextStyle(color = p.text, fontSize = 14.sp),
+            textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 14.sp),
             cursorBrush = SolidColor(p.accent),
             modifier = Modifier.fillMaxWidth(),
         )
