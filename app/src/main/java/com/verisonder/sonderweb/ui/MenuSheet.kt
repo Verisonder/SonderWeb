@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Computer
 import androidx.compose.material.icons.outlined.FindInPage
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -172,11 +173,9 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
             )
         }
         Divider()
-        if (Ublock.extension != null) {
-            Item("uBlock Origin", Icons.Outlined.Shield) {
-                Ublock.openDashboard()
-                close()
-            }
+        Item("Extensions", Icons.Outlined.Extension) {
+            ui.panel = Panel.Extensions
+            close()
         }
         Item("Settings", Icons.Outlined.Settings) {
             ui.panel = Panel.Settings

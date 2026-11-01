@@ -77,12 +77,15 @@ object Browser {
             .loginAutofillEnabled(false)
             .webManifest(true)
             .extensionsProcessEnabled(true)
+            // Lets addons.mozilla.org's "Add to Firefox" buttons install extensions here.
+            .extensionsWebAPIEnabled(true)
             .preferredColorScheme(colorScheme())
             .allowInsecureConnections(insecureMode())
             .build()
 
         Bar.setMode(prefs.barHide)
         runtime = GeckoRuntime.create(app, settings)
+        Extensions.setup()
         Ublock.install(runtime)
         restoreTabs()
     }

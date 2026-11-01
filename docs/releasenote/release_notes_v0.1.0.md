@@ -2,7 +2,7 @@
 
 The first version.
 
-- Firefox's engine with uBlock Origin built in. Tap the shield in the address bar to see what a page blocked.
+- Firefox's engine with uBlock Origin built in. Tap the shield in the address bar to see what a page blocked. Add more extensions from addons.mozilla.org (⋮ › Extensions).
 - Pages use the whole screen: the address bar shrinks into a small button you tap to bring it back, and the phone status bar is hidden (both adjustable in Settings › Appearance).
 - A start page with the time, a greeting with your name, the weather and the shortcuts you add.
 - Search with !bangs: `!w`, `!yt`, `!gh` and more, before or after your words.

@@ -28,7 +28,7 @@ object Delegates {
                 Bar.onScroll(tab, scrollY)
             }
         })
-        Ublock.attach(tab)
+        Extensions.attach(tab)
     }
 
     private fun navigation(tab: Tab) = object : NavigationDelegate {
@@ -130,6 +130,13 @@ object Delegates {
         }
 
         override fun onExternalResponse(session: GeckoSession, response: WebResponse) {
+            val type = response.headers.entries.firstOrNull { it.key.equals("Content-Type", true) }?.value.orEmpty()
+            if (type.startsWith("application/x-xpinstall") || response.uri.substringBefore('?').endsWith(".xpi")) {
+                // An extension: add it instead of downloading the file.
+                runCatching { response.body?.close() }
+                Extensions.installFrom(response.uri)
+                return
+            }
             Downloads.save(response, tab.isPrivate)
         }
 

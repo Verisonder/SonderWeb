@@ -67,7 +67,7 @@ import com.verisonder.sonderweb.browser.Delegates
 import com.verisonder.sonderweb.browser.Prompts
 import com.verisonder.sonderweb.browser.Ublock
 
-enum class Panel { None, Tabs, History, Bookmarks, Downloads, Settings }
+enum class Panel { None, Tabs, History, Bookmarks, Downloads, Settings, Extensions }
 
 /** Screen state that isn't the browser's own. */
 class UiState {
@@ -291,6 +291,7 @@ fun BrowserScreen(activity: MainActivity) {
                         Panel.Bookmarks -> BookmarksScreen(ui)
                         Panel.Downloads -> DownloadsScreen(ui)
                         Panel.Settings -> SettingsScreen(ui)
+                        Panel.Extensions -> ExtensionsScreen(ui)
                         Panel.None -> Unit
                     }
                 }
@@ -299,6 +300,7 @@ fun BrowserScreen(activity: MainActivity) {
             ContextMenu.request?.let { ContextSheet(it) }
             Ublock.popup?.let { UblockSheet(it) }
             Prompts.queue.firstOrNull { it.tab === tab }?.let { PromptDialog(it) }
+            com.verisonder.sonderweb.browser.Extensions.pending?.let { InstallDialog(it) }
         }
     }
 }

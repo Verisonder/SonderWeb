@@ -38,6 +38,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Palette
@@ -82,7 +83,7 @@ import org.mozilla.geckoview.StorageController
 /** Settings pages, Brave-style: a grouped list on the first page, details one tap away. */
 private enum class Page(val title: String) {
     Privacy("Privacy & security"),
-    Shields("uBlock Origin"),
+    Shields("Extensions"),
     Start("Start page"),
     Search("Search engine"),
     Look("Appearance"),
@@ -99,6 +100,8 @@ private val index: List<Pair<String, Page>> = listOf(
     "Cookies" to Page.Privacy,
     "uBlock Origin filters" to Page.Shields,
     "Ad blocker" to Page.Shields,
+    "Extensions" to Page.Shields,
+    "Add-ons" to Page.Shields,
     "Your name" to Page.Start,
     "Weather" to Page.Start,
     "City" to Page.Start,
@@ -240,8 +243,8 @@ private fun MainPage(
     Group {
         NavRow(Icons.Outlined.Security, "Privacy & security", null, first = true) { onOpen(Page.Privacy) }
         NavRow(
-            Icons.Outlined.Shield,
-            "uBlock Origin",
+            Icons.Outlined.Extension,
+            "Extensions",
             ublockStatus(),
         ) { onOpen(Page.Shields) }
         NavRow(Icons.Outlined.Dashboard, "Start page", null, last = true) { onOpen(Page.Start) }
@@ -267,14 +270,16 @@ private fun MainPage(
 }
 
 private fun ublockStatus(): String = when {
-    Ublock.extension != null -> "On · version " + BuildConfig.UBLOCK_VERSION
+    Ublock.extension != null -> com.verisonder.sonderweb.browser.Extensions.list.size.let { n ->
+        if (n > 1) "uBlock Origin and ${n - 1} more" else "uBlock Origin " + BuildConfig.UBLOCK_VERSION
+    }
     Ublock.error != null -> "Couldn't start: " + Ublock.error
     else -> "Starting…"
 }
 
 private fun iconFor(page: Page): ImageVector = when (page) {
     Page.Privacy -> Icons.Outlined.Security
-    Page.Shields -> Icons.Outlined.Shield
+    Page.Shields -> Icons.Outlined.Extension
     Page.Start -> Icons.Outlined.Dashboard
     Page.Search -> Icons.Outlined.Search
     Page.Look -> Icons.Outlined.Palette
@@ -326,17 +331,13 @@ private fun PrivacyPage(onClear: () -> Unit) {
 private fun ShieldsPage(ui: UiState) {
     Spacer(Modifier.height(8.dp))
     Group {
-        Action(
-            "Filters and settings",
-            ublockStatus(),
-        ) {
-            if (Ublock.extension != null) {
-                ui.panel = Panel.None
-                Ublock.openDashboard()
-            }
+        Action("Manage extensions", ublockStatus()) { ui.panel = Panel.Extensions }
+        Action("Get more extensions", "From addons.mozilla.org") {
+            ui.panel = Panel.None
+            Browser.newTab(com.verisonder.sonderweb.browser.Extensions.GET_MORE, isPrivate = false)
         }
     }
-    Hint("Tap the shield in the address bar to see what a page blocked, or to turn blocking off for that site.")
+    Hint("Tap the shield in the address bar to see what uBlock Origin blocked on a page, or to turn it off for that site.")
 }
 
 @Composable
