@@ -40,6 +40,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.composed
+import androidx.compose.ui.layout.onSizeChanged
+import kotlin.math.roundToInt
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -175,7 +179,11 @@ fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
                     Spacer(Modifier.weight(1f))
                 } else {
                     IconButtonSmall(Icons.Outlined.Home, "Home", size = 44, tint = p.mute) { Browser.home(tab) }
-                    Omnibox(ui, tab, Modifier.weight(1f))
+                    val picker = rememberTabPicker(tab, top)
+                    Box(Modifier.weight(1f)) {
+                        Omnibox(ui, tab, Modifier.fillMaxWidth(), picker)
+                        TabPickerPopup(picker)
+                    }
                 }
                 TabCountButton(
                     Browser.tabs.count { it.isPrivate == (tab?.isPrivate ?: false) },
@@ -284,14 +292,14 @@ private fun RowScope.FindBar(ui: UiState, tab: Tab) {
 
 /** The rounded address field when not typing: site lock, the site's name, uBlock Origin's count. */
 @Composable
-private fun Omnibox(ui: UiState, tab: Tab?, modifier: Modifier) {
+private fun Omnibox(ui: UiState, tab: Tab?, modifier: Modifier, picker: TabPicker? = null) {
     val p = LocalPalette.current
     Row(
         modifier
             .height(40.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(p.field)
-            .clickable { startEditing(ui, tab) }
+            .then(if (picker != null) Modifier.tabPicker(picker) { startEditing(ui, tab) } else Modifier.clickable { startEditing(ui, tab) })
             .padding(start = 14.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -593,6 +601,159 @@ private fun SuggestionRow(
         }
         if (fill && onFill != null) {
             IconButtonSmall(Icons.Outlined.NorthWest, "Edit", tint = p.faint) { onFill() }
+        }
+    }
+}
+
+/**
+ * Hold the address and a list of your open tabs pops out; slide onto one and let go to switch
+ * to it, all in one movement (like holding the tabs button for a new tab).
+ */
+class TabPicker(val top: Boolean, val rowPx: Float, val gapPx: Float, val padPx: Float) {
+    var open by mutableStateOf(false)
+    var tabs by mutableStateOf<List<Tab>>(emptyList())
+    var hover by mutableStateOf(-1)
+    var anchorH by mutableStateOf(0f)
+    val listH get() = tabs.size * rowPx + 2 * padPx
+
+    /** Which row is under the finger ([y] relative to the address field), or -1. */
+    fun rowAt(y: Float): Int {
+        val listTop = if (top) anchorH + gapPx else -(gapPx + listH)
+        val i = kotlin.math.floor((y - listTop - padPx) / rowPx).toInt()
+        return if (i in tabs.indices) i else -1
+    }
+}
+
+private const val PICKER_MAX = 7
+
+@Composable
+fun rememberTabPicker(tab: Tab?, top: Boolean): TabPicker {
+    val d = LocalDensity.current
+    return remember(top, d) { with(d) { TabPicker(top, 52.dp.toPx(), 10.dp.toPx(), 6.dp.toPx()) } }
+}
+
+private fun Modifier.tabPicker(picker: TabPicker, onTap: () -> Unit): Modifier = composed {
+    val haptics = LocalHapticFeedback.current
+    val tap by rememberUpdatedState(onTap)
+    this
+        .onSizeChanged { picker.anchorH = it.height.toFloat() }
+        .pointerInput(picker) {
+            val slop = viewConfiguration.touchSlop
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                var moved = false
+                var released = false
+                var consumedUp = false
+                withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                    while (true) {
+                        val c = awaitPointerEvent().changes.first()
+                        if ((c.position - down.position).getDistance() > slop) moved = true
+                        if (!c.pressed) {
+                            released = true
+                            consumedUp = c.isConsumed
+                            break
+                        }
+                    }
+                }
+                if (released) {
+                    // A tap (not one the uBlock shield inside already took) opens the address for typing.
+                    if (!moved && !consumedUp) tap()
+                    return@awaitEachGesture
+                }
+                if (moved) return@awaitEachGesture
+                val cur = Browser.current
+                val same = Browser.tabs.filter { it.isPrivate == (cur?.isPrivate ?: false) }
+                val at = same.indexOf(cur).coerceAtLeast(0)
+                val from = (at - PICKER_MAX / 2).coerceIn(0, (same.size - PICKER_MAX).coerceAtLeast(0))
+                picker.tabs = same.drop(from).take(PICKER_MAX)
+                picker.hover = -1
+                picker.open = true
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                while (true) {
+                    val c = awaitPointerEvent().changes.first()
+                    val i = picker.rowAt(c.position.y)
+                    if (i != picker.hover) {
+                        picker.hover = i
+                        if (i >= 0) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
+                    c.consume()
+                    if (!c.pressed) break
+                }
+                picker.tabs.getOrNull(picker.hover)?.let { if (it !== Browser.current) Browser.select(it) }
+                picker.open = false
+                picker.hover = -1
+            }
+        }
+}
+
+@Composable
+fun TabPickerPopup(picker: TabPicker) {
+    val p = LocalPalette.current
+    val show by animateFloatAsState(if (picker.open) 1f else 0f, spring(dampingRatio = 0.75f, stiffness = 520f), label = "picker")
+    if (show < 0.01f || picker.tabs.isEmpty()) return
+    val y = if (picker.top) picker.anchorH + picker.gapPx else -(picker.gapPx + picker.listH)
+    Popup(
+        alignment = Alignment.TopStart,
+        offset = IntOffset(0, y.roundToInt()),
+        properties = PopupProperties(focusable = false, clippingEnabled = false),
+    ) {
+        val shape = RoundedCornerShape(22.dp)
+        Column(
+            Modifier
+                .graphicsLayer {
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, if (picker.top) 0f else 1f)
+                    val k = 0.85f + 0.15f * show
+                    scaleX = k
+                    scaleY = k
+                    alpha = show.coerceIn(0f, 1f)
+                }
+                .width(300.dp)
+                .shadow(14.dp, shape)
+                .clip(shape)
+                .background(p.card)
+                .padding(vertical = 6.dp),
+        ) {
+            picker.tabs.forEachIndexed { i, t ->
+                val lit = i == picker.hover
+                val bg by androidx.compose.animation.animateColorAsState(if (lit) p.accent.copy(alpha = 0.22f) else androidx.compose.ui.graphics.Color.Transparent, tween(90), label = "row")
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .padding(horizontal = 6.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(bg)
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val host = UrlText.host(t.url)
+                    Box(
+                        Modifier.size(28.dp).clip(CircleShape).background(p.field),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            if (t.isBlank) "+" else host.firstOrNull()?.uppercase() ?: "•",
+                            color = p.mute,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            if (t.isBlank) "New tab" else t.displayTitle,
+                            color = if (lit) p.accent else p.text,
+                            fontSize = 15.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (!t.isBlank) Text(host, color = p.faint, fontSize = 12.sp, maxLines = 1)
+                    }
+                    if (t === Browser.current) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(p.accent))
+                    }
+                }
+            }
         }
     }
 }
