@@ -86,7 +86,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
         super.onCreate(savedInstanceState)
         Browser.start(this)
         Browser.host = this
-        geckoView = GeckoView(this)
+        geckoView = com.verisonder.sonderweb.browser.PullGeckoView(this)
 
         setContent { BrowserScreen(this) }
         applySystemBars()

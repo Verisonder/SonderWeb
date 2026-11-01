@@ -25,6 +25,8 @@ import androidx.compose.ui.platform.LocalDensity
 import com.verisonder.sonderweb.browser.Bar
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.outlined.Refresh
+import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -237,6 +239,9 @@ fun BrowserScreen(activity: MainActivity) {
                                 },
                             ),
                     )
+                    if (tab != null && !tab.isBlank && !activity.inFullscreen) {
+                        PullIndicator(tab) { safeTop + if (barTop) (overPage - overOffset()).roundToInt() else 0 }
+                    }
                     // Opening the start page covers the engine view at once, so the previous page
                     // never shows through while the start page fades in.
                     if (tab != null && tab.isBlank) Box(Modifier.fillMaxSize().background(palette.bg))
@@ -544,6 +549,74 @@ private fun SwipeToCompact(enabled: Boolean, content: @Composable () -> Unit) {
                 }
             },
     ) { content() }
+}
+
+/**
+ * The pull-to-refresh badge: drops in from the page's top edge as you pull, the arrow turning
+ * with it; past the line it fills with the accent colour, and on release it spins until the page
+ * has reloaded.
+ */
+@Composable
+private fun BoxScope.PullIndicator(tab: com.verisonder.sonderweb.browser.Tab, pageTop: () -> Int) {
+    val p = LocalPalette.current
+    val density = LocalDensity.current
+    val pull = com.verisonder.sonderweb.browser.PullToRefresh
+    val threshold = with(density) { 72.dp.toPx() }
+    LaunchedEffect(threshold) { pull.threshold = threshold }
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val armed = pull.pull >= threshold
+    LaunchedEffect(armed) { if (armed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+    // While reloading the badge rests just below the top; otherwise it follows the finger.
+    val shown by animateFloatAsState(
+        targetValue = if (pull.refreshing) threshold * 0.9f else pull.pull,
+        animationSpec = if (pull.pull > 0f) spring(stiffness = 4000f) else spring(dampingRatio = 0.8f, stiffness = 380f),
+        label = "pull",
+    )
+    // The reload is done when the page stops loading (or after a few seconds at most).
+    LaunchedEffect(pull.refreshing) {
+        if (!pull.refreshing) return@LaunchedEffect
+        kotlinx.coroutines.delay(400)
+        kotlinx.coroutines.withTimeoutOrNull(8000) {
+            androidx.compose.runtime.snapshotFlow { tab.loading }.first { !it }
+        }
+        pull.refreshing = false
+    }
+    if (shown < 1f && !pull.refreshing) return
+    val size = 40.dp
+    Box(
+        Modifier
+            .align(Alignment.TopCenter)
+            .offset { IntOffset(0, pageTop() + (shown - with(density) { size.toPx() }).roundToInt()) }
+            .graphicsLayer {
+                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                alpha = (shown / (threshold * 0.6f)).coerceIn(0f, 1f)
+                val k = 0.6f + 0.4f * (shown / threshold).coerceIn(0f, 1f)
+                scaleX = k
+                scaleY = k
+            }
+            .size(size)
+            .shadow(6.dp, CircleShape)
+            .clip(CircleShape)
+            .background(if (armed || pull.refreshing) p.accent else p.field),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (pull.refreshing) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                color = p.onAccent,
+                strokeWidth = 2.5.dp,
+            )
+        } else {
+            androidx.compose.material3.Icon(
+                androidx.compose.material.icons.Icons.Outlined.Refresh,
+                "Reload",
+                tint = if (armed) p.onAccent else p.text,
+                modifier = Modifier
+                    .size(22.dp)
+                    .graphicsLayer { rotationZ = 300f * (shown / threshold).coerceIn(0f, 1.2f) },
+            )
+        }
+    }
 }
 
 /** [DraggableBarButton]'s corner value for the free (advanced) position. */
