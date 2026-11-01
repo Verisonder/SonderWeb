@@ -2,6 +2,9 @@ package com.verisonder.sonderweb.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
@@ -38,7 +41,6 @@ import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -76,15 +78,7 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
 
     // The menu keeps its normal size however big the bar is.
     Unscaled {
-        DropdownMenu(
-            expanded = ui.menu,
-            onDismissRequest = close,
-            shape = RoundedCornerShape(26.dp),
-            containerColor = p.card,
-            tonalElevation = 0.dp,
-            shadowElevation = 12.dp,
-            modifier = Modifier.width(290.dp),
-        ) {
+        MenuPopup(expanded = ui.menu, top = top, onDismiss = close) {
             val actions: @Composable () -> Unit = {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
@@ -285,4 +279,81 @@ fun UpdateDot(modifier: Modifier = Modifier) {
             .clip(androidx.compose.foundation.shape.CircleShape)
             .background(LocalPalette.current.accent),
     )
+}
+
+/**
+ * The menu's card, in its own popup: the popup window has room around the card, so its shadow
+ * is drawn whole (the standard dropdown cut it off at the edge). Opens from the ⋮ button's corner.
+ */
+@Composable
+private fun MenuPopup(
+    expanded: Boolean,
+    top: Boolean,
+    onDismiss: () -> Unit,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    val state = remember { androidx.compose.animation.core.MutableTransitionState(false) }
+    state.targetState = expanded
+    if (!state.currentState && !state.targetState && state.isIdle) return
+    val p = LocalPalette.current
+    val d = androidx.compose.ui.platform.LocalDensity.current
+    val margin = 20.dp
+    val marginPx = with(d) { margin.roundToPx() }
+    val gapPx = with(d) { 4.dp.roundToPx() }
+    val maxH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 96.dp
+    val origin = androidx.compose.ui.graphics.TransformOrigin(0.9f, if (top) 0f else 1f)
+    val shape = RoundedCornerShape(26.dp)
+    androidx.compose.ui.window.Popup(
+        popupPositionProvider = remember(top, marginPx, gapPx) {
+            object : androidx.compose.ui.window.PopupPositionProvider {
+                override fun calculatePosition(
+                    anchorBounds: androidx.compose.ui.unit.IntRect,
+                    windowSize: androidx.compose.ui.unit.IntSize,
+                    layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+                    popupContentSize: androidx.compose.ui.unit.IntSize,
+                ): androidx.compose.ui.unit.IntOffset {
+                    val x = (anchorBounds.right - popupContentSize.width + marginPx)
+                        .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+                    val y = if (top) {
+                        anchorBounds.bottom + gapPx - marginPx
+                    } else {
+                        anchorBounds.top - gapPx - popupContentSize.height + marginPx
+                    }
+                    return androidx.compose.ui.unit.IntOffset(x, y.coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0)))
+                }
+            }
+        },
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+    ) {
+        androidx.compose.animation.AnimatedVisibility(
+            visibleState = state,
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(120)) +
+                androidx.compose.animation.scaleIn(
+                    androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 650f),
+                    initialScale = 0.88f,
+                    transformOrigin = origin,
+                ),
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(110)) +
+                androidx.compose.animation.scaleOut(
+                    androidx.compose.animation.core.tween(130),
+                    targetScale = 0.94f,
+                    transformOrigin = origin,
+                ),
+        ) {
+            androidx.compose.foundation.layout.Box(Modifier.padding(margin)) {
+                androidx.compose.foundation.layout.Column(
+                    Modifier
+                        .width(290.dp)
+                        .heightIn(max = maxH)
+                        .shadow(12.dp, shape)
+                        .clip(shape)
+                        .background(p.card)
+                        .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                        .padding(vertical = 8.dp),
+                    content = content,
+                )
+            }
+        }
+    }
 }
