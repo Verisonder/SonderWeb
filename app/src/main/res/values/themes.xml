@@ -6,7 +6,7 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
     <color name="bg">#FFFFFF</color>
-    <color name="icon_bg">#0B0B0C</color>
+    <color name="icon_bg">#202124</color>
     <color name="icon_fg">#FFFFFF</color>
     <color name="icon_accent">#3B82FF</color>
 </resources>

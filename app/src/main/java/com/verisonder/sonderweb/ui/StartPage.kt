@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -74,14 +75,28 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** The ring-and-dot mark (same as the app icon). */
+/** The SonderWeb mark: a blue glass sphere with two highlights (same as the app icon). */
 @Composable
-fun Mark(size: Int, ring: Color, dot: Color) {
+fun Mark(size: Int, @Suppress("UNUSED_PARAMETER") ring: Color = Color.White, @Suppress("UNUSED_PARAMETER") dot: Color = Color.White) {
     Canvas(Modifier.size(size.dp)) {
-        val r = this.size.minDimension * 0.30f
+        val r = this.size.minDimension * 0.46f
+        val k = r / 25f
         val c = center
-        drawCircle(ring, radius = r, center = c, style = Stroke(width = this.size.minDimension * 0.085f))
-        drawCircle(dot, radius = this.size.minDimension * 0.09f, center = Offset(c.x + r * 0.72f, c.y - r * 1.05f))
+        drawCircle(
+            Brush.radialGradient(
+                listOf(Color(0xFF8AB4F8), Color(0xFF1A4FD6)),
+                center = Offset(c.x - 6f * k, c.y - 8f * k),
+                radius = 35f * k,
+            ),
+            radius = r,
+            center = c,
+        )
+        val hr = 17f * k
+        val box = Size(hr * 2, hr * 2)
+        val tl = Offset(c.x - hr, c.y - hr)
+        val stroke = Stroke(width = 5f * k, cap = StrokeCap.Round)
+        drawArc(Color.White.copy(alpha = 0.85f), 194f, 69f, false, tl, box, style = stroke)
+        drawArc(Color.White.copy(alpha = 0.85f), 14f, 69f, false, tl, box, style = stroke)
     }
 }
 
