@@ -105,6 +105,7 @@ fun PageHeader(
 
 @Composable
 private fun EntryRow(
+    modifier: Modifier,
     letter: String,
     title: String,
     sub: String,
@@ -115,7 +116,7 @@ private fun EntryRow(
 ) {
     val p = LocalPalette.current
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(start = 16.dp, end = 6.dp, top = 9.dp, bottom = 9.dp),
@@ -170,6 +171,7 @@ fun HistoryScreen(ui: UiState) {
             LazyColumn(Modifier.fillMaxSize()) {
                 items(items, key = { it.id }) { h ->
                     EntryRow(
+                        modifier = Modifier.animateItem(),
                         UrlText.host(h.url).firstOrNull()?.uppercase() ?: "•",
                         h.title.ifBlank { UrlText.host(h.url) },
                         UrlText.host(h.url) + " · " +
@@ -205,6 +207,7 @@ fun BookmarksScreen(ui: UiState) {
             LazyColumn(Modifier.fillMaxSize()) {
                 items(items, key = { it.id }) { b ->
                     EntryRow(
+                        modifier = Modifier.animateItem(),
                         UrlText.host(b.url).firstOrNull()?.uppercase() ?: "•",
                         b.title.ifBlank { UrlText.host(b.url) },
                         UrlText.editable(b.url),
@@ -248,6 +251,7 @@ fun DownloadsScreen(ui: UiState) {
                         else -> Formatter.formatShortFileSize(ctx, d.size) + " · " + UrlText.host(d.url)
                     }
                     EntryRow(
+                        modifier = Modifier.animateItem(),
                         "",
                         d.name,
                         status,

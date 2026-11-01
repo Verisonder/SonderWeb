@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.draw.clipToBounds
@@ -118,13 +119,13 @@ fun BrowserScreen(activity: MainActivity) {
     val collapsed = Bar.hidden && !pinned
     val barOffset by animateFloatAsState(
         targetValue = if (collapsed) barPx.toFloat() else 0f,
-        animationSpec = tween(240, easing = FastOutSlowInEasing),
+        animationSpec = spring(dampingRatio = 0.9f, stiffness = 500f),
         label = "bar",
     )
     // 0 = full bar, 1 = small button (button mode only).
     val morph by animateFloatAsState(
         targetValue = if (collapsed && hideMode == Bar.BUTTON) 1f else 0f,
-        animationSpec = tween(280, easing = FastOutSlowInEasing),
+        animationSpec = spring(dampingRatio = 0.78f, stiffness = 380f),
         label = "morph",
     )
     val visibleBarDp = with(LocalDensity.current) { (barPx - barOffset).coerceAtLeast(0f).toDp() }
@@ -187,11 +188,19 @@ fun BrowserScreen(activity: MainActivity) {
                                 },
                             ),
                     )
-                    if (tab != null && tab.isBlank) {
+                    AnimatedVisibility(
+                        visible = tab != null && tab.isBlank,
+                        enter = fadeIn(tween(180)),
+                        exit = fadeOut(tween(140)),
+                    ) {
                         Box(Modifier.fillMaxSize().padding(barSpace)) { StartPage(ui) }
                     }
-                    if (ui.editing && tab != null) {
-                        Box(Modifier.fillMaxSize().padding(barSpace)) { Suggestions(ui, tab, barTop) }
+                    AnimatedVisibility(
+                        visible = ui.editing && tab != null,
+                        enter = fadeIn(tween(160)) + slideInVertically(tween(200)) { if (barTop) -it / 24 else it / 24 },
+                        exit = fadeOut(tween(120)),
+                    ) {
+                        tab?.let { Box(Modifier.fillMaxSize().padding(barSpace)) { Suggestions(ui, it, barTop) } }
                     }
                 }
                 if (!activity.inFullscreen) {
@@ -257,8 +266,8 @@ fun BrowserScreen(activity: MainActivity) {
 
             AnimatedVisibility(
                 visible = ui.panel != Panel.None,
-                enter = fadeIn() + slideInVertically { it / 12 },
-                exit = fadeOut() + slideOutVertically { it / 12 },
+                enter = fadeIn(tween(200)) + slideInVertically(spring(dampingRatio = 0.9f, stiffness = 600f)) { it / 14 },
+                exit = fadeOut(tween(160)) + slideOutVertically(tween(180, easing = FastOutSlowInEasing)) { it / 14 },
             ) {
                 Box(
                     Modifier

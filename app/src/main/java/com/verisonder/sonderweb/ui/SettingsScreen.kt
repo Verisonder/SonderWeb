@@ -5,6 +5,14 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -140,6 +148,17 @@ fun SettingsScreen(ui: UiState) {
             IconButtonSmall(Icons.Outlined.Close, "Close", size = 48, onClick = close)
         }
 
+        AnimatedContent(
+            targetState = page,
+            transitionSpec = {
+                // Deeper: new page comes in from the right; back: the list returns from the left.
+                val forward = targetState != null
+                val dir = if (forward) 1 else -1
+                (slideInHorizontally(spring(dampingRatio = 0.9f, stiffness = 500f)) { it * dir / 4 } + fadeIn(tween(180)))
+                    .togetherWith(slideOutHorizontally(tween(200)) { -it * dir / 6 } + fadeOut(tween(120)))
+            },
+            label = "settings",
+        ) { page ->
         Column(
             Modifier
                 .fillMaxSize()
@@ -156,6 +175,7 @@ fun SettingsScreen(ui: UiState) {
                 Page.Tabs -> TabsPage()
                 Page.About -> AboutPage(ui)
             }
+        }
         }
     }
 

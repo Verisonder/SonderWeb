@@ -68,6 +68,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
 
         setContent { BrowserScreen(this) }
         applySystemBars()
+        preferHighRefreshRate()
         if (savedInstanceState == null) handleIntent(intent)
     }
 
@@ -172,6 +173,19 @@ class MainActivity : ComponentActivity(), Browser.Host {
             c.show(WindowInsetsCompat.Type.statusBars())
         } else {
             c.hide(WindowInsetsCompat.Type.statusBars())
+        }
+    }
+
+    /** Ask for the screen's fastest refresh rate (120 Hz on the 12T); some phones keep apps at 60 Hz otherwise. */
+    private fun preferHighRefreshRate() {
+        runCatching {
+            @Suppress("DEPRECATION")
+            val d = if (android.os.Build.VERSION.SDK_INT >= 30) display else windowManager.defaultDisplay
+            val cur = d?.mode ?: return
+            val best = d.supportedModes
+                .filter { it.physicalWidth == cur.physicalWidth && it.physicalHeight == cur.physicalHeight }
+                .maxByOrNull { it.refreshRate } ?: return
+            window.attributes = window.attributes.apply { preferredDisplayModeId = best.modeId }
         }
     }
 
