@@ -48,6 +48,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -75,9 +79,20 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** The SonderWeb mark: a blue glass sphere with two highlights (same as the app icon). */
+/** The S drawn by the three highlights, in the icon's 108-unit space. */
+private const val S_PATH = "M63,40 C60,35 45,34 45,44 C45,53 63,53 63,63 C63,73 47,74 44,68"
+private val S_SEGMENTS = listOf(0f to 0.30f, 0.37f to 0.63f, 0.70f to 1f)
+
+/** The SonderWeb mark: a blue glass sphere whose three highlights form an S (same as the app icon). */
 @Composable
 fun Mark(size: Int, @Suppress("UNUSED_PARAMETER") ring: Color = Color.White, @Suppress("UNUSED_PARAMETER") dot: Color = Color.White) {
+    val pieces = remember {
+        val full = PathParser().parsePathString(S_PATH).toPath()
+        val measure = PathMeasure().apply { setPath(full, false) }
+        S_SEGMENTS.map { (a, b) ->
+            Path().also { measure.getSegment(a * measure.length, b * measure.length, it, true) }
+        }
+    }
     Canvas(Modifier.size(size.dp)) {
         val r = this.size.minDimension * 0.46f
         val k = r / 25f
@@ -91,12 +106,14 @@ fun Mark(size: Int, @Suppress("UNUSED_PARAMETER") ring: Color = Color.White, @Su
             radius = r,
             center = c,
         )
-        val hr = 17f * k
-        val box = Size(hr * 2, hr * 2)
-        val tl = Offset(c.x - hr, c.y - hr)
-        val stroke = Stroke(width = 5f * k, cap = StrokeCap.Round)
-        drawArc(Color.White.copy(alpha = 0.85f), 194f, 69f, false, tl, box, style = stroke)
-        drawArc(Color.White.copy(alpha = 0.85f), 14f, 69f, false, tl, box, style = stroke)
+        withTransform({
+            translate(c.x - 54f * k, c.y - 54f * k)
+            scale(k, k, pivot = Offset.Zero)
+        }) {
+            pieces.forEach {
+                drawPath(it, Color.White.copy(alpha = 0.88f), style = Stroke(width = 5f, cap = StrokeCap.Round))
+            }
+        }
     }
 }
 
