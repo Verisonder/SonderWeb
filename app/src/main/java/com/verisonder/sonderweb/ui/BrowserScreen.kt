@@ -262,9 +262,10 @@ fun BrowserScreen(activity: MainActivity) {
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .navigationBarsPadding()
-                        .padding(14.dp),
+                        .padding(2.dp),
                 ) {
-                    tab?.let { Scaled(remember(ui.themeVersion) { Browser.prefs.barSize / 100f }) { StartControls(ui, it, Modifier) } }
+                    // The margin sits inside the animated layer so the shadow is never cut off.
+                    tab?.let { Scaled(remember(ui.themeVersion) { Browser.prefs.barSize / 100f }) { StartControls(ui, it, Modifier.padding(12.dp)) } }
                 }
                 AnimatedVisibility(
                     visible = !startPage && !activity.inFullscreen,
@@ -362,6 +363,8 @@ private fun BoxScope.BarArea(
                     .graphicsLayer {
                         transformOrigin = TransformOrigin(if (right) 0.94f else 0.06f, if (barTop) 0f else 1f)
                         val m = morph()
+                        // Fade each shape directly (no offscreen layer) so shadows aren't clipped mid-animation.
+                        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
                         scaleX = 1f - 0.82f * m
                         scaleY = 1f - 0.3f * m
                         alpha = (1f - m * 1.6f).coerceIn(0f, 1f)
@@ -460,6 +463,7 @@ private fun BoxScope.DraggableBarButton(
             }
             .graphicsLayer {
                 val m = morph()
+                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
                 val k = (0.6f + 0.4f * m) * lift
                 scaleX = k
                 scaleY = k
