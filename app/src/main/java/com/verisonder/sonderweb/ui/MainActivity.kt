@@ -31,7 +31,6 @@ import androidx.lifecycle.lifecycleScope
 import com.verisonder.sonderweb.browser.Browser
 import com.verisonder.sonderweb.browser.Tab
 import com.verisonder.sonderweb.core.AddressInput
-import com.verisonder.sonderweb.core.UrlText
 import kotlinx.coroutines.launch
 import org.mozilla.geckoview.GeckoSession.PromptDelegate.DateTimePrompt
 import org.mozilla.geckoview.GeckoView
@@ -149,37 +148,14 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun geckoViewFor(tab: Tab): GeckoView? =
         if (::geckoView.isInitialized && geckoView.session === tab.session) geckoView else null
 
-    override fun openExternal(url: String): Boolean {
-        val intent = try {
-            if (url.startsWith("intent:", ignoreCase = true)) {
-                Intent.parseUri(url, Intent.URI_INTENT_SCHEME).apply {
-                    // Pages may only open apps, never pick a component or run a selector.
-                    component = null
-                    selector = null
-                    addCategory(Intent.CATEGORY_BROWSABLE)
-                }
-            } else {
-                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
-            }
-        } catch (_: Exception) {
-            return false
-        }
-        return try {
-            startActivity(intent)
-            ownScreen = true
-            true
-        } catch (_: ActivityNotFoundException) {
-            val fallback = intent.getStringExtra("browser_fallback_url")
-            val cur = Browser.current
-            if (fallback != null && UrlText.isWeb(fallback) && cur != null) {
-                Browser.load(cur, fallback)
-                true
-            } else {
-                false
-            }
-        } catch (_: SecurityException) {
-            false
-        }
+    override fun launch(intent: Intent): Boolean = try {
+        startActivity(intent)
+        ownScreen = true
+        true
+    } catch (_: ActivityNotFoundException) {
+        false
+    } catch (_: SecurityException) {
+        false
     }
 
     override fun share(text: String, title: String?) {

@@ -352,7 +352,8 @@ object Browser {
     interface Host {
         /** The engine view, when it is currently showing [tab]. */
         fun geckoViewFor(tab: Tab): org.mozilla.geckoview.GeckoView?
-        fun openExternal(url: String): Boolean
+        /** Opens another app; false when it can't be started. */
+        fun launch(intent: android.content.Intent): Boolean
         fun share(text: String, title: String?)
         fun setFullscreen(on: Boolean)
         fun applySystemBars()

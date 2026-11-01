@@ -317,6 +317,7 @@ fun BrowserScreen(activity: MainActivity) {
             Ublock.popup?.let { UblockSheet(it) }
             Prompts.queue.firstOrNull { it.tab === tab }?.let { PromptDialog(it) }
             com.verisonder.sonderweb.browser.Extensions.pending?.let { InstallDialog(it) }
+            com.verisonder.sonderweb.browser.AppLinks.ask?.let { OpenAppDialog(it) }
 
             // Back from another app: the private tab stays hidden until you unlock it.
             AnimatedVisibility(

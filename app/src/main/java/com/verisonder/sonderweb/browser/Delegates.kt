@@ -60,12 +60,21 @@ object Delegates {
             request: NavigationDelegate.LoadRequest,
         ): GeckoResult<AllowOrDeny>? {
             val uri = request.uri
-            if (UrlText.isInternal(uri)) return GeckoResult.allow()
+            if (UrlText.isInternal(uri)) {
+                // A link you tapped that an installed app can also open: you're asked first,
+                // and the page waits for your answer.
+                if (UrlText.isWeb(uri) && request.hasUserGesture && !request.isDirectNavigation &&
+                    request.target == NavigationDelegate.TARGET_WINDOW_CURRENT &&
+                    AppLinks.askForWebLink(tab, uri)
+                ) {
+                    return GeckoResult.deny()
+                }
+                return GeckoResult.allow()
+            }
             // tel:, mailto:, intent:, market: … belong to other apps. Only when you tapped
-            // something: pages may not launch apps on their own.
+            // something (pages may not launch apps on their own), and only after you say so.
             if (!request.hasUserGesture && !request.isDirectNavigation) return GeckoResult.deny()
-            val opened = Browser.host?.openExternal(uri) ?: false
-            if (!opened) Browser.host?.toast("No app can open this link")
+            if (!AppLinks.askForAppLink(tab, uri)) Browser.host?.toast("No app can open this link")
             return GeckoResult.deny()
         }
 

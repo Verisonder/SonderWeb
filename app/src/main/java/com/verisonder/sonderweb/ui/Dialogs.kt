@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -384,4 +385,39 @@ fun UblockSheet(session: GeckoSession) {
             AndroidView(factory = { view }, modifier = Modifier.fillMaxWidth().fillMaxHeight())
         }
     }
+}
+
+/** "Open in <app>?": the app, or stay in the browser. Nothing opens until you choose. */
+@Composable
+fun OpenAppDialog(ask: com.verisonder.sonderweb.browser.AppLinks.Ask) {
+    val p = LocalPalette.current
+    val links = com.verisonder.sonderweb.browser.AppLinks
+    AlertDialog(
+        onDismissRequest = { links.stayInBrowser() },
+        containerColor = p.card,
+        icon = ask.icon?.let { bmp ->
+            {
+                androidx.compose.foundation.Image(
+                    bmp.asImageBitmap(),
+                    null,
+                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)),
+                )
+            }
+        },
+        title = { Text("Open in ${ask.app}?", color = p.text, fontSize = 18.sp) },
+        text = {
+            Text(
+                if (ask.stay != null) "This link can open in the app, or stay here in SonderWeb." else "This link wants to open another app.",
+                color = p.mute,
+            )
+        },
+        confirmButton = {
+            TextButton({ links.openApp() }) { Text("Open app", color = p.accent, fontWeight = FontWeight.SemiBold) }
+        },
+        dismissButton = {
+            TextButton({ links.stayInBrowser() }) {
+                Text(if (ask.stay != null) "Stay in browser" else "Cancel", color = p.text)
+            }
+        },
+    )
 }
