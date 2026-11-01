@@ -94,7 +94,7 @@ fun TabsScreen(ui: UiState) {
                 modifier = Modifier.fillMaxSize(),
             ) {
                 items(list, key = { it.id }) { t ->
-                    TabCard(t, selected = t === Browser.current, accent = accent, modifier = Modifier.animateItem()) {
+                    TabCard(ui, t, selected = t === Browser.current, accent = accent, modifier = Modifier.animateItem()) {
                         Browser.select(t)
                         ui.panel = Panel.None
                     }
@@ -140,7 +140,7 @@ fun TabsScreen(ui: UiState) {
 }
 
 @Composable
-private fun TabCard(tab: Tab, selected: Boolean, accent: Color, modifier: Modifier, onClick: () -> Unit) {
+private fun TabCard(ui: UiState, tab: Tab, selected: Boolean, accent: Color, modifier: Modifier, onClick: () -> Unit) {
     val p = LocalPalette.current
     val shape = RoundedCornerShape(16.dp)
     Column(
@@ -183,7 +183,18 @@ private fun TabCard(tab: Tab, selected: Boolean, accent: Color, modifier: Modifi
             contentAlignment = Alignment.Center,
         ) {
             val thumb = tab.thumbnail
-            if (thumb != null && !tab.isBlank) {
+            if (tab.isBlank) {
+                // A new tab shows its start page, small: the real one, drawn at about 40%.
+                Box(Modifier.fillMaxSize()) {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalPalette provides if (tab.isPrivate) PrivatePalette else p,
+                    ) {
+                        Scaled(0.42f) { StartPage(ui, preview = tab) }
+                    }
+                    // Taps open the tab; nothing on the small page itself reacts.
+                    Box(Modifier.matchParentSize().clickable(onClick = onClick))
+                }
+            } else if (thumb != null) {
                 Image(
                     thumb,
                     null,
@@ -193,18 +204,14 @@ private fun TabCard(tab: Tab, selected: Boolean, accent: Color, modifier: Modifi
                 )
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (tab.isBlank) {
-                        Mark(40, p.faint, accent)
-                    } else {
-                        Text(
-                            UrlText.host(tab.url).firstOrNull()?.uppercase() ?: "•",
-                            color = p.mute,
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(UrlText.host(tab.url), color = p.faint, fontSize = 11.sp, maxLines = 1)
-                    }
+                    Text(
+                        UrlText.host(tab.url).firstOrNull()?.uppercase() ?: "•",
+                        color = p.mute,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(UrlText.host(tab.url), color = p.faint, fontSize = 11.sp, maxLines = 1)
                 }
             }
         }

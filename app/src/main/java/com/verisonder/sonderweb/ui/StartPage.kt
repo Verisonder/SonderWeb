@@ -180,10 +180,11 @@ private fun PrivateStart(ui: UiState, tab: com.verisonder.sonderweb.browser.Tab)
 
 /** What a new tab shows: the time, a greeting, the weather, a search box and your shortcuts. */
 @Composable
-fun StartPage(ui: UiState) {
+fun StartPage(ui: UiState, preview: com.verisonder.sonderweb.browser.Tab? = null) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
-    val tab = Browser.current ?: return
+    // [preview]: drawn small on a card in the tab switcher.
+    val tab = preview ?: Browser.current ?: return
     if (tab.isPrivate) {
         PrivateStart(ui, tab)
         return
@@ -223,7 +224,7 @@ fun StartPage(ui: UiState) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Spacer(Modifier.height(88.dp))
+            if (preview == null) Spacer(Modifier.height(88.dp))
             if (prefs.showClock) {
                 Text(
                     time,
