@@ -158,14 +158,14 @@ fun SettingsScreen(ui: UiState) {
                     .togetherWith(slideOutHorizontally(tween(200)) { -it * dir / 6 } + fadeOut(tween(120)))
             },
             label = "settings",
-        ) { page ->
+        ) { shown ->
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 28.dp),
         ) {
-            when (page) {
+            when (shown) {
                 null -> MainPage(query, { query = it }, onOpen = { page = it }, onClear = { clearing = true })
                 Page.Privacy -> PrivacyPage { clearing = true }
                 Page.Shields -> ShieldsPage(ui)
