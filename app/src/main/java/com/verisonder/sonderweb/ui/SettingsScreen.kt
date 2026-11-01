@@ -449,7 +449,7 @@ private fun LookPage(ui: UiState) {
     }
     Spacer(Modifier.height(12.dp))
     Group {
-        Choice("Shrink to a small button", barHide == 2, "Tap the button to bring the bar back") {
+        Choice("Shrink to a small button", barHide == 2, "Tap it, or scroll to the top of the page, to bring the bar back") {
             barHide = 2; prefs.barHide = 2; changed()
         }
         Choice("Slide away while scrolling", barHide == 1, "Scroll up to bring it back") {

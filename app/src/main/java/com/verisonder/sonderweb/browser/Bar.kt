@@ -9,7 +9,8 @@ import androidx.compose.runtime.setValue
  *  0  always shown;
  *  1  slides away while you scroll down, back when you scroll up, reach the top, switch tabs
  *     or a page starts loading;
- *  2  shrinks into a small button that brings it back when tapped (and only then).
+ *  2  shrinks into a small button while you scroll down; tap it, or scroll back to the top
+ *     of the page, to bring the bar back.
  */
 object Bar {
     const val ALWAYS = 0
@@ -39,7 +40,9 @@ object Bar {
         val prev = lastY.put(tab.id, y) ?: y
         if (tab !== Browser.current || mode == ALWAYS) return
         if (y <= 0) {
-            show()
+            // Back at the top of the page: the whole bar returns (in button mode only when you
+            // scrolled there, not when a page simply opens at the top).
+            if (mode == BUTTON && prev > 0) expand() else show()
             return
         }
         val dy = y - prev

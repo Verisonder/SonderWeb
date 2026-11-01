@@ -112,6 +112,22 @@ fun Mark(size: Int, @Suppress("UNUSED_PARAMETER") ring: Color = Color.White, @Su
     }
 }
 
+/** Just the mark's three highlights in one colour, for the small bar button. */
+@Composable
+fun MarkLines(size: Int, color: Color) {
+    val pieces = remember { HIGHLIGHTS.map { PathParser().parsePathString(it).toPath() } }
+    Canvas(Modifier.size(size.dp)) {
+        // The highlights span 31..77 of the 108-unit icon.
+        val k = this.size.minDimension / 46f
+        withTransform({
+            scale(k, k, pivot = Offset.Zero)
+            translate(-31f, -31f)
+        }) {
+            pieces.forEach { drawPath(it, color, style = Stroke(width = 6f, cap = StrokeCap.Round)) }
+        }
+    }
+}
+
 /** What a new tab shows: the time, a greeting, the weather, a search box and your shortcuts. */
 @Composable
 fun StartPage(ui: UiState) {

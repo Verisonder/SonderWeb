@@ -137,7 +137,8 @@ fun BrowserScreen(activity: MainActivity) {
     val collapsed = Bar.hidden && !pinned
     val barOffset by animateFloatAsState(
         targetValue = if (collapsed) barPx.toFloat() else 0f,
-        animationSpec = spring(dampingRatio = 0.9f, stiffness = 500f),
+        // Button mode: same pace as the morph so the page and the bar move as one, no bounce on the page.
+        animationSpec = if (hideMode == Bar.BUTTON) spring(dampingRatio = 1f, stiffness = 380f) else spring(dampingRatio = 0.9f, stiffness = 500f),
         label = "bar",
     )
     // 0 = full bar, 1 = small button (button mode only).
@@ -397,7 +398,7 @@ private fun BarButton(tab: com.verisonder.sonderweb.browser.Tab?, modifier: Modi
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Mark(26, p.text, if (tab?.isPrivate == true) p.privateAccent else p.accent)
+        MarkLines(31, p.text)
         if (tab != null && tab.loading) {
             CircularProgressIndicator(
                 progress = { tab.progress / 100f },
