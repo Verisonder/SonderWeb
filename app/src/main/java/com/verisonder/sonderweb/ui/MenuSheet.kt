@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Close
@@ -54,6 +55,7 @@ import com.verisonder.sonderweb.browser.Browser
 import com.verisonder.sonderweb.browser.Tab
 import com.verisonder.sonderweb.browser.Ublock
 import com.verisonder.sonderweb.core.UrlText
+import com.verisonder.sonderweb.data.Shortcut
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -125,6 +127,18 @@ fun MenuSheet(ui: UiState, tab: Tab) {
             MenuRow(Icons.Outlined.VisibilityOff, "New private tab") {
                 Browser.newTab(null, isPrivate = true)
                 close()
+            }
+            if (web && !tab.isPrivate) {
+                MenuRow(Icons.Outlined.AddCircleOutline, "Add to start page") {
+                    val list = Browser.prefs.shortcuts
+                    if (list.none { UrlText.host(it.url) == UrlText.host(tab.url) }) {
+                        Browser.prefs.shortcuts = list + Shortcut(tab.url, tab.title.take(24).ifBlank { UrlText.host(tab.url) })
+                        Browser.host?.toast("Added to the start page")
+                    } else {
+                        Browser.host?.toast("Already on the start page")
+                    }
+                    close()
+                }
             }
             MenuRow(Icons.Outlined.Collections, "Bookmarks") {
                 ui.panel = Panel.Bookmarks

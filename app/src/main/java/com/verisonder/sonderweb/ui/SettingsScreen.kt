@@ -29,6 +29,8 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +48,10 @@ import com.verisonder.sonderweb.BuildConfig
 import com.verisonder.sonderweb.browser.Browser
 import com.verisonder.sonderweb.browser.Ublock
 import com.verisonder.sonderweb.core.SearchEngines
+import com.verisonder.sonderweb.data.Place
+import com.verisonder.sonderweb.data.Weather
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.mozilla.geckoview.StorageController
 
 @Composable
@@ -112,6 +118,8 @@ fun SettingsScreen(ui: UiState) {
                 }
             }
             Hint("Type !w, !yt, !gh … before or after your words to search a site directly. Unknown bangs go through DuckDuckGo.")
+
+            StartPageSettings(ui)
 
             Section("Privacy")
             Toggle("Strict tracking protection", "Firefox's own blocking on top of uBlock Origin. Turn off if a site breaks.", strict) {
@@ -308,5 +316,104 @@ private fun Action(title: String, sub: String, onClick: () -> Unit) {
         Text(title, color = p.text, fontSize = 15.sp)
         Spacer(Modifier.height(2.dp))
         Text(sub, color = p.faint, fontSize = 12.sp)
+    }
+}
+
+
+@Composable
+private fun StartPageSettings(ui: UiState) {
+    val p = LocalPalette.current
+    val prefs = Browser.prefs
+    val scope = rememberCoroutineScope()
+    var name by remember { mutableStateOf(prefs.userName) }
+    var weatherOn by remember { mutableStateOf(prefs.weatherOn) }
+    var fahrenheit by remember { mutableStateOf(prefs.fahrenheit) }
+    var place by remember { mutableStateOf(prefs.place) }
+    var query by remember { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<Place>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+
+    Section("Start page")
+    Column(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
+        Text("Your name", color = p.text, fontSize = 15.sp)
+        Spacer(Modifier.height(6.dp))
+        SettingsField(name, "Shown in the greeting") {
+            name = it
+            prefs.userName = it
+            ui.themeVersion++
+        }
+    }
+    Toggle("Weather", "From Open-Meteo. Only the place you pick below is sent.", weatherOn) {
+        weatherOn = it
+        prefs.weatherOn = it
+        if (!it) Weather.forget()
+        ui.themeVersion++
+    }
+    if (weatherOn) {
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
+            Text(place?.name ?: "No place yet", color = if (place == null) p.faint else p.text, fontSize = 14.sp)
+            Spacer(Modifier.height(8.dp))
+            SettingsField(query, "Search a city") { query = it }
+            LaunchedEffect(query) {
+                if (query.trim().length < 2) {
+                    results = emptyList()
+                    return@LaunchedEffect
+                }
+                delay(350)
+                searching = true
+                results = Weather.search(query)
+                searching = false
+            }
+            if (searching) Text("Searching…", color = p.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            results.forEach { r ->
+                Text(
+                    r.name,
+                    color = p.text,
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            place = r
+                            prefs.place = r
+                            query = ""
+                            results = emptyList()
+                            scope.launch { Weather.refresh(prefs, force = true) }
+                            ui.themeVersion++
+                        }
+                        .padding(vertical = 10.dp),
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Segmented(listOf("°C", "°F"), if (fahrenheit) 1 else 0, p.accent) {
+                fahrenheit = it == 1
+                prefs.fahrenheit = fahrenheit
+                Weather.refresh(prefs, force = true)
+                ui.themeVersion++
+            }
+        }
+    }
+    Hint("Long-press a shortcut on the start page to edit or remove it.")
+}
+
+@Composable
+private fun SettingsField(value: String, placeholder: String, onChange: (String) -> Unit) {
+    val p = LocalPalette.current
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(p.field)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        if (value.isEmpty()) Text(placeholder, color = p.faint, fontSize = 14.sp)
+        BasicTextField(
+            value,
+            onChange,
+            singleLine = true,
+            textStyle = TextStyle(color = p.text, fontSize = 14.sp),
+            cursorBrush = SolidColor(p.accent),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

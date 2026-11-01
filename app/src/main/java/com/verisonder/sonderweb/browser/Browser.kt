@@ -154,6 +154,7 @@ object Browser {
             runCatching { runtime.webExtensionController.setTabActive(old.session, false) }
         }
         current = tab
+        Bar.show()
         if (tab.ready) activate(tab)
         saveTabs()
     }
@@ -186,6 +187,7 @@ object Browser {
         if (i < 0) return
         tabs.removeAt(i)
         Prompts.queue.removeAll { it.tab === tab }
+        Bar.forget(tab)
         if (current === tab) {
             current = null
             val next = tabs.firstOrNull { it.id == tab.openerId && it.isPrivate == tab.isPrivate }

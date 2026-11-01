@@ -8,6 +8,16 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import com.verisonder.sonderweb.browser.Bar
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -83,6 +93,22 @@ fun BrowserScreen(activity: MainActivity) {
         }
     }
 
+    // ---- The sliding bar ----
+    var barPx by remember { mutableIntStateOf(0) }
+    val barDp = with(LocalDensity.current) { barPx.toDp() }
+    val pinned = ui.editing || ui.menu || tab == null || tab.isBlank || activity.fullscreen
+    val barOffset by animateFloatAsState(
+        targetValue = if (Bar.hidden && !pinned) barPx.toFloat() else 0f,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "bar",
+    )
+    LaunchedEffect(barPx, activity.fullscreen) {
+        activity.geckoView.setDynamicToolbarMaxHeight(if (activity.fullscreen) 0 else barPx)
+    }
+    SideEffect {
+        activity.geckoView.setVerticalClipping(if (activity.fullscreen) 0 else -barOffset.roundToInt())
+    }
+
     BackHandler(enabled = true) {
         when {
             activity.fullscreen -> tab?.session?.exitFullScreen()
@@ -103,16 +129,18 @@ fun BrowserScreen(activity: MainActivity) {
                 .fillMaxSize()
                 .background(palette.bar),
         ) {
-            Column(
+            Box(
                 Modifier
                     .fillMaxSize()
                     .then(if (activity.fullscreen) Modifier else Modifier.statusBarsPadding().navigationBarsPadding())
-                    .imePadding(),
+                    .imePadding()
+                    .clipToBounds(),
             ) {
+                // The page fills everything; the bar floats over its bottom edge and slides away
+                // while you scroll down. The engine is told how much of the page the bar covers.
                 Box(
                     Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
+                        .fillMaxSize()
                         .background(palette.bg),
                 ) {
                     AndroidView(
@@ -120,14 +148,21 @@ fun BrowserScreen(activity: MainActivity) {
                         modifier = Modifier.fillMaxSize(),
                     )
                     if (tab != null && tab.isBlank) {
-                        StartPage(ui)
+                        Box(Modifier.fillMaxSize().padding(bottom = barDp)) { StartPage(ui) }
                     }
                     if (ui.editing && tab != null) {
-                        Suggestions(ui, tab)
+                        Box(Modifier.fillMaxSize().padding(bottom = barDp)) { Suggestions(ui, tab) }
                     }
                 }
                 if (!activity.fullscreen) {
-                    AddressBar(ui, tab)
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .onSizeChanged { barPx = it.height }
+                            .graphicsLayer { translationY = barOffset },
+                    ) {
+                        AddressBar(ui, tab)
+                    }
                 }
             }
 

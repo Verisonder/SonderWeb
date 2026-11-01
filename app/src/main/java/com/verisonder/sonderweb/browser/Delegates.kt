@@ -23,6 +23,11 @@ object Delegates {
         s.setContentDelegate(content(tab))
         s.setPermissionDelegate(Permissions.delegate(tab))
         s.setPromptDelegate(Prompts.delegate(tab))
+        s.setScrollDelegate(object : GeckoSession.ScrollDelegate {
+            override fun onScrollChanged(session: GeckoSession, scrollX: Int, scrollY: Int) {
+                Bar.onScroll(tab, scrollY)
+            }
+        })
         Ublock.attach(tab)
     }
 
@@ -78,6 +83,7 @@ object Delegates {
 
     private fun progress(tab: Tab) = object : ProgressDelegate {
         override fun onPageStart(session: GeckoSession, url: String) {
+            if (tab === Browser.current) Bar.show()
             tab.loading = true
             tab.progress = 5
             tab.url = url
@@ -107,6 +113,10 @@ object Delegates {
             if (!tab.isPrivate && Browser.prefs.saveHistory && UrlText.isWeb(tab.url) && !title.isNullOrBlank()) {
                 Browser.db.setTitle(tab.url, title)
             }
+        }
+
+        override fun onShowDynamicToolbar(session: GeckoSession) {
+            if (tab === Browser.current) Bar.show()
         }
 
         override fun onFullScreen(session: GeckoSession, fullScreen: Boolean) {
