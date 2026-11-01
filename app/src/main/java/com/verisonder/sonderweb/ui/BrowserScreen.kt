@@ -5,6 +5,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -20,6 +22,7 @@ import androidx.compose.ui.platform.LocalDensity
 import com.verisonder.sonderweb.browser.Bar
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -124,6 +127,8 @@ fun BrowserScreen(activity: MainActivity) {
     // On the start page the bar starts as the small button (button mode).
     LaunchedEffect(tab, tab?.isBlank) { if (tab?.isBlank == true) Bar.collapse() }
     var barPx by remember { mutableIntStateOf(0) }
+    // The start page shows no bar: only the tabs button and the menu (the bar comes back to type).
+    val startPage = tab?.isBlank == true && !ui.editing && !ui.finding
     val pinned = ui.editing || ui.menu || ui.finding || tab == null || activity.inFullscreen ||
         hideMode == Bar.ALWAYS || (hideMode == Bar.SLIDE && tab.isBlank)
     val collapsed = Bar.hidden && !pinned
@@ -211,7 +216,7 @@ fun BrowserScreen(activity: MainActivity) {
                         enter = fadeIn(tween(180)),
                         exit = fadeOut(tween(140)),
                     ) {
-                        Box(Modifier.fillMaxSize().padding(barSpace)) { StartPage(ui) }
+                        Box(Modifier.fillMaxSize()) { StartPage(ui) }
                     }
                     AnimatedVisibility(
                         visible = ui.editing && tab != null,
@@ -221,49 +226,24 @@ fun BrowserScreen(activity: MainActivity) {
                         tab?.let { Box(Modifier.fillMaxSize().padding(barSpace)) { Suggestions(ui, it, barTop) } }
                     }
                 }
-                if (!activity.inFullscreen) {
-                    if (hideMode == Bar.BUTTON) {
-                        // The bar shrinks towards its left corner while the button grows out of it.
-                        if (morph < 1f) {
-                            Box(
-                                Modifier
-                                    .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
-                                    .onSizeChanged { barPx = it.height }
-                                    .graphicsLayer {
-                                        transformOrigin = TransformOrigin(0.06f, if (barTop) 0f else 1f)
-                                        scaleX = 1f - 0.82f * morph
-                                        scaleY = 1f - 0.3f * morph
-                                        alpha = (1f - morph * 1.6f).coerceIn(0f, 1f)
-                                    },
-                            ) {
-                                AddressBar(ui, tab, barTop)
-                            }
-                        }
-                        if (morph > 0f) {
-                            BarButton(
-                                tab,
-                                Modifier
-                                    .align(if (barTop) Alignment.TopStart else Alignment.BottomStart)
-                                    .then(if (barTop) Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top)) else Modifier.navigationBarsPadding())
-                                    .padding(14.dp)
-                                    .graphicsLayer {
-                                        val k = 0.6f + 0.4f * morph
-                                        scaleX = k
-                                        scaleY = k
-                                        alpha = ((morph - 0.3f) / 0.7f).coerceIn(0f, 1f)
-                                    },
-                            ) { Bar.expand() }
-                        }
-                    } else {
-                        Box(
-                            Modifier
-                                .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
-                                .onSizeChanged { barPx = it.height }
-                                .graphicsLayer { translationY = if (barTop) -barOffset else barOffset },
-                        ) {
-                            AddressBar(ui, tab, barTop)
-                        }
-                    }
+                AnimatedVisibility(
+                    visible = startPage && !activity.inFullscreen,
+                    enter = fadeIn(tween(180)) + scaleIn(spring(dampingRatio = 0.75f, stiffness = 500f), initialScale = 0.85f),
+                    exit = fadeOut(tween(120)) + scaleOut(tween(140), targetScale = 0.9f),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .navigationBarsPadding()
+                        .padding(14.dp),
+                ) {
+                    tab?.let { StartControls(ui, it, Modifier) }
+                }
+                AnimatedVisibility(
+                    visible = !startPage && !activity.inFullscreen,
+                    enter = fadeIn(tween(180)),
+                    exit = fadeOut(tween(120)),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    Box(Modifier.fillMaxSize()) { BarArea(ui, tab, barTop, hideMode, morph, barOffset) { barPx = it } }
                 }
             }
 
@@ -320,6 +300,61 @@ fun BrowserScreen(activity: MainActivity) {
             ) {
                 PrivateLock(onLeave = { leavePrivate(ui) })
             }
+        }
+    }
+}
+
+/** The address bar in its current form: full, sliding away, or shrunk into the small button. */
+@Composable
+private fun BoxScope.BarArea(
+    ui: UiState,
+    tab: com.verisonder.sonderweb.browser.Tab?,
+    barTop: Boolean,
+    hideMode: Int,
+    morph: Float,
+    barOffset: Float,
+    onBarSize: (Int) -> Unit,
+) {
+    if (hideMode == Bar.BUTTON) {
+        // The bar shrinks towards its left corner while the button grows out of it.
+        if (morph < 1f) {
+            Box(
+                Modifier
+                    .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
+                    .onSizeChanged { onBarSize(it.height) }
+                    .graphicsLayer {
+                        transformOrigin = TransformOrigin(0.06f, if (barTop) 0f else 1f)
+                        scaleX = 1f - 0.82f * morph
+                        scaleY = 1f - 0.3f * morph
+                        alpha = (1f - morph * 1.6f).coerceIn(0f, 1f)
+                    },
+            ) {
+                AddressBar(ui, tab, barTop)
+            }
+        }
+        if (morph > 0f) {
+            BarButton(
+                tab,
+                Modifier
+                    .align(if (barTop) Alignment.TopStart else Alignment.BottomStart)
+                    .then(if (barTop) Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top)) else Modifier.navigationBarsPadding())
+                    .padding(14.dp)
+                    .graphicsLayer {
+                        val k = 0.6f + 0.4f * morph
+                        scaleX = k
+                        scaleY = k
+                        alpha = ((morph - 0.3f) / 0.7f).coerceIn(0f, 1f)
+                    },
+            ) { Bar.expand() }
+        }
+    } else {
+        Box(
+            Modifier
+                .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
+                .onSizeChanged { onBarSize(it.height) }
+                .graphicsLayer { translationY = if (barTop) -barOffset else barOffset },
+        ) {
+            AddressBar(ui, tab, barTop)
         }
     }
 }

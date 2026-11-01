@@ -195,6 +195,31 @@ fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
     }
 }
 
+/** The start page has its own search box: only the tabs button and the menu, bottom right. */
+@Composable
+fun StartControls(ui: UiState, tab: Tab, modifier: Modifier) {
+    val p = LocalPalette.current
+    val shape = RoundedCornerShape(26.dp)
+    Row(
+        modifier
+            .shadow(6.dp, shape)
+            .clip(shape)
+            .background(p.field)
+            .padding(horizontal = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TabCountButton(
+            Browser.tabs.count { it.isPrivate == tab.isPrivate },
+            top = false,
+            onNewTab = { Browser.newTab(null, isPrivate = tab.isPrivate) },
+        ) { ui.panel = Panel.Tabs }
+        Box {
+            IconButtonSmall(Icons.Outlined.MoreVert, "Menu", size = 44, tint = p.mute) { ui.menu = true }
+            BrowserMenu(ui, tab, top = false)
+        }
+    }
+}
+
 /** Find in page: type, see "3/12", step up and down. */
 @Composable
 private fun RowScope.FindBar(ui: UiState, tab: Tab) {
@@ -348,7 +373,7 @@ private fun ShieldButton(tab: Tab) {
  * pops out, and let go: a new tab. One continuous gesture; letting go elsewhere cancels.
  */
 @Composable
-private fun TabCountButton(count: Int, top: Boolean, onNewTab: () -> Unit, onClick: () -> Unit) {
+fun TabCountButton(count: Int, top: Boolean, onNewTab: () -> Unit, onClick: () -> Unit) {
     val p = LocalPalette.current
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
