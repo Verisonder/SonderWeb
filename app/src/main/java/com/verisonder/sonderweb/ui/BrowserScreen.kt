@@ -140,19 +140,20 @@ fun BrowserScreen(activity: MainActivity) {
     val pinned = ui.editing || ui.menu || ui.finding || tab == null || activity.inFullscreen ||
         hideMode == Bar.ALWAYS || (hideMode == Bar.SLIDE && tab.isBlank)
     val collapsed = Bar.hidden && !pinned
-    val barOffset by animateFloatAsState(
+    // The animated values are read only while laying out and drawing (never while composing),
+    // so each frame of the bar's movement just moves pixels instead of rebuilding the screen.
+    val barOffsetState = animateFloatAsState(
         targetValue = if (collapsed) barPx.toFloat() else 0f,
         // Button mode: same pace as the morph so the page and the bar move as one, no bounce on the page.
         animationSpec = if (hideMode == Bar.BUTTON) spring(dampingRatio = 1f, stiffness = 380f) else spring(dampingRatio = 0.9f, stiffness = 500f),
         label = "bar",
     )
     // 0 = full bar, 1 = small button (button mode only).
-    val morph by animateFloatAsState(
+    val morphState = animateFloatAsState(
         targetValue = if (collapsed && hideMode == Bar.BUTTON) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.78f, stiffness = 380f),
         label = "morph",
     )
-    val visibleBarDp = with(LocalDensity.current) { (barPx - barOffset).coerceAtLeast(0f).toDp() }
 
     // The page keeps clear of the camera hole and the gesture bar (nothing hidden there); those
     // two thin strips take the colour of the page's own edges so it still looks edge to edge.
@@ -162,13 +163,15 @@ fun BrowserScreen(activity: MainActivity) {
     val safeBottom = if (activity.inFullscreen) 0 else WindowInsets.navigationBars.getBottom(density)
     // The bar already covers the strip on its side: only the rest of it lies over the page.
     val overPage = (barPx - if (barTop) safeTop else safeBottom).coerceAtLeast(0)
-    val overOffset = barOffset.coerceIn(0f, overPage.toFloat())
+    val overOffset = { barOffsetState.value.coerceIn(0f, overPage.toFloat()) }
     LaunchedEffect(overPage, activity.inFullscreen) {
         activity.geckoView.setDynamicToolbarMaxHeight(if (activity.inFullscreen) 0 else overPage)
+        // Follows the bar frame by frame without recomposing anything.
+        androidx.compose.runtime.snapshotFlow { if (activity.inFullscreen) 0 else -overOffset().roundToInt() }
+            .collect { activity.geckoView.setVerticalClipping(it) }
     }
-    SideEffect {
-        activity.geckoView.setVerticalClipping(if (activity.inFullscreen) 0 else -overOffset.roundToInt())
-    }
+    // While typing the bar is always fully shown, so suggestions sit right under (or over) it.
+    val barDp = with(density) { barPx.toDp() }
     val edgeTop by animateColorAsState(tab?.edgeTop?.let { Color(it) } ?: palette.bg, tween(220), label = "edgeTop")
     val edgeBottom by animateColorAsState(tab?.edgeBottom?.let { Color(it) } ?: palette.bg, tween(220), label = "edgeBottom")
 
@@ -213,7 +216,7 @@ fun BrowserScreen(activity: MainActivity) {
                 // you scroll down. The engine is told how much of the page the bar covers.
                 // Top bar: the page sits just under the visible part of the bar (its bottom
                 // runs off-screen by the same amount, which the engine accounts for).
-                val barSpace = if (barTop) PaddingValues(top = visibleBarDp) else PaddingValues(bottom = visibleBarDp)
+                val barSpace = if (barTop) PaddingValues(top = barDp) else PaddingValues(bottom = barDp)
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -228,7 +231,7 @@ fun BrowserScreen(activity: MainActivity) {
                             .padding(with(density) { PaddingValues(top = safeTop.toDp(), bottom = safeBottom.toDp()) })
                             .then(
                                 if (barTop && !activity.inFullscreen) {
-                                    Modifier.offset { IntOffset(0, (overPage - overOffset).roundToInt()) }
+                                    Modifier.offset { IntOffset(0, (overPage - overOffset()).roundToInt()) }
                                 } else {
                                     Modifier
                                 },
@@ -269,7 +272,7 @@ fun BrowserScreen(activity: MainActivity) {
                     exit = fadeOut(tween(120)),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    Box(Modifier.fillMaxSize()) { BarArea(ui, tab, barTop, hideMode, morph, barOffset) { barPx = it } }
+                    Box(Modifier.fillMaxSize()) { BarArea(ui, tab, barTop, hideMode, { morphState.value }, { barOffsetState.value }) { barPx = it } }
                 }
             }
 
@@ -338,8 +341,8 @@ private fun BoxScope.BarArea(
     tab: com.verisonder.sonderweb.browser.Tab?,
     barTop: Boolean,
     hideMode: Int,
-    morph: Float,
-    barOffset: Float,
+    morph: () -> Float,
+    barOffset: () -> Float,
     onBarSize: (Int) -> Unit,
 ) {
     val barScale = remember(ui.themeVersion) { Browser.prefs.barSize / 100f }
@@ -348,22 +351,26 @@ private fun BoxScope.BarArea(
         var corner by remember(saved, barTop) { mutableStateOf(if (saved in 0..3) saved else if (barTop) 1 else 3) }
         val right = corner == 1 || corner == 3
         // The bar shrinks towards the button's corner while the button grows out of it.
-        if (morph < 1f) {
+        // Only these two yes/no answers recompose; the in-between frames are drawn directly.
+        val barShown by remember { androidx.compose.runtime.derivedStateOf { morph() < 1f } }
+        val buttonShown by remember { androidx.compose.runtime.derivedStateOf { morph() > 0f } }
+        if (barShown) {
             Box(
                 Modifier
                     .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
                     .onSizeChanged { onBarSize(it.height) }
                     .graphicsLayer {
                         transformOrigin = TransformOrigin(if (right) 0.94f else 0.06f, if (barTop) 0f else 1f)
-                        scaleX = 1f - 0.82f * morph
-                        scaleY = 1f - 0.3f * morph
-                        alpha = (1f - morph * 1.6f).coerceIn(0f, 1f)
+                        val m = morph()
+                        scaleX = 1f - 0.82f * m
+                        scaleY = 1f - 0.3f * m
+                        alpha = (1f - m * 1.6f).coerceIn(0f, 1f)
                     },
             ) {
                 Scaled(barScale) { AddressBar(ui, tab, barTop) }
             }
         }
-        if (morph > 0f) {
+        if (buttonShown) {
             DraggableBarButton(tab, remember(ui.themeVersion) { Browser.prefs.buttonSize }, corner, morph, { corner = it; Browser.prefs.buttonCorner = it }) { Bar.expand() }
         }
     } else {
@@ -371,7 +378,7 @@ private fun BoxScope.BarArea(
             Modifier
                 .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
                 .onSizeChanged { onBarSize(it.height) }
-                .graphicsLayer { translationY = if (barTop) -barOffset else barOffset },
+                .graphicsLayer { translationY = if (barTop) -barOffset() else barOffset() },
         ) {
             Scaled(barScale) { AddressBar(ui, tab, barTop) }
         }
@@ -387,7 +394,7 @@ private fun BoxScope.DraggableBarButton(
     tab: com.verisonder.sonderweb.browser.Tab?,
     buttonDp: Int,
     corner: Int,
-    morph: Float,
+    morph: () -> Float,
     onCorner: (Int) -> Unit,
     onClick: () -> Unit,
 ) {
@@ -452,10 +459,11 @@ private fun BoxScope.DraggableBarButton(
                 }
             }
             .graphicsLayer {
-                val k = (0.6f + 0.4f * morph) * lift
+                val m = morph()
+                val k = (0.6f + 0.4f * m) * lift
                 scaleX = k
                 scaleY = k
-                alpha = ((morph - 0.3f) / 0.7f).coerceIn(0f, 1f)
+                alpha = ((m - 0.3f) / 0.7f).coerceIn(0f, 1f)
             },
         onClick = onClick,
     )
