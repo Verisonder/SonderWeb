@@ -106,6 +106,7 @@ private val index: List<Pair<String, Page>> = listOf(
     "Strict tracking protection" to Page.Privacy,
     "HTTPS only" to Page.Privacy,
     "Fingerprinting" to Page.Privacy,
+    "DuckDuckGo look" to Page.Search,
     "Secure DNS" to Page.Privacy,
     "DNS over HTTPS" to Page.Privacy,
     "Keep history" to Page.Privacy,
@@ -436,6 +437,15 @@ private fun SearchPage() {
         }
     }
     Hint("Type !w, !yt, !gh … before or after your words to search a site directly. Unknown bangs go through DuckDuckGo.")
+    var clean by remember { mutableStateOf(prefs.cleanDdg) }
+    Spacer(Modifier.height(12.dp))
+    Group {
+        Toggle("Clean DuckDuckGo look", "DuckDuckGo in the browser's own colours and font, without ads, logo, menus or extra buttons.", clean) {
+            clean = it
+            prefs.cleanDdg = it
+            com.verisonder.sonderweb.browser.Look.apply(it)
+        }
+    }
 }
 
 @Composable

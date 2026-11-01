@@ -119,7 +119,15 @@ val unpackUblock by tasks.registering(Sync::class) {
     into(layout.projectDirectory.dir("src/main/assets/extensions/ublock"))
 }
 
-tasks.named("preBuild") { dependsOn(unpackUblock) }
+// The built-in "SonderWeb look" extension uses the app's own Inter font files (copied, not committed).
+val styleFonts by tasks.registering(Sync::class) {
+    from(layout.projectDirectory.dir("src/main/res/font")) {
+        include("inter_regular.ttf", "inter_semibold.ttf")
+    }
+    into(layout.projectDirectory.dir("src/main/assets/extensions/style/fonts"))
+}
+
+tasks.named("preBuild") { dependsOn(unpackUblock, styleFonts) }
 
 dependencies {
     implementation(libs.androidx.core.ktx)

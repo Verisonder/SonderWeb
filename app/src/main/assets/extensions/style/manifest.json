@@ -1,0 +1,17 @@
+{
+  "manifest_version": 2,
+  "name": "SonderWeb look",
+  "version": "1.0",
+  "description": "Gives DuckDuckGo the same clean look as the rest of SonderWeb.",
+  "browser_specific_settings": { "gecko": { "id": "look@sonderweb" } },
+  "content_scripts": [
+    {
+      "matches": ["https://duckduckgo.com/*", "https://*.duckduckgo.com/*"],
+      "exclude_matches": ["https://duckduckgo.com/duckduckgo-help-pages/*"],
+      "js": ["ddg.js"],
+      "css": ["ddg.css"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": ["fonts/*"]
+}

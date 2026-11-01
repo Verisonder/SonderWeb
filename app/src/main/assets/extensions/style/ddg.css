@@ -1,0 +1,107 @@
+/* DuckDuckGo, made to look like the rest of SonderWeb: calm colours, rounded cards,
+   and nothing that isn't the search box, the tabs and the results. */
+
+html.sw-look, html.sw-look body, html.sw-look .site-wrapper, html.sw-look #header_wrapper,
+html.sw-look .header-wrap, html.sw-look #web_content_wrapper, html.sw-look .content-wrap,
+html.sw-look #header, html.sw-look .header, html.sw-look #react-duckbar, html.sw-look #react-layout {
+  background: var(--sw-bg) !important;
+  color: var(--sw-text) !important;
+  font-family: "SonderInter", system-ui, sans-serif !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+html.sw-look body * { font-family: "SonderInter", system-ui, sans-serif !important; }
+
+/* Clutter out: logo, menu, AI button, filter row, sidebar, promos, feedback, footer. */
+html.sw-look [data-testid="header-logo"],
+html.sw-look .header--aside,
+html.sw-look #react-ai-button-slot,
+html.sw-look .js-side-menu-open,
+html.sw-look [data-testid="web-vertical"] > div:first-child,
+html.sw-look [data-testid="sidebar"],
+html.sw-look [data-testid="serp-atb-btn"],
+html.sw-look [data-testid="promo-button"],
+html.sw-look [data-testid="feedback-prompt"],
+html.sw-look [data-testid="privacy-reminder"],
+html.sw-look .footer,
+html.sw-look article[data-testid="result"] > div:first-child,
+html.sw-look article[data-testid="result"] ul {
+  display: none !important;
+}
+
+/* No empty band where the logo was. */
+html.sw-look #header_wrapper, html.sw-look .header-wrap { height: auto !important; min-height: 0 !important; padding-top: 8px !important; }
+html.sw-look #header { padding-top: 0 !important; height: auto !important; }
+
+/* The search box: one rounded field, like the address bar. */
+html.sw-look [data-testid="search-form"],
+html.sw-look [data-testid="search-form-input-wrapper"] {
+  background: var(--sw-field) !important;
+  border: 0 !important;
+  border-radius: 24px !important;
+  box-shadow: none !important;
+}
+html.sw-look [data-testid="search-form"] input {
+  background: transparent !important;
+  color: var(--sw-text) !important;
+}
+html.sw-look [data-testid="search-form"] button,
+html.sw-look [data-testid="search-form"] svg {
+  color: var(--sw-faint) !important;
+  fill: currentColor;
+  background: transparent !important;
+}
+
+/* All · Images · Videos … */
+html.sw-look [data-testid="duckbar"],
+html.sw-look [data-testid="duckbar"] * {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+html.sw-look [data-testid="duckbar"] *::before,
+html.sw-look [data-testid="duckbar"] *::after { background: none !important; box-shadow: none !important; }
+html.sw-look [data-testid="duckbar"] a { color: var(--sw-mute) !important; }
+html.sw-look [data-testid="duckbar"] a[aria-current],
+html.sw-look [data-testid="duckbar"] a.is-active,
+html.sw-look [data-testid="duckbar"] a[class*="active"] {
+  color: var(--sw-accent) !important;
+  border-bottom: 2px solid var(--sw-accent) !important;
+}
+html.sw-look [data-testid="duckbar"] button { display: none !important; }
+
+/* Results: plain rounded cards. */
+html.sw-look article[data-testid="result"] {
+  background: var(--sw-card) !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+  margin: 0 12px 10px !important;
+  padding: 14px 16px !important;
+}
+html.sw-look article[data-testid="result"] * {
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+html.sw-look [data-testid="result-title-a"],
+html.sw-look [data-testid="result-title-a"] span {
+  color: var(--sw-accent) !important;
+  font-weight: 600 !important;
+  font-size: 17px !important;
+  text-decoration: none !important;
+}
+html.sw-look [data-testid="result-title-a"]:visited,
+html.sw-look [data-testid="result-title-a"]:visited span { color: var(--sw-visited) !important; }
+html.sw-look [data-testid="result-extras-url-link"],
+html.sw-look [data-testid="result-extras-url-link"] * { color: var(--sw-faint) !important; font-size: 12px !important; }
+html.sw-look article[data-testid="result"] p { color: var(--sw-mute) !important; }
+html.sw-look article[data-testid="result"] span,
+html.sw-look article[data-testid="result"] b { color: var(--sw-text); }
+html.sw-look [data-testid="result-extras-site-search-link"] > div {
+  background: var(--sw-field) !important;
+  border-radius: 10px !important;
+}
+
+/* Everything else DuckDuckGo draws in its own greys follows the browser's palette. */
+html.sw-look section, html.sw-look [data-testid="mainline"] { background: transparent !important; }
+html.sw-look a { color: var(--sw-accent); }

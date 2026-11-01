@@ -101,6 +101,7 @@ object Browser {
         applyHardening()
         Extensions.setup()
         Ublock.install(runtime)
+        Look.install(runtime)
         restoreTabs()
     }
 

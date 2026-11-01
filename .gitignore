@@ -9,3 +9,4 @@ local.properties
 *.keystore
 docs/HANDOFF.md
 app/src/main/assets/extensions/ublock/
+app/src/main/assets/extensions/style/fonts/

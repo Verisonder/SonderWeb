@@ -134,7 +134,8 @@ object Extensions {
     fun refresh() {
         controller.list().accept({ all ->
             Browser.main.post {
-                val exts = (all ?: emptyList()).filter { !it.metaData.temporary }
+                // The browser's own look extension isn't one of yours: it stays out of the list.
+                val exts = (all ?: emptyList()).filter { !it.metaData.temporary && it.id != Look.ID }
                 list.clear()
                 // uBlock Origin first, then by name.
                 list.addAll(exts.sortedWith(compareBy({ it.id != Ublock.ID }, { it.metaData.name ?: it.id })))
@@ -268,6 +269,37 @@ object Extensions {
         override fun onOpenOptionsPage(source: WebExtension) {
             closePopup()
             openOptions(source)
+        }
+    }
+}
+
+/**
+ * A small extension inside the app that restyles DuckDuckGo to match the browser
+ * (Settings › Search engine › "Clean DuckDuckGo look").
+ */
+object Look {
+    const val ID = "look@sonderweb"
+    private const val LOCATION = "resource://android/assets/extensions/style/"
+    private var extension: WebExtension? = null
+
+    fun install(runtime: GeckoRuntime) {
+        runtime.webExtensionController.ensureBuiltIn(LOCATION, ID).accept({ ext ->
+            Browser.main.post {
+                extension = ext ?: return@post
+                runtime.webExtensionController.setAllowedInPrivateBrowsing(ext, true)
+                apply(Browser.prefs.cleanDdg)
+            }
+        }, { _ -> })
+    }
+
+    fun apply(on: Boolean) {
+        val ext = extension ?: return
+        val c = Browser.runtime.webExtensionController
+        val enabled = ext.metaData.enabled
+        if (on && !enabled) {
+            c.enable(ext, WebExtensionController.EnableSource.USER).accept({ e -> if (e != null) extension = e }, { _ -> })
+        } else if (!on && enabled) {
+            c.disable(ext, WebExtensionController.EnableSource.USER).accept({ e -> if (e != null) extension = e }, { _ -> })
         }
     }
 }

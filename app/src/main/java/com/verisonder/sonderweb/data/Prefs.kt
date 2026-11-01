@@ -24,6 +24,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("strict", true)
         set(v) = sp.edit().putBoolean("strict", v).apply()
 
+    /** DuckDuckGo restyled to look like the browser (a small built-in extension). */
+    var cleanDdg: Boolean
+        get() = sp.getBoolean("clean_ddg", true)
+        set(v) = sp.edit().putBoolean("clean_ddg", v).apply()
+
     var httpsOnly: Boolean
         get() = sp.getBoolean("https_only", true)
         set(v) = sp.edit().putBoolean("https_only", v).apply()
