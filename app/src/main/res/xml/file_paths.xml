@@ -2,4 +2,6 @@
 <paths>
     <!-- Downloads on Android 8 and 9 (newer versions use the shared Downloads folder). -->
     <external-files-path name="downloads" path="Download/" />
+    <!-- App updates, downloaded before Android's installer opens them. -->
+    <cache-path name="updates" path="updates/" />
 </paths>

@@ -200,7 +200,7 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                 ui.panel = Panel.Extensions
                 close()
             }
-            Item("Settings", Icons.Outlined.Settings) {
+            Item("Settings", Icons.Outlined.Settings, dot = com.verisonder.sonderweb.data.AppUpdate.available != null) {
                 ui.panel = Panel.Settings
                 close()
             }
@@ -220,10 +220,15 @@ private fun Divider() {
 }
 
 @Composable
-private fun Item(label: String, icon: ImageVector, onClick: () -> Unit) {
+private fun Item(label: String, icon: ImageVector, dot: Boolean = false, onClick: () -> Unit) {
     val p = LocalPalette.current
     DropdownMenuItem(
-        text = { Text(label, fontSize = 16.sp, color = p.text) },
+        text = {
+            androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(label, fontSize = 16.sp, color = p.text)
+                if (dot) UpdateDot(Modifier.padding(start = 8.dp))
+            }
+        },
         onClick = onClick,
         leadingIcon = { Icon(icon, null, tint = p.mute, modifier = Modifier.size(22.dp)) },
         contentPadding = PaddingValues(horizontal = 20.dp),
@@ -269,4 +274,15 @@ fun MenuRow(icon: ImageVector, label: String, tint: androidx.compose.ui.graphics
         Spacer(Modifier.width(18.dp))
         Text(label, color = tint ?: p.text, fontSize = 15.sp)
     }
+}
+
+/** The small blue dot that says a new version is ready (on the menu button and on Settings). */
+@Composable
+fun UpdateDot(modifier: Modifier = Modifier) {
+    androidx.compose.foundation.layout.Box(
+        modifier
+            .size(8.dp)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(LocalPalette.current.accent),
+    )
 }

@@ -195,6 +195,7 @@ fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
                 }
                 Box {
                     IconButtonSmall(Icons.Outlined.MoreVert, "Menu", size = 44, tint = p.mute) { ui.menu = true }
+                    if (com.verisonder.sonderweb.data.AppUpdate.available != null) UpdateDot(Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp))
                     if (tab != null) BrowserMenu(ui, tab, top)
                 }
             }
@@ -225,6 +226,7 @@ fun StartControls(ui: UiState, tab: Tab, modifier: Modifier) {
         ) { ui.panel = Panel.Tabs }
         Box {
             IconButtonSmall(Icons.Outlined.MoreVert, "Menu", size = 44, tint = p.mute) { ui.menu = true }
+                    if (com.verisonder.sonderweb.data.AppUpdate.available != null) UpdateDot(Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp))
             BrowserMenu(ui, tab, top = false)
         }
     }

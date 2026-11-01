@@ -47,6 +47,7 @@ import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Tab
 import androidx.compose.material3.AlertDialog
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.offset
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.outlined.MoreVert
@@ -136,6 +137,8 @@ private val index: List<Pair<String, Page>> = listOf(
     "Address bar size" to Page.Look,
     "Button size" to Page.Look,
     "Button position" to Page.Look,
+    "Update" to Page.About,
+    "Version" to Page.About,
     "Status bar" to Page.Look,
     "Reopen tabs" to Page.Tabs,
     "Version" to Page.About,
@@ -284,7 +287,14 @@ private fun MainPage(
 
     GroupTitle("About")
     Group {
-        NavRow(Icons.Outlined.Info, "About SonderWeb", "Version " + BuildConfig.VERSION_NAME, first = true, last = true) {
+        NavRow(
+            Icons.Outlined.Info,
+            "About SonderWeb",
+            com.verisonder.sonderweb.data.AppUpdate.available?.let { "Version ${it.version} is ready to install" } ?: ("Version " + BuildConfig.VERSION_NAME),
+            first = true,
+            last = true,
+            dot = com.verisonder.sonderweb.data.AppUpdate.available != null,
+        ) {
             onOpen(Page.About)
         }
     }
@@ -684,6 +694,8 @@ private fun TabsPage() {
 @Composable
 private fun AboutPage(ui: UiState) {
     Spacer(Modifier.height(8.dp))
+    Group { UpdateRow() }
+    Spacer(Modifier.height(12.dp))
     Group {
         Action("SonderWeb " + BuildConfig.VERSION_NAME, "by Verisonder · Apache License 2.0") {}
         Action("Source code", "github.com/Verisonder/SonderWeb") {
@@ -697,6 +709,86 @@ private fun AboutPage(ui: UiState) {
             "Inter typeface (SIL Open Font License 1.1)\n" +
             "No accounts, no telemetry, no tracking.",
     )
+}
+
+/** Updates: check, see what's new, install in one tap. */
+@Composable
+private fun UpdateRow() {
+    val p = LocalPalette.current
+    val ctx = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val up = com.verisonder.sonderweb.data.AppUpdate
+    val info = up.available
+    val progress = up.progress
+    var checking by remember { mutableStateOf(false) }
+    var note by remember { mutableStateOf<String?>(null) }
+    Column(Modifier.fillMaxWidth().background(p.field).padding(horizontal = 20.dp, vertical = 16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (info != null) "Version ${info.version} is ready" else "Updates",
+                    color = p.text,
+                    fontSize = 16.sp,
+                )
+                Text(
+                    when {
+                        progress != null -> "Downloading… ${(progress * 100).roundToInt()}%"
+                        info != null -> "You have " + BuildConfig.VERSION_NAME + (if (info.size > 0) " · ${info.size / 1_000_000} MB" else "")
+                        else -> note ?: ("You have " + BuildConfig.VERSION_NAME)
+                    },
+                    color = p.faint,
+                    fontSize = 13.sp,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            val label = when {
+                progress != null -> null
+                info != null -> "Update"
+                checking -> "Checking…"
+                else -> "Check"
+            }
+            if (label != null) {
+                Text(
+                    label,
+                    color = if (info != null) p.onAccent else p.text,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (info != null) p.accent else p.line)
+                        .clickable(enabled = !checking) {
+                            scope.launch {
+                                if (info != null) {
+                                    runCatching { up.install(ctx, info) }
+                                        .onFailure { note = "Couldn't download: " + (it.message ?: "network error") }
+                                } else {
+                                    checking = true
+                                    note = runCatching { up.check(ctx) }.fold(
+                                        { if (it == null) "You're on the latest version" else null },
+                                        { "Couldn't check: " + (it.message ?: "network error") },
+                                    )
+                                    checking = false
+                                }
+                            }
+                        }
+                        .padding(horizontal = 18.dp, vertical = 9.dp),
+                )
+            }
+        }
+        if (progress != null) {
+            Spacer(Modifier.height(12.dp))
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = { progress },
+                color = p.accent,
+                trackColor = p.line,
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)),
+            )
+        }
+        if (info != null && info.notes.isNotBlank() && progress == null) {
+            Spacer(Modifier.height(10.dp))
+            Text(info.notes.trim().take(600), color = p.mute, fontSize = 13.sp, lineHeight = 18.sp)
+        }
+    }
 }
 
 /** Start page settings (also reachable from the start page itself). */
@@ -836,6 +928,7 @@ private fun NavRow(
     sub: String?,
     first: Boolean = false,
     last: Boolean = false,
+    dot: Boolean = false,
     onClick: () -> Unit,
 ) {
     val p = LocalPalette.current
@@ -853,8 +946,9 @@ private fun NavRow(
         Spacer(Modifier.width(22.dp))
         Column(Modifier.weight(1f)) {
             Text(title, color = p.text, fontSize = 17.sp)
-            if (!sub.isNullOrBlank()) Text(sub, color = p.faint, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (!sub.isNullOrBlank()) Text(sub, color = if (dot) p.accent else p.faint, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        if (dot) UpdateDot()
     }
 }
 
