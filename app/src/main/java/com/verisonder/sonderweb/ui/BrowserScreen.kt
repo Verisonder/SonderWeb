@@ -248,10 +248,16 @@ fun BrowserScreen(activity: MainActivity) {
                     }
                     AnimatedVisibility(
                         visible = ui.editing && tab != null,
-                        enter = fadeIn(tween(160)) + slideInVertically(tween(200)) { if (barTop) -it / 24 else it / 24 },
+                        enter = fadeIn(tween(160)),
                         exit = fadeOut(tween(120)),
                     ) {
-                        tab?.let { Box(Modifier.fillMaxSize().padding(barSpace)) { Suggestions(ui, it, barTop) } }
+                        // Typing: an opaque sheet over the whole page (also behind and around the bar), so no
+                        // part of the page peeks through above the keyboard.
+                        tab?.let {
+                            Box(Modifier.fillMaxSize().background(palette.bg)) {
+                                Box(Modifier.fillMaxSize().padding(barSpace)) { Suggestions(ui, it, barTop) }
+                            }
+                        }
                     }
                 }
                 AnimatedVisibility(
