@@ -26,6 +26,7 @@ import com.verisonder.sonderweb.browser.Bar
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.animation.core.VectorConverter
@@ -536,7 +537,7 @@ private fun SwipeToCompact(enabled: Boolean, content: @Composable () -> Unit) {
             }
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
-                androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                detectHorizontalDragGestures(
                     onDragEnd = {
                         if (kotlin.math.abs(dx.value) > threshold) {
                             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)

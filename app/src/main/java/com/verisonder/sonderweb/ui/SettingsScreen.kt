@@ -582,7 +582,7 @@ private fun ButtonPlace(ui: UiState) {
     var x by remember { mutableStateOf(prefs.buttonX) }
     var y by remember { mutableStateOf(prefs.buttonY) }
     val colors = SliderDefaults.colors(thumbColor = p.accent, activeTrackColor = p.accent, inactiveTrackColor = p.line)
-    val save = {
+    val save: () -> Unit = {
         prefs.buttonX = x
         prefs.buttonY = y
         ui.themeVersion++
