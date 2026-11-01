@@ -4,15 +4,19 @@ import android.app.role.RoleManager
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,16 +25,28 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Tab
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,9 +55,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verisonder.sonderweb.BuildConfig
@@ -51,154 +69,620 @@ import com.verisonder.sonderweb.core.SearchEngines
 import com.verisonder.sonderweb.data.Place
 import com.verisonder.sonderweb.data.Weather
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import org.mozilla.geckoview.StorageController
+
+/** Settings pages, Brave-style: a grouped list on the first page, details one tap away. */
+private enum class Page(val title: String) {
+    Privacy("Privacy & security"),
+    Shields("uBlock Origin"),
+    Start("Start page"),
+    Search("Search engine"),
+    Look("Appearance"),
+    Tabs("Tabs"),
+    About("About SonderWeb"),
+}
+
+/** Every setting by name, so the search box can find it. */
+private val index: List<Pair<String, Page>> = listOf(
+    "Strict tracking protection" to Page.Privacy,
+    "HTTPS only" to Page.Privacy,
+    "Keep history" to Page.Privacy,
+    "Clear browsing data" to Page.Privacy,
+    "Cookies" to Page.Privacy,
+    "uBlock Origin filters" to Page.Shields,
+    "Ad blocker" to Page.Shields,
+    "Your name" to Page.Start,
+    "Weather" to Page.Start,
+    "City" to Page.Start,
+    "Clock" to Page.Start,
+    "Greeting" to Page.Start,
+    "Shortcuts" to Page.Start,
+    "Search engine" to Page.Search,
+    "!bangs" to Page.Search,
+    "Theme" to Page.Look,
+    "Dark mode" to Page.Look,
+    "Address bar position" to Page.Look,
+    "Hide address bar" to Page.Look,
+    "Status bar" to Page.Look,
+    "Reopen tabs" to Page.Tabs,
+    "Version" to Page.About,
+    "Licences" to Page.About,
+)
 
 @Composable
 fun SettingsScreen(ui: UiState) {
     val p = LocalPalette.current
-    val ctx = LocalContext.current
-    val prefs = Browser.prefs
-    var engine by remember { mutableStateOf(prefs.searchEngineId) }
-    var custom by remember { mutableStateOf(prefs.customSearch) }
-    var strict by remember { mutableStateOf(prefs.strictTracking) }
-    var httpsOnly by remember { mutableStateOf(prefs.httpsOnly) }
-    var history by remember { mutableStateOf(prefs.saveHistory) }
-    var restore by remember { mutableStateOf(prefs.restoreTabs) }
-    var theme by remember { mutableStateOf(prefs.theme) }
-    var barTop by remember { mutableStateOf(prefs.barOnTop) }
+    var page by remember { mutableStateOf<Page?>(null) }
+    var query by remember { mutableStateOf("") }
     var clearing by remember { mutableStateOf(false) }
+    val close = { ui.panel = Panel.None }
 
-    Column(Modifier.fillMaxSize()) {
-        PageHeader("Settings", { ui.panel = Panel.None })
+    BackHandler(enabled = page != null) { page = null }
+
+    Column(Modifier.fillMaxSize().background(p.bg)) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButtonSmall(Icons.AutoMirrored.Outlined.ArrowBack, "Back", size = 48) {
+                if (page != null) page = null else close()
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                page?.title ?: "Settings",
+                color = p.text,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            IconButtonSmall(Icons.Outlined.Close, "Close", size = 48, onClick = close)
+        }
+
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 24.dp),
+                .padding(bottom = 28.dp),
         ) {
-            Section("Search")
-            SearchEngines.builtIn.forEach { e ->
-                Choice(e.name, engine == e.id) {
-                    engine = e.id
-                    prefs.searchEngineId = e.id
-                }
-            }
-            Choice("Custom", engine == SearchEngines.CUSTOM_ID) {
-                engine = SearchEngines.CUSTOM_ID
-                prefs.searchEngineId = SearchEngines.CUSTOM_ID
-            }
-            if (engine == SearchEngines.CUSTOM_ID) {
-                Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(p.field)
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                    ) {
-                        if (custom.isEmpty()) Text("https://example.com/search?q={q}", color = p.faint, fontSize = 14.sp)
-                        BasicTextField(
-                            custom,
-                            {
-                                custom = it
-                                prefs.customSearch = it
-                            },
-                            singleLine = true,
-                            textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 14.sp),
-                            cursorBrush = SolidColor(p.accent),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    Text(
-                        if (SearchEngines.isValidTemplate(custom)) "Your search goes where {q} is." else "Needs to start with https:// and contain {q}. Until then DuckDuckGo is used.",
-                        color = if (SearchEngines.isValidTemplate(custom)) p.faint else p.danger,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
-            }
-            Hint("Type !w, !yt, !gh … before or after your words to search a site directly. Unknown bangs go through DuckDuckGo.")
-
-            StartPageSettings(ui)
-
-            Section("Privacy")
-            Toggle("Strict tracking protection", "Firefox's own blocking on top of uBlock Origin. Turn off if a site breaks.", strict) {
-                strict = it
-                prefs.strictTracking = it
-                Browser.applySettings()
-            }
-            Toggle("HTTPS only", "Never load a site over an unencrypted connection.", httpsOnly) {
-                httpsOnly = it
-                prefs.httpsOnly = it
-                Browser.applySettings()
-            }
-            Toggle("Keep history", "Off: pages you visit aren't remembered (private tabs never are).", history) {
-                history = it
-                prefs.saveHistory = it
-            }
-            Toggle("Reopen tabs", "Bring back your normal tabs when the app starts.", restore) {
-                restore = it
-                prefs.restoreTabs = it
-            }
-            Action("Clear browsing data", "History, cookies, site data, cache") { clearing = true }
-
-            Section("uBlock Origin")
-            Action(
-                "Filters and settings",
-                if (Ublock.extension != null) "Version " + BuildConfig.UBLOCK_VERSION + " · built in" else "Starting…",
-            ) { if (Ublock.extension != null) {
-                ui.panel = Panel.None
-                Ublock.openDashboard()
-            } }
-            Hint("Tap the shield in the address bar to see what a page blocked, or to turn blocking off for that site.")
-
-            Section("Look")
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("Address bar", color = p.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                Segmented(listOf("Top", "Bottom"), if (barTop) 0 else 1, p.accent) {
-                    barTop = it == 0
-                    prefs.barOnTop = barTop
-                    ui.themeVersion++
-                }
-            }
-            Choice("Follow the system", theme == 0) { theme = 0; prefs.theme = 0; Browser.applySettings(); ui.themeVersion++ }
-            Choice("Light", theme == 1) { theme = 1; prefs.theme = 1; Browser.applySettings(); ui.themeVersion++ }
-            Choice("Dark", theme == 2) { theme = 2; prefs.theme = 2; Browser.applySettings(); ui.themeVersion++ }
-
-            Section("Default browser")
-            Action("Make SonderWeb the default", "Links from other apps open here") {
-                val i = if (Build.VERSION.SDK_INT >= 29) {
-                    val rm = ctx.getSystemService(RoleManager::class.java)
-                    if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_BROWSER) && !rm.isRoleHeld(RoleManager.ROLE_BROWSER)) {
-                        rm.createRequestRoleIntent(RoleManager.ROLE_BROWSER)
-                    } else {
-                        Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
-                    }
-                } else {
-                    Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
-                }
-                runCatching { ctx.startActivity(i) }
-            }
-
-            Section("About")
-            Hint(
-                "SonderWeb " + BuildConfig.VERSION_NAME + " by Verisonder · Apache License 2.0\n" +
-                    "Engine: GeckoView (Mozilla Public License 2.0)\n" +
-                    "uBlock Origin by Raymond Hill (GPL-3.0), included unmodified\n" +
-                    "No accounts, no telemetry, no tracking.",
-            )
-            Action("Source code", "github.com/Verisonder/SonderWeb") {
-                ui.panel = Panel.None
-                Browser.newTab("https://github.com/Verisonder/SonderWeb", isPrivate = false)
+            when (page) {
+                null -> MainPage(query, { query = it }, onOpen = { page = it }, onClear = { clearing = true })
+                Page.Privacy -> PrivacyPage { clearing = true }
+                Page.Shields -> ShieldsPage(ui)
+                Page.Start -> StartSettings(ui)
+                Page.Search -> SearchPage()
+                Page.Look -> LookPage(ui)
+                Page.Tabs -> TabsPage()
+                Page.About -> AboutPage(ui)
             }
         }
     }
 
     if (clearing) ClearDataDialog { clearing = false }
+}
+
+// ---- First page ----
+
+@Composable
+private fun MainPage(
+    query: String,
+    onQuery: (String) -> Unit,
+    onOpen: (Page) -> Unit,
+    onClear: () -> Unit,
+) {
+    val p = LocalPalette.current
+    val ctx = LocalContext.current
+    Row(
+        Modifier
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .fillMaxWidth()
+            .height(52.dp)
+            .clip(RoundedCornerShape(26.dp))
+            .background(p.field)
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.Search, null, tint = p.mute, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(14.dp))
+        Box(Modifier.weight(1f)) {
+            if (query.isEmpty()) Text("Search settings", color = p.faint, fontSize = 16.sp)
+            BasicTextField(
+                query,
+                onQuery,
+                singleLine = true,
+                textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 16.sp),
+                cursorBrush = SolidColor(p.accent),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (query.isNotEmpty()) IconButtonSmall(Icons.Outlined.Close, "Clear", size = 32) { onQuery("") }
+    }
+
+    if (query.isNotBlank()) {
+        val q = query.trim().lowercase()
+        val hits = index.filter { (name, pg) -> name.lowercase().contains(q) || pg.title.lowercase().contains(q) }
+        GroupTitle("Results")
+        if (hits.isEmpty()) {
+            Hint("Nothing matches.")
+        } else {
+            Group {
+                hits.forEachIndexed { i, (name, pg) ->
+                    NavRow(iconFor(pg), name, pg.title, first = i == 0, last = i == hits.lastIndex) { onOpen(pg) }
+                }
+            }
+        }
+        return
+    }
+
+    GroupTitle("Features")
+    Group {
+        NavRow(Icons.Outlined.Security, "Privacy & security", null, first = true) { onOpen(Page.Privacy) }
+        NavRow(
+            Icons.Outlined.Shield,
+            "uBlock Origin",
+            if (Ublock.extension != null) "On · version " + BuildConfig.UBLOCK_VERSION else "Starting…",
+        ) { onOpen(Page.Shields) }
+        NavRow(Icons.Outlined.Dashboard, "Start page", null, last = true) { onOpen(Page.Start) }
+    }
+
+    GroupTitle("General")
+    Group {
+        NavRow(Icons.Outlined.Search, "Search engine", Browser.prefs.engine().name, first = true) { onOpen(Page.Search) }
+        NavRow(Icons.Outlined.Palette, "Appearance", null) { onOpen(Page.Look) }
+        NavRow(Icons.Outlined.Tab, "Tabs", null) { onOpen(Page.Tabs) }
+        NavRow(Icons.AutoMirrored.Outlined.OpenInNew, "Default browser", "Open links from other apps here") {
+            runCatching { ctx.startActivity(defaultBrowserIntent(ctx)) }
+        }
+        NavRow(Icons.Outlined.DeleteSweep, "Clear browsing data", null, last = true, onClick = onClear)
+    }
+
+    GroupTitle("About")
+    Group {
+        NavRow(Icons.Outlined.Info, "About SonderWeb", "Version " + BuildConfig.VERSION_NAME, first = true, last = true) {
+            onOpen(Page.About)
+        }
+    }
+}
+
+private fun iconFor(page: Page): ImageVector = when (page) {
+    Page.Privacy -> Icons.Outlined.Security
+    Page.Shields -> Icons.Outlined.Shield
+    Page.Start -> Icons.Outlined.Dashboard
+    Page.Search -> Icons.Outlined.Search
+    Page.Look -> Icons.Outlined.Palette
+    Page.Tabs -> Icons.Outlined.Tab
+    Page.About -> Icons.Outlined.Info
+}
+
+private fun defaultBrowserIntent(ctx: android.content.Context): Intent {
+    if (Build.VERSION.SDK_INT >= 29) {
+        val rm = ctx.getSystemService(RoleManager::class.java)
+        if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_BROWSER) && !rm.isRoleHeld(RoleManager.ROLE_BROWSER)) {
+            return rm.createRequestRoleIntent(RoleManager.ROLE_BROWSER)
+        }
+    }
+    return Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+}
+
+// ---- Pages ----
+
+@Composable
+private fun PrivacyPage(onClear: () -> Unit) {
+    val prefs = Browser.prefs
+    var strict by remember { mutableStateOf(prefs.strictTracking) }
+    var httpsOnly by remember { mutableStateOf(prefs.httpsOnly) }
+    var history by remember { mutableStateOf(prefs.saveHistory) }
+    Spacer(Modifier.height(8.dp))
+    Group {
+        Toggle("Strict tracking protection", "Firefox's own blocking on top of uBlock Origin. Turn off if a site breaks.", strict) {
+            strict = it
+            prefs.strictTracking = it
+            Browser.applySettings()
+        }
+        Toggle("HTTPS only", "Never load a site over an unencrypted connection.", httpsOnly) {
+            httpsOnly = it
+            prefs.httpsOnly = it
+            Browser.applySettings()
+        }
+        Toggle("Keep history", "Off: pages you visit aren't remembered. Private tabs never are.", history) {
+            history = it
+            prefs.saveHistory = it
+        }
+    }
+    Spacer(Modifier.height(12.dp))
+    Group { Action("Clear browsing data", "History, cookies, site data, cache", onClick = onClear) }
+    Hint("Always on: cookies are kept apart per site, tracking parameters are removed from links, and sites are told not to sell your data (Global Privacy Control).")
+}
+
+@Composable
+private fun ShieldsPage(ui: UiState) {
+    Spacer(Modifier.height(8.dp))
+    Group {
+        Action(
+            "Filters and settings",
+            if (Ublock.extension != null) "uBlock Origin " + BuildConfig.UBLOCK_VERSION + " · built in" else "Starting…",
+        ) {
+            if (Ublock.extension != null) {
+                ui.panel = Panel.None
+                Ublock.openDashboard()
+            }
+        }
+    }
+    Hint("Tap the shield in the address bar to see what a page blocked, or to turn blocking off for that site.")
+}
+
+@Composable
+private fun SearchPage() {
+    val p = LocalPalette.current
+    val prefs = Browser.prefs
+    var engine by remember { mutableStateOf(prefs.searchEngineId) }
+    var custom by remember { mutableStateOf(prefs.customSearch) }
+    Spacer(Modifier.height(8.dp))
+    Group {
+        SearchEngines.builtIn.forEach { e ->
+            Choice(e.name, engine == e.id) {
+                engine = e.id
+                prefs.searchEngineId = e.id
+            }
+        }
+        Choice("Custom", engine == SearchEngines.CUSTOM_ID) {
+            engine = SearchEngines.CUSTOM_ID
+            prefs.searchEngineId = SearchEngines.CUSTOM_ID
+        }
+    }
+    if (engine == SearchEngines.CUSTOM_ID) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            SettingsField(custom, "https://example.com/search?q={q}") {
+                custom = it
+                prefs.customSearch = it
+            }
+            Text(
+                if (SearchEngines.isValidTemplate(custom)) "Your search goes where {q} is." else "Needs to start with https:// and contain {q}. Until then DuckDuckGo is used.",
+                color = if (SearchEngines.isValidTemplate(custom)) p.faint else p.danger,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 6.dp, start = 4.dp),
+            )
+        }
+    }
+    Hint("Type !w, !yt, !gh … before or after your words to search a site directly. Unknown bangs go through DuckDuckGo.")
+}
+
+@Composable
+private fun LookPage(ui: UiState) {
+    val p = LocalPalette.current
+    val prefs = Browser.prefs
+    var theme by remember { mutableStateOf(prefs.theme) }
+    var barTop by remember { mutableStateOf(prefs.barOnTop) }
+    var barHide by remember { mutableStateOf(prefs.barHide) }
+    var status by remember { mutableStateOf(prefs.showStatusBar) }
+    val changed = {
+        Browser.applySettings()
+        ui.themeVersion++
+    }
+
+    GroupTitle("Theme")
+    Group {
+        Choice("Follow the system", theme == 0) { theme = 0; prefs.theme = 0; changed() }
+        Choice("Light", theme == 1) { theme = 1; prefs.theme = 1; changed() }
+        Choice("Dark", theme == 2) { theme = 2; prefs.theme = 2; changed() }
+    }
+
+    GroupTitle("Address bar")
+    Group {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 18.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Position", color = p.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            Segmented(listOf("Top", "Bottom"), if (barTop) 0 else 1, p.accent) {
+                barTop = it == 0
+                prefs.barOnTop = barTop
+                changed()
+            }
+        }
+    }
+    Spacer(Modifier.height(12.dp))
+    Group {
+        Choice("Shrink to a small button", barHide == 2, "Tap the button to bring the bar back") {
+            barHide = 2; prefs.barHide = 2; changed()
+        }
+        Choice("Slide away while scrolling", barHide == 1, "Scroll up to bring it back") {
+            barHide = 1; prefs.barHide = 1; changed()
+        }
+        Choice("Always shown", barHide == 0) { barHide = 0; prefs.barHide = 0; changed() }
+    }
+
+    GroupTitle("Screen")
+    Group {
+        Toggle("Phone status bar", "Time and battery at the top. Off: pages use the whole screen; swipe down to peek.", status) {
+            status = it
+            prefs.showStatusBar = it
+            Browser.host?.applySystemBars()
+            changed()
+        }
+    }
+}
+
+@Composable
+private fun TabsPage() {
+    val prefs = Browser.prefs
+    var restore by remember { mutableStateOf(prefs.restoreTabs) }
+    Spacer(Modifier.height(8.dp))
+    Group {
+        Toggle("Reopen tabs", "Bring back your normal tabs when the app starts. Private tabs never come back.", restore) {
+            restore = it
+            prefs.restoreTabs = it
+        }
+    }
+}
+
+@Composable
+private fun AboutPage(ui: UiState) {
+    Spacer(Modifier.height(8.dp))
+    Group {
+        Action("SonderWeb " + BuildConfig.VERSION_NAME, "by Verisonder · Apache License 2.0") {}
+        Action("Source code", "github.com/Verisonder/SonderWeb") {
+            ui.panel = Panel.None
+            Browser.newTab("https://github.com/Verisonder/SonderWeb", isPrivate = false)
+        }
+    }
+    Hint(
+        "Engine: GeckoView by Mozilla (Mozilla Public License 2.0)\n" +
+            "uBlock Origin by Raymond Hill (GPL-3.0), included unmodified\n" +
+            "Inter typeface (SIL Open Font License 1.1)\n" +
+            "No accounts, no telemetry, no tracking.",
+    )
+}
+
+/** Start page settings (also reachable from the start page itself). */
+@Composable
+private fun StartSettings(ui: UiState) {
+    val p = LocalPalette.current
+    val prefs = Browser.prefs
+    var name by remember { mutableStateOf(prefs.userName) }
+    var clock by remember { mutableStateOf(prefs.showClock) }
+    var greeting by remember { mutableStateOf(prefs.showGreeting) }
+    var weatherOn by remember { mutableStateOf(prefs.weatherOn) }
+    var fahrenheit by remember { mutableStateOf(prefs.fahrenheit) }
+    var place by remember { mutableStateOf(prefs.place) }
+    var query by remember { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<Place>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+
+    GroupTitle("Show")
+    Group {
+        Toggle("Clock and date", null, clock) {
+            clock = it
+            prefs.showClock = it
+            ui.themeVersion++
+        }
+        Toggle("Greeting", null, greeting) {
+            greeting = it
+            prefs.showGreeting = it
+            ui.themeVersion++
+        }
+        Toggle("Weather", "From Open-Meteo. Only the city you pick is sent.", weatherOn) {
+            weatherOn = it
+            prefs.weatherOn = it
+            if (!it) Weather.forget()
+            ui.themeVersion++
+        }
+    }
+
+    if (greeting) {
+        GroupTitle("Your name")
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            SettingsField(name, "Shown in the greeting") {
+                name = it
+                prefs.userName = it
+                ui.themeVersion++
+            }
+        }
+    }
+
+    if (weatherOn) {
+        GroupTitle("Weather")
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            Text(
+                place?.name ?: "No city yet",
+                color = if (place == null) p.faint else p.text,
+                fontSize = 15.sp,
+                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+            )
+            SettingsField(query, "Search a city") { query = it }
+            LaunchedEffect(query) {
+                if (query.trim().length < 2) {
+                    results = emptyList()
+                    return@LaunchedEffect
+                }
+                delay(350)
+                searching = true
+                results = Weather.search(query)
+                searching = false
+            }
+            if (searching) Text("Searching…", color = p.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp, start = 4.dp))
+            results.forEach { r ->
+                Text(
+                    r.name,
+                    color = p.text,
+                    fontSize = 15.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable {
+                            place = r
+                            prefs.place = r
+                            query = ""
+                            results = emptyList()
+                            Weather.refresh(prefs, force = true)
+                            ui.themeVersion++
+                        }
+                        .padding(horizontal = 4.dp, vertical = 12.dp),
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Segmented(listOf("°C", "°F"), if (fahrenheit) 1 else 0, p.accent) {
+                fahrenheit = it == 1
+                prefs.fahrenheit = fahrenheit
+                Weather.refresh(prefs, force = true)
+                ui.themeVersion++
+            }
+        }
+    }
+    Hint("Add shortcuts with the + on the start page. Long-press one to edit or remove it.")
+}
+
+// ---- Building blocks ----
+
+@Composable
+private fun GroupTitle(title: String) {
+    val p = LocalPalette.current
+    Text(
+        title,
+        color = p.mute,
+        fontSize = 15.sp,
+        modifier = Modifier.padding(start = 32.dp, end = 20.dp, top = 24.dp, bottom = 10.dp),
+    )
+}
+
+/** A rounded card holding a few rows, separated by thin gaps like Brave's settings. */
+@Composable
+private fun Group(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp)),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun NavRow(
+    icon: ImageVector,
+    title: String,
+    sub: String?,
+    first: Boolean = false,
+    last: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val p = LocalPalette.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(if (first) 18.dp else 4.dp, if (first) 18.dp else 4.dp, if (last) 18.dp else 4.dp, if (last) 18.dp else 4.dp))
+            .background(p.field)
+            .clickable(onClick = onClick)
+            .heightIn(min = 68.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = p.text, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(22.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = p.text, fontSize = 17.sp)
+            if (!sub.isNullOrBlank()) Text(sub, color = p.faint, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun Hint(text: String) {
+    val p = LocalPalette.current
+    Text(text, color = p.faint, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(start = 32.dp, end = 24.dp, top = 12.dp))
+}
+
+@Composable
+private fun Choice(label: String, on: Boolean, sub: String? = null, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(p.field)
+            .clickable(onClick = onClick)
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, color = p.text, fontSize = 16.sp)
+            if (sub != null) Text(sub, color = p.faint, fontSize = 13.sp)
+        }
+        Box(
+            Modifier
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(if (on) p.accent else p.line),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (on) Box(Modifier.size(9.dp).clip(CircleShape).background(p.onAccent))
+        }
+    }
+}
+
+@Composable
+private fun Toggle(title: String, sub: String?, on: Boolean, onChange: (Boolean) -> Unit) {
+    val p = LocalPalette.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(p.field)
+            .clickable { onChange(!on) }
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = p.text, fontSize = 16.sp)
+            if (sub != null) {
+                Spacer(Modifier.height(2.dp))
+                Text(sub, color = p.faint, fontSize = 13.sp, lineHeight = 17.sp)
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(on, onChange, colors = SwitchDefaults.colors(checkedTrackColor = p.accent, checkedThumbColor = p.onAccent))
+    }
+}
+
+@Composable
+private fun Action(title: String, sub: String, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(p.field)
+            .clickable(onClick = onClick)
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+    ) {
+        Text(title, color = p.text, fontSize = 16.sp)
+        Spacer(Modifier.height(2.dp))
+        Text(sub, color = p.faint, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun SettingsField(value: String, placeholder: String, onChange: (String) -> Unit) {
+    val p = LocalPalette.current
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(p.field)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+    ) {
+        if (value.isEmpty()) Text(placeholder, color = p.faint, fontSize = 15.sp)
+        BasicTextField(
+            value,
+            onChange,
+            singleLine = true,
+            textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 15.sp),
+            cursorBrush = SolidColor(p.accent),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 @Composable
@@ -251,181 +735,5 @@ private fun Check(label: String, on: Boolean, onChange: (Boolean) -> Unit) {
     ) {
         Checkbox(on, onChange, colors = CheckboxDefaults.colors(checkedColor = p.accent))
         Text(label, color = p.text, fontSize = 14.sp)
-    }
-}
-
-@Composable
-private fun Section(title: String) {
-    val p = LocalPalette.current
-    Text(
-        title.uppercase(),
-        color = p.accent,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.2.sp,
-        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 26.dp, bottom = 8.dp),
-    )
-}
-
-@Composable
-private fun Hint(text: String) {
-    val p = LocalPalette.current
-    Text(text, color = p.faint, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-}
-
-@Composable
-private fun Choice(label: String, on: Boolean, onClick: () -> Unit) {
-    val p = LocalPalette.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, color = p.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
-        Box(
-            Modifier
-                .size(20.dp)
-                .clip(CircleShape)
-                .background(if (on) p.accent else p.field),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (on) Box(Modifier.size(8.dp).clip(CircleShape).background(p.onAccent))
-        }
-    }
-}
-
-@Composable
-private fun Toggle(title: String, sub: String, on: Boolean, onChange: (Boolean) -> Unit) {
-    val p = LocalPalette.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable { onChange(!on) }
-            .padding(horizontal = 20.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, color = p.text, fontSize = 15.sp)
-            Spacer(Modifier.height(2.dp))
-            Text(sub, color = p.faint, fontSize = 12.sp, lineHeight = 16.sp)
-        }
-        Spacer(Modifier.width(12.dp))
-        Switch(on, onChange, colors = SwitchDefaults.colors(checkedTrackColor = p.accent))
-    }
-}
-
-@Composable
-private fun Action(title: String, sub: String, onClick: () -> Unit) {
-    val p = LocalPalette.current
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-    ) {
-        Text(title, color = p.text, fontSize = 15.sp)
-        Spacer(Modifier.height(2.dp))
-        Text(sub, color = p.faint, fontSize = 12.sp)
-    }
-}
-
-
-@Composable
-private fun StartPageSettings(ui: UiState) {
-    val p = LocalPalette.current
-    val prefs = Browser.prefs
-    val scope = rememberCoroutineScope()
-    var name by remember { mutableStateOf(prefs.userName) }
-    var weatherOn by remember { mutableStateOf(prefs.weatherOn) }
-    var fahrenheit by remember { mutableStateOf(prefs.fahrenheit) }
-    var place by remember { mutableStateOf(prefs.place) }
-    var query by remember { mutableStateOf("") }
-    var results by remember { mutableStateOf<List<Place>>(emptyList()) }
-    var searching by remember { mutableStateOf(false) }
-
-    Section("Start page")
-    Column(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
-        Text("Your name", color = p.text, fontSize = 15.sp)
-        Spacer(Modifier.height(6.dp))
-        SettingsField(name, "Shown in the greeting") {
-            name = it
-            prefs.userName = it
-            ui.themeVersion++
-        }
-    }
-    Toggle("Weather", "From Open-Meteo. Only the place you pick below is sent.", weatherOn) {
-        weatherOn = it
-        prefs.weatherOn = it
-        if (!it) Weather.forget()
-        ui.themeVersion++
-    }
-    if (weatherOn) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
-            Text(place?.name ?: "No place yet", color = if (place == null) p.faint else p.text, fontSize = 14.sp)
-            Spacer(Modifier.height(8.dp))
-            SettingsField(query, "Search a city") { query = it }
-            LaunchedEffect(query) {
-                if (query.trim().length < 2) {
-                    results = emptyList()
-                    return@LaunchedEffect
-                }
-                delay(350)
-                searching = true
-                results = Weather.search(query)
-                searching = false
-            }
-            if (searching) Text("Searching…", color = p.faint, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-            results.forEach { r ->
-                Text(
-                    r.name,
-                    color = p.text,
-                    fontSize = 14.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable {
-                            place = r
-                            prefs.place = r
-                            query = ""
-                            results = emptyList()
-                            scope.launch { Weather.refresh(prefs, force = true) }
-                            ui.themeVersion++
-                        }
-                        .padding(vertical = 10.dp),
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            Segmented(listOf("°C", "°F"), if (fahrenheit) 1 else 0, p.accent) {
-                fahrenheit = it == 1
-                prefs.fahrenheit = fahrenheit
-                Weather.refresh(prefs, force = true)
-                ui.themeVersion++
-            }
-        }
-    }
-    Hint("Long-press a shortcut on the start page to edit or remove it.")
-}
-
-@Composable
-private fun SettingsField(value: String, placeholder: String, onChange: (String) -> Unit) {
-    val p = LocalPalette.current
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(p.field)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-    ) {
-        if (value.isEmpty()) Text(placeholder, color = p.faint, fontSize = 14.sp)
-        BasicTextField(
-            value,
-            onChange,
-            singleLine = true,
-            textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 14.sp),
-            cursorBrush = SolidColor(p.accent),
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }

@@ -10,8 +10,8 @@ A private, fast and honest web browser for Android. uBlock Origin built in, Fire
 - **Firefox's engine (GeckoView).** Strict tracking protection, cookies kept apart per site, tracking parameters stripped from links, Global Privacy Control on.
 - **!bangs.** Type `!w Tangier`, `!yt lofi` or `!gh sonder` to search a site directly. Common bangs are resolved on your phone; any other bang goes through DuckDuckGo.
 - **Your search engine.** DuckDuckGo by default; Brave, Startpage, Qwant, Ecosia, Kagi, Google, Bing, or your own.
-- **The page gets the whole screen.** The address bar slides away while you scroll down and comes back when you scroll up.
-- **A start page** with the time, a greeting, the weather (Open-Meteo, only the place you pick is sent) and your shortcuts.
+- **The page gets the whole screen.** The address bar shrinks into a small button (or slides away, your choice) and the phone status bar is hidden unless you want it.
+- **A start page** with the time, a greeting, the weather (Open-Meteo, only the place you pick is sent) and the shortcuts you add.
 - **Tabs and private tabs.** Private tabs keep no history, cookies or site data once closed.
 - **History, bookmarks, downloads**, all stored only on your phone.
 - **No accounts, no telemetry, no tracking.**

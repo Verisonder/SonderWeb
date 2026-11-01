@@ -92,6 +92,8 @@ fun StartPage(ui: UiState) {
     val ctx = LocalContext.current
     val tab = Browser.current ?: return
     val prefs = Browser.prefs
+    // Settings bump themeVersion; reading it here redraws the page with the new choices.
+    if (ui.themeVersion < 0) return
 
     // The clock ticks on the minute.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -122,29 +124,32 @@ fun StartPage(ui: UiState) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(56.dp))
-        Text(
-            time,
-            color = p.text,
-            fontSize = 88.sp,
-            fontWeight = FontWeight.ExtraLight,
-            letterSpacing = (-2).sp,
-            maxLines = 1,
-        )
-        Text(date, color = p.text, fontSize = 16.sp)
-
-        Spacer(Modifier.height(34.dp))
-        Text(
-            if (tab.isPrivate) "Private tab" else WeatherCodes.greeting(hour, prefs.userName),
-            color = p.text,
-            fontSize = 27.sp,
-            textAlign = TextAlign.Center,
-        )
+        if (prefs.showClock) {
+            Text(
+                time,
+                color = p.text,
+                fontSize = 88.sp,
+                fontWeight = FontWeight.ExtraLight,
+                letterSpacing = (-2).sp,
+                maxLines = 1,
+            )
+            Text(date, color = p.text, fontSize = 16.sp)
+            Spacer(Modifier.height(34.dp))
+        }
         if (tab.isPrivate) {
+            Text("Private tab", color = p.text, fontSize = 27.sp, textAlign = TextAlign.Center)
             Spacer(Modifier.height(4.dp))
             Text(
                 "Nothing from this tab is kept once you close it.",
                 color = p.mute,
                 fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+            )
+        } else if (prefs.showGreeting) {
+            Text(
+                WeatherCodes.greeting(hour, prefs.userName),
+                color = p.text,
+                fontSize = 27.sp,
                 textAlign = TextAlign.Center,
             )
         }
@@ -175,9 +180,7 @@ fun StartPage(ui: UiState) {
                 .padding(horizontal = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Outlined.Search, null, tint = p.faint, modifier = Modifier.size(19.dp))
-            Spacer(Modifier.width(12.dp))
-            Text("Search " + prefs.engine().name + " or type an address", color = p.faint, fontSize = 15.sp, maxLines = 1)
+            Icon(Icons.Outlined.Search, "Search", tint = p.faint, modifier = Modifier.size(20.dp))
         }
 
         Spacer(Modifier.height(30.dp))

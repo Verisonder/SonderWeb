@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
         geckoView = GeckoView(this)
 
         setContent { BrowserScreen(this) }
+        applySystemBars()
         if (savedInstanceState == null) handleIntent(intent)
     }
 
@@ -155,13 +156,28 @@ class MainActivity : ComponentActivity(), Browser.Host {
 
     override fun setFullscreen(on: Boolean) {
         inFullscreen = on
+        applySystemBars()
+    }
+
+    /** Fullscreen video hides everything; otherwise the status bar follows Settings › Appearance. */
+    override fun applySystemBars() {
         val c = WindowCompat.getInsetsController(window, window.decorView)
-        if (on) {
-            c.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        c.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (inFullscreen) {
             c.hide(WindowInsetsCompat.Type.systemBars())
-        } else {
-            c.show(WindowInsetsCompat.Type.systemBars())
+            return
         }
+        c.show(WindowInsetsCompat.Type.navigationBars())
+        if (Browser.prefs.showStatusBar) {
+            c.show(WindowInsetsCompat.Type.statusBars())
+        } else {
+            c.hide(WindowInsetsCompat.Type.statusBars())
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) applySystemBars()
     }
 
     override fun requestAndroidPermissions(perms: Array<String>, result: (Boolean) -> Unit) {

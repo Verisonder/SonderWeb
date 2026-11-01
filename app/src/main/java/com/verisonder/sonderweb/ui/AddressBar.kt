@@ -57,6 +57,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.verisonder.sonderweb.browser.Bar
 import com.verisonder.sonderweb.browser.Browser
 import com.verisonder.sonderweb.browser.Delegates
 import com.verisonder.sonderweb.browser.Tab
@@ -75,6 +76,7 @@ fun startEditing(ui: UiState, tab: Tab?) {
 fun submit(ui: UiState, text: String) {
     if (text.isBlank()) return
     ui.editing = false
+    Bar.collapse()
     Browser.go(text)
 }
 

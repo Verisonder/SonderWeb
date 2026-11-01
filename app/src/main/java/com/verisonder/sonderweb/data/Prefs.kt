@@ -41,6 +41,25 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("bar_top", true)
         set(v) = sp.edit().putBoolean("bar_top", v).apply()
 
+    /** How the address bar gets out of the way: 0 = always shown, 1 = slides away while
+     *  scrolling, 2 = shrinks into a small button you tap to bring it back. */
+    var barHide: Int
+        get() = sp.getInt("bar_hide", 2)
+        set(v) = sp.edit().putInt("bar_hide", v).apply()
+
+    /** The phone's status bar (time, battery) at the top. Hidden by default: pages use the whole screen. */
+    var showStatusBar: Boolean
+        get() = sp.getBoolean("status_bar", false)
+        set(v) = sp.edit().putBoolean("status_bar", v).apply()
+
+    var showClock: Boolean
+        get() = sp.getBoolean("show_clock", true)
+        set(v) = sp.edit().putBoolean("show_clock", v).apply()
+
+    var showGreeting: Boolean
+        get() = sp.getBoolean("show_greeting", true)
+        set(v) = sp.edit().putBoolean("show_greeting", v).apply()
+
     /** 0 = follow the system, 1 = light, 2 = dark. */
     var theme: Int
         get() = sp.getInt("theme", 0)
@@ -92,7 +111,7 @@ class Prefs(context: Context) {
             e.apply()
         }
 
-    /** Start page shortcuts. A few common sites until you change them. */
+    /** Start page shortcuts. None until you add some. */
     var shortcuts: List<Shortcut>
         get() {
             val raw = sp.getString("shortcuts", null) ?: return defaultShortcuts
@@ -111,16 +130,7 @@ class Prefs(context: Context) {
         }
 
     companion object {
-        val defaultShortcuts = listOf(
-            Shortcut("https://www.youtube.com/", "YouTube"),
-            Shortcut("https://github.com/", "GitHub"),
-            Shortcut("https://mail.google.com/", "Gmail"),
-            Shortcut("https://www.instagram.com/", "Instagram"),
-            Shortcut("https://en.wikipedia.org/", "Wikipedia"),
-            Shortcut("https://www.reddit.com/", "Reddit"),
-            Shortcut("https://web.telegram.org/", "Telegram"),
-            Shortcut("https://drive.google.com/", "Drive"),
-        )
+        val defaultShortcuts = emptyList<Shortcut>()
     }
 }
 

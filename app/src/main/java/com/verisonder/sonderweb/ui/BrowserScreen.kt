@@ -21,6 +21,18 @@ import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.layout.WindowInsets
@@ -96,16 +108,26 @@ fun BrowserScreen(activity: MainActivity) {
         }
     }
 
-    // ---- The sliding bar ----
+    // ---- The bar: always there, sliding away, or shrunk into a small button ----
     val barTop = remember(ui.themeVersion) { Browser.prefs.barOnTop }
+    val hideMode = remember(ui.themeVersion) { Browser.prefs.barHide }
+    LaunchedEffect(hideMode) { Bar.setMode(hideMode) }
     var barPx by remember { mutableIntStateOf(0) }
-    val barDp = with(LocalDensity.current) { barPx.toDp() }
-    val pinned = ui.editing || ui.menu || tab == null || tab.isBlank || activity.inFullscreen
+    val pinned = ui.editing || ui.menu || tab == null || activity.inFullscreen ||
+        hideMode == Bar.ALWAYS || (hideMode == Bar.SLIDE && tab.isBlank)
+    val collapsed = Bar.hidden && !pinned
     val barOffset by animateFloatAsState(
-        targetValue = if (Bar.hidden && !pinned) barPx.toFloat() else 0f,
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        targetValue = if (collapsed) barPx.toFloat() else 0f,
+        animationSpec = tween(240, easing = FastOutSlowInEasing),
         label = "bar",
     )
+    // 0 = full bar, 1 = small button (button mode only).
+    val morph by animateFloatAsState(
+        targetValue = if (collapsed && hideMode == Bar.BUTTON) 1f else 0f,
+        animationSpec = tween(280, easing = FastOutSlowInEasing),
+        label = "morph",
+    )
+    val visibleBarDp = with(LocalDensity.current) { (barPx - barOffset).coerceAtLeast(0f).toDp() }
     LaunchedEffect(barPx, activity.inFullscreen) {
         activity.geckoView.setDynamicToolbarMaxHeight(if (activity.inFullscreen) 0 else barPx)
     }
@@ -127,6 +149,9 @@ fun BrowserScreen(activity: MainActivity) {
         }
     }
 
+    // Top padding: the status bar when it's shown, else only the camera cut-out.
+    val screenInsets = WindowInsets.statusBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)
+
     SonderTheme(palette) {
         Box(
             Modifier
@@ -136,7 +161,7 @@ fun BrowserScreen(activity: MainActivity) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .then(if (activity.inFullscreen) Modifier else Modifier.statusBarsPadding().navigationBarsPadding())
+                    .then(if (activity.inFullscreen) Modifier else Modifier.windowInsetsPadding(screenInsets).navigationBarsPadding())
                     .imePadding()
                     .clipToBounds(),
             ) {
@@ -144,7 +169,7 @@ fun BrowserScreen(activity: MainActivity) {
                 // you scroll down. The engine is told how much of the page the bar covers.
                 // Top bar: the page sits just under the visible part of the bar (its bottom
                 // runs off-screen by the same amount, which the engine accounts for).
-                val barSpace = if (barTop) PaddingValues(top = barDp) else PaddingValues(bottom = barDp)
+                val barSpace = if (barTop) PaddingValues(top = visibleBarDp) else PaddingValues(bottom = visibleBarDp)
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -170,13 +195,46 @@ fun BrowserScreen(activity: MainActivity) {
                     }
                 }
                 if (!activity.inFullscreen) {
-                    Box(
-                        Modifier
-                            .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
-                            .onSizeChanged { barPx = it.height }
-                            .graphicsLayer { translationY = if (barTop) -barOffset else barOffset },
-                    ) {
-                        AddressBar(ui, tab, barTop)
+                    if (hideMode == Bar.BUTTON) {
+                        // The bar shrinks towards its left corner while the button grows out of it.
+                        if (morph < 1f) {
+                            Box(
+                                Modifier
+                                    .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
+                                    .onSizeChanged { barPx = it.height }
+                                    .graphicsLayer {
+                                        transformOrigin = TransformOrigin(0.06f, if (barTop) 0f else 1f)
+                                        scaleX = 1f - 0.82f * morph
+                                        scaleY = 1f - 0.3f * morph
+                                        alpha = (1f - morph * 1.6f).coerceIn(0f, 1f)
+                                    },
+                            ) {
+                                AddressBar(ui, tab, barTop)
+                            }
+                        }
+                        if (morph > 0f) {
+                            BarButton(
+                                tab,
+                                Modifier
+                                    .align(if (barTop) Alignment.TopStart else Alignment.BottomStart)
+                                    .padding(14.dp)
+                                    .graphicsLayer {
+                                        val k = 0.6f + 0.4f * morph
+                                        scaleX = k
+                                        scaleY = k
+                                        alpha = ((morph - 0.3f) / 0.7f).coerceIn(0f, 1f)
+                                    },
+                            ) { Bar.expand() }
+                        }
+                    } else {
+                        Box(
+                            Modifier
+                                .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
+                                .onSizeChanged { barPx = it.height }
+                                .graphicsLayer { translationY = if (barTop) -barOffset else barOffset },
+                        ) {
+                            AddressBar(ui, tab, barTop)
+                        }
                     }
                 }
             }
@@ -206,7 +264,7 @@ fun BrowserScreen(activity: MainActivity) {
                     Modifier
                         .fillMaxSize()
                         .background(palette.bg)
-                        .statusBarsPadding()
+                        .windowInsetsPadding(screenInsets)
                         .navigationBarsPadding(),
                 ) {
                     when (ui.panel) {
@@ -223,6 +281,32 @@ fun BrowserScreen(activity: MainActivity) {
             ContextMenu.request?.let { ContextSheet(it) }
             Ublock.popup?.let { UblockSheet(it) }
             Prompts.queue.firstOrNull { it.tab === tab }?.let { PromptDialog(it) }
+        }
+    }
+}
+
+/** The small round button the bar shrinks into. Tap it to bring the bar back. */
+@Composable
+private fun BarButton(tab: com.verisonder.sonderweb.browser.Tab?, modifier: Modifier, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    Box(
+        modifier
+            .size(46.dp)
+            .shadow(6.dp, CircleShape)
+            .clip(CircleShape)
+            .background(p.field)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Mark(26, p.text, if (tab?.isPrivate == true) p.privateAccent else p.accent)
+        if (tab != null && tab.loading) {
+            CircularProgressIndicator(
+                progress = { tab.progress / 100f },
+                modifier = Modifier.size(46.dp),
+                color = p.accent,
+                strokeWidth = 2.dp,
+                trackColor = androidx.compose.ui.graphics.Color.Transparent,
+            )
         }
     }
 }

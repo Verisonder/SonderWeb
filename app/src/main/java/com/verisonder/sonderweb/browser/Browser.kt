@@ -81,6 +81,7 @@ object Browser {
             .allowInsecureConnections(insecureMode())
             .build()
 
+        Bar.setMode(prefs.barHide)
         runtime = GeckoRuntime.create(app, settings)
         Ublock.install(runtime)
         restoreTabs()
@@ -284,6 +285,7 @@ object Browser {
         fun openExternal(url: String): Boolean
         fun share(text: String, title: String?)
         fun setFullscreen(on: Boolean)
+        fun applySystemBars()
         fun requestAndroidPermissions(perms: Array<String>, result: (Boolean) -> Unit)
         fun pickFiles(mimeTypes: Array<String>, multiple: Boolean, result: (List<android.net.Uri>) -> Unit)
 
