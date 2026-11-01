@@ -24,6 +24,11 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import com.verisonder.sonderweb.browser.Bar
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -334,14 +339,17 @@ private fun BoxScope.BarArea(
     onBarSize: (Int) -> Unit,
 ) {
     if (hideMode == Bar.BUTTON) {
-        // The bar shrinks towards its left corner while the button grows out of it.
+        val saved = remember(ui.themeVersion) { Browser.prefs.buttonCorner }
+        var corner by remember(saved, barTop) { mutableStateOf(if (saved in 0..3) saved else if (barTop) 0 else 2) }
+        val right = corner == 1 || corner == 3
+        // The bar shrinks towards the button's corner while the button grows out of it.
         if (morph < 1f) {
             Box(
                 Modifier
                     .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
                     .onSizeChanged { onBarSize(it.height) }
                     .graphicsLayer {
-                        transformOrigin = TransformOrigin(0.06f, if (barTop) 0f else 1f)
+                        transformOrigin = TransformOrigin(if (right) 0.94f else 0.06f, if (barTop) 0f else 1f)
                         scaleX = 1f - 0.82f * morph
                         scaleY = 1f - 0.3f * morph
                         alpha = (1f - morph * 1.6f).coerceIn(0f, 1f)
@@ -351,19 +359,7 @@ private fun BoxScope.BarArea(
             }
         }
         if (morph > 0f) {
-            BarButton(
-                tab,
-                Modifier
-                    .align(if (barTop) Alignment.TopStart else Alignment.BottomStart)
-                    .then(if (barTop) Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top)) else Modifier.navigationBarsPadding())
-                    .padding(14.dp)
-                    .graphicsLayer {
-                        val k = 0.6f + 0.4f * morph
-                        scaleX = k
-                        scaleY = k
-                        alpha = ((morph - 0.3f) / 0.7f).coerceIn(0f, 1f)
-                    },
-            ) { Bar.expand() }
+            DraggableBarButton(tab, corner, morph, { corner = it; Browser.prefs.buttonCorner = it }) { Bar.expand() }
         }
     } else {
         Box(
@@ -375,6 +371,87 @@ private fun BoxScope.BarArea(
             AddressBar(ui, tab, barTop)
         }
     }
+}
+
+/**
+ * The small bar button. Drag it anywhere: let go and it glides to the nearest corner
+ * (top or bottom, left or right) and stays there.
+ */
+@Composable
+private fun BoxScope.DraggableBarButton(
+    tab: com.verisonder.sonderweb.browser.Tab?,
+    corner: Int,
+    morph: Float,
+    onCorner: (Int) -> Unit,
+    onClick: () -> Unit,
+) {
+    val density = LocalDensity.current
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var area by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+    val topInset = WindowInsets.displayCutout.getTop(density)
+    val bottomInset = WindowInsets.navigationBars.getBottom(density)
+    val margin = with(density) { 14.dp.roundToPx() }
+    val size = with(density) { 46.dp.roundToPx() }
+    fun base(c: Int) = androidx.compose.ui.geometry.Offset(
+        if (c == 1 || c == 3) (area.width - margin - size).toFloat() else margin.toFloat(),
+        if (c >= 2) (area.height - bottomInset - margin - size).toFloat() else (topInset + margin).toFloat(),
+    )
+    val drag = remember { androidx.compose.animation.core.Animatable(androidx.compose.ui.geometry.Offset.Zero, androidx.compose.ui.geometry.Offset.VectorConverter) }
+    var held by remember { mutableStateOf(false) }
+    val lift by animateFloatAsState(if (held) 1.1f else 1f, spring(dampingRatio = 0.6f, stiffness = 600f), label = "lift")
+    // Read while laying out, together with the drag, so a change of corner never shows a jump.
+    var at by remember { mutableStateOf(corner) }
+    LaunchedEffect(corner) { at = corner }
+
+    Box(Modifier.matchParentSize().onSizeChanged { area = it })
+    if (area.width == 0) return
+    BarButton(
+        tab,
+        Modifier
+            .offset {
+                val b = base(at)
+                IntOffset((b.x + drag.value.x).roundToInt(), (b.y + drag.value.y).roundToInt())
+            }
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = {
+                        held = true
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    },
+                    onDragEnd = {
+                        held = false
+                        val c = at
+                        val pos = base(c) + drag.value
+                        val right = pos.x + size / 2f > area.width / 2f
+                        val bottom = pos.y + size / 2f > area.height / 2f
+                        val next = (if (bottom) 2 else 0) + (if (right) 1 else 0)
+                        scope.launch {
+                            // Keep it where your finger left it, then glide into the corner.
+                            drag.snapTo(pos - base(next))
+                            at = next
+                            if (next != c) onCorner(next)
+                            drag.animateTo(androidx.compose.ui.geometry.Offset.Zero, spring(dampingRatio = 0.72f, stiffness = 420f))
+                        }
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    },
+                    onDragCancel = {
+                        held = false
+                        scope.launch { drag.animateTo(androidx.compose.ui.geometry.Offset.Zero, spring(dampingRatio = 0.72f, stiffness = 420f)) }
+                    },
+                ) { change, amount ->
+                    change.consume()
+                    scope.launch { drag.snapTo(drag.value + amount) }
+                }
+            }
+            .graphicsLayer {
+                val k = (0.6f + 0.4f * morph) * lift
+                scaleX = k
+                scaleY = k
+                alpha = ((morph - 0.3f) / 0.7f).coerceIn(0f, 1f)
+            },
+        onClick = onClick,
+    )
 }
 
 /** From a locked private tab to your normal tabs. */
