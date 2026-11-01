@@ -1,40 +1,96 @@
-<p align="center"><img src="docs/logo.svg" width="120" alt="SonderWeb"></p>
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="SonderWeb" width="100%">
+</p>
 
-# SonderWeb
+<p align="center">
+  <a href="https://github.com/Verisonder/SonderWeb/releases"><img alt="Releases" src="https://img.shields.io/badge/download-APK-8AB4F8?style=flat-square"></a>
+  <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-8AB4F8?style=flat-square">
+  <img alt="Engine" src="https://img.shields.io/badge/engine-GeckoView-8AB4F8?style=flat-square">
+  <img alt="uBlock Origin built in" src="https://img.shields.io/badge/uBlock_Origin-built_in-8AB4F8?style=flat-square">
+  <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-8AB4F8?style=flat-square"></a>
+</p>
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+<p align="center">
+  <b>A private, minimal web browser for Android.</b><br>
+  Firefox's engine underneath, uBlock Origin built in, the whole screen for the page. No account, no telemetry.
+</p>
 
-A private, fast and honest web browser for Android. uBlock Origin built in, Firefox's engine underneath, nothing sent home.
+<p align="center">
+  <a href="https://github.com/Verisonder/SonderWeb/releases"><b>⬇ Download the APK</b></a>
+</p>
 
-## What it does
+---
 
-- **uBlock Origin, built in.** Ads, trackers and malware are blocked from the first page. Tap the shield in the address bar to see what a page blocked, or to switch blocking off for that site. Add more extensions from addons.mozilla.org (⋮ › Extensions).
-- **Firefox's engine (GeckoView), hardened.** Strict tracking protection, fingerprinting protection, cookies kept apart per site and trackers' cookies purged, bounce-tracking protection, tracking parameters stripped from links, HTTPS only, sites blocked from probing your home network, Global Privacy Control on, optional encrypted DNS (Quad9, Mullvad, Cloudflare).
-- **!bangs.** Type `!w Tangier`, `!yt lofi` or `!gh sonder` to search a site directly. Common bangs are resolved on your phone; any other bang goes through DuckDuckGo.
-- **Your search engine.** DuckDuckGo by default; Brave, Startpage, Qwant, Ecosia, Kagi, Google, Bing, or your own.
-- **The page gets the whole screen**, edge to edge: the address bar shrinks into a small button (or slides away, your choice) and the phone status bar is hidden unless you want it.
-- **A start page** with the time, a greeting, the weather (Open-Meteo, only the place you pick is sent) and the shortcuts you add.
-- **Tabs and private tabs.** Private tabs keep no history, cookies or site data once closed, load only over HTTPS, lock behind your fingerprint when you leave the app (or close themselves), block screenshots and the recent-apps preview, and ask the keyboard not to learn what you type.
-- **History, bookmarks, downloads**, all stored only on your phone.
-- **No accounts, no telemetry, no tracking.**
+## What it is
+
+SonderWeb is a calm, quiet browser in the spirit of Helium on the desktop: almost no interface, the page edge to edge, and privacy switched on from the first launch. It's built on GeckoView, the engine of Firefox for Android, so add-ons from addons.mozilla.org work too.
+
+Nothing is sent to any SonderWeb server, because there isn't one.
+
+## Features
+
+| | |
+|---|---|
+| **uBlock Origin, built in** | Ads, trackers and malware blocked from the first page. Tap the shield in the bar for the count, the element picker or to switch it off for a site. |
+| **Other extensions** | Add more from addons.mozilla.org: ⋮ › Extensions › Get more extensions. |
+| **Hardened engine** | Strict tracking protection, fingerprinting protection, cookies kept apart per site and trackers' cookies purged, bounce-tracking protection, tracking parameters stripped from links, HTTPS only, sites kept from probing your home network, Global Privacy Control. |
+| **Really private tabs** | Pure black and kept apart from your history, bookmarks and shortcuts. Locked behind your fingerprint every time you go in, no screenshots, no tab previews, incognito keyboard, encrypted DNS (Quad9), nothing kept once closed. |
+| **The page gets the screen** | The bar floats, then shrinks into a small round button as you scroll, or slides away. Swipe the bar sideways to put it away, long-press the button to tuck it out of sight. The status bar is hidden unless you want it. |
+| **Quick gestures** | Hold the tabs button and slide up for a new tab. Hold the address and slide onto any open tab to switch. Pull down at the top of a page to reload. |
+| **A start page** | The time, a greeting, the weather (Open-Meteo; only the place you pick is sent) and the shortcuts you add. Star a site in the menu to pin it there. |
+| **!bangs and your search engine** | `!w Tangier`, `!yt lofi`, `!gh sonder` search a site directly. DuckDuckGo by default, restyled to match the browser; Brave, Startpage, Qwant, Ecosia, Kagi, Google, Bing or your own. |
+| **Asks before opening apps** | A link an app could open asks first: open the app, or stay in the browser. |
+| **Encrypted DNS** | Off by default so a VPN or DNS blocker keeps working; Quad9, Mullvad or Cloudflare when you want it. |
+| **Yours to shape** | Light, dark or system theme; bar on top or bottom, floating or docked, at the size you like; the small button in any corner or anywhere you set. |
+| **On your phone only** | History, bookmarks and downloads stay on the device. |
 
 ## Install
 
-Download the APK from [Releases](https://github.com/Verisonder/SonderWeb/releases/latest). Android 8.0 or newer, 64-bit phones.
+1. Download `SonderWeb-x.y.z.apk` from the [releases](https://github.com/Verisonder/SonderWeb/releases) and open it.
+2. Allow installing from your browser or file manager if Android asks.
+3. Optional: Settings › Default browser, so links from other apps open in SonderWeb.
 
-## Using SonderWeb
+Android 8.0 or newer, 64-bit phones.
 
-✅ Use it, share it, change it, ship your own build (keep the licence and NOTICE).
-🚫 Don't present your build as the official SonderWeb.
-
-## Building
+## How it is built
 
 ```
+app/src/main/java/com/verisonder/sonderweb/
+  browser/   the engine, tabs, extensions, downloads, private-tab locking
+  core/      address bar logic, !bangs, search engines (plain Kotlin, tested)
+  data/      settings, history and bookmarks (SQLite), weather
+  ui/        Jetpack Compose: bar, start page, tabs, menu, settings
+app/src/main/assets/extensions/style/   the built-in DuckDuckGo look
+```
+
+Kotlin and Jetpack Compose on GeckoView. The build downloads GeckoView from Mozilla's Maven repository and the signed uBlock Origin release named in `gradle/libs.versions.toml`, and ships it as a built-in extension.
+
+### Building
+
+Needs JDK 17 and the Android SDK.
+
+```sh
 gradle assembleDebug
 ```
 
-The build downloads GeckoView from Mozilla's Maven repository and the uBlock Origin release named in `gradle/libs.versions.toml`.
+## Privacy
+
+No account, no analytics, no crash reports, no SonderWeb servers. The only requests SonderWeb makes on its own are the weather for the place you choose (Open-Meteo) and site icons for your shortcuts (from the site itself, or DuckDuckGo's icon service). Everything else is the pages you open.
+
+## Using SonderWeb
+
+You're welcome to use it, change it and share it — just:
+
+- ✅ **Keep the credit** — leave the copyright and `NOTICE` in place
+- 🚫 **Don't claim it as your own** — don't pass SonderWeb off as something you created; if you build on it, say it's based on SonderWeb by Verisonder
+- 🚫 **Don't imply endorsement** — the SonderWeb name and logo are the author's; name them only to credit the origin
+
+Want to do something beyond that? Just ask first. 🌐
 
 ## License
 
-SonderWeb is released under the [Apache License 2.0](LICENSE). GeckoView is under the Mozilla Public License 2.0 and uBlock Origin under the GPL-3.0; see [NOTICE](NOTICE).
+Apache License 2.0 — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+
+GeckoView is under the Mozilla Public License 2.0 and uBlock Origin under the GPL-3.0; both are used unmodified. Font: Inter, SIL Open Font License.
+
+<p align="center"><sub>By <a href="https://github.com/Verisonder">Verisonder</a></sub></p>
