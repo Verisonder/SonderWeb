@@ -119,8 +119,13 @@ fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
                 }
                 Spacer(Modifier.width(8.dp))
             } else {
-                IconButtonSmall(Icons.Outlined.Home, "Home", size = 44, tint = p.mute) { tab?.let { Browser.home(it) } }
-                Omnibox(ui, tab, Modifier.weight(1f))
+                if (tab == null || tab.isBlank) {
+                    // The start page has its own search box: here only tabs and the menu.
+                    Spacer(Modifier.weight(1f))
+                } else {
+                    IconButtonSmall(Icons.Outlined.Home, "Home", size = 44, tint = p.mute) { Browser.home(tab) }
+                    Omnibox(ui, tab, Modifier.weight(1f))
+                }
                 TabCountButton(Browser.tabs.count { it.isPrivate == (tab?.isPrivate ?: false) }) {
                     tab?.let { Delegates.capture(it) }
                     ui.panel = Panel.Tabs

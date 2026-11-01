@@ -116,6 +116,8 @@ fun BrowserScreen(activity: MainActivity) {
     val barTop = remember(ui.themeVersion) { Browser.prefs.barOnTop }
     val hideMode = remember(ui.themeVersion) { Browser.prefs.barHide }
     LaunchedEffect(hideMode) { Bar.setMode(hideMode) }
+    // On the start page the bar starts as the small button (button mode).
+    LaunchedEffect(tab, tab?.isBlank) { if (tab?.isBlank == true) Bar.collapse() }
     var barPx by remember { mutableIntStateOf(0) }
     val pinned = ui.editing || ui.menu || ui.finding || tab == null || activity.inFullscreen ||
         hideMode == Bar.ALWAYS || (hideMode == Bar.SLIDE && tab.isBlank)

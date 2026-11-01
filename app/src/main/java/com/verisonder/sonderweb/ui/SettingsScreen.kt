@@ -105,6 +105,7 @@ private val index: List<Pair<String, Page>> = listOf(
     "Clock" to Page.Start,
     "Greeting" to Page.Start,
     "Shortcuts" to Page.Start,
+    "Shortcut names" to Page.Start,
     "Search engine" to Page.Search,
     "!bangs" to Page.Search,
     "Theme" to Page.Look,
@@ -469,6 +470,7 @@ private fun StartSettings(ui: UiState) {
     var name by remember { mutableStateOf(prefs.userName) }
     var clock by remember { mutableStateOf(prefs.showClock) }
     var greeting by remember { mutableStateOf(prefs.showGreeting) }
+    var names by remember { mutableStateOf(prefs.showShortcutNames) }
     var weatherOn by remember { mutableStateOf(prefs.weatherOn) }
     var fahrenheit by remember { mutableStateOf(prefs.fahrenheit) }
     var place by remember { mutableStateOf(prefs.place) }
@@ -486,6 +488,11 @@ private fun StartSettings(ui: UiState) {
         Toggle("Greeting", null, greeting) {
             greeting = it
             prefs.showGreeting = it
+            ui.themeVersion++
+        }
+        Toggle("Shortcut names", "The site's name under each shortcut", names) {
+            names = it
+            prefs.showShortcutNames = it
             ui.themeVersion++
         }
         Toggle("Weather", "From Open-Meteo. Only the city you pick is sent.", weatherOn) {

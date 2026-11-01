@@ -56,6 +56,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("show_clock", true)
         set(v) = sp.edit().putBoolean("show_clock", v).apply()
 
+    /** Names under the start page shortcuts. */
+    var showShortcutNames: Boolean
+        get() = sp.getBoolean("shortcut_names", true)
+        set(v) = sp.edit().putBoolean("shortcut_names", v).apply()
+
     var showGreeting: Boolean
         get() = sp.getBoolean("show_greeting", true)
         set(v) = sp.edit().putBoolean("show_greeting", v).apply()

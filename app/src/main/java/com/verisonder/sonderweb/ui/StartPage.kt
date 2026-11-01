@@ -231,7 +231,12 @@ private fun ShortcutGrid(
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val columns = if (maxWidth > 560.dp) 6 else 4
         val cell = maxWidth / columns
-        FlowRow(Modifier.fillMaxWidth(), maxItemsInEachRow = columns) {
+        val names = Browser.prefs.showShortcutNames
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            maxItemsInEachRow = columns,
+        ) {
             shortcuts.forEachIndexed { i, s ->
                 val host = UrlText.host(s.url)
                 LaunchedEffect(host) { SiteIcons.load(ctx, host) }
@@ -244,16 +249,18 @@ private fun ShortcutGrid(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     SiteTile(host, s.title)
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        s.title.ifBlank { host },
-                        color = p.mute,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                    )
+                    if (names) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            s.title.ifBlank { host },
+                            color = p.mute,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                        )
+                    }
                 }
             }
             if (shortcuts.size < 24) {
@@ -271,8 +278,10 @@ private fun ShortcutGrid(
                     ) {
                         Icon(Icons.Outlined.Add, "Add shortcut", tint = p.mute, modifier = Modifier.size(22.dp))
                     }
-                    Spacer(Modifier.height(6.dp))
-                    Text("Add", color = p.faint, fontSize = 11.sp)
+                    if (names) {
+                        Spacer(Modifier.height(6.dp))
+                        Text("Add", color = p.faint, fontSize = 11.sp)
+                    }
                 }
             }
         }
