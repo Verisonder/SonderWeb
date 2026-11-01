@@ -127,6 +127,10 @@ object Delegates {
         }
     }
 
+    /** Pixels at the bottom of the page view that the bar covers (set by the screen). */
+    @Volatile
+    var coveredBottom = 0
+
     private val resample = Runnable { Browser.current?.let { capture(it, thumbnail = false) } }
     private val resampleLate = Runnable { Browser.current?.let { capture(it, thumbnail = false) } }
 
@@ -201,7 +205,9 @@ object Delegates {
             view.capturePixels().accept({ bmp: Bitmap? ->
                 if (bmp == null || bmp.width < 2 || bmp.height < 4) return@accept
                 val top = runCatching { edgeColor(bmp, 1) }.getOrNull()
-                val bottom = runCatching { edgeColor(bmp, bmp.height - 2) }.getOrNull()
+                // The page's own bottom, just above the part the bar covers (the engine leaves that unpainted).
+                val bottomY = (bmp.height - coveredBottom - 3).coerceIn(1, bmp.height - 2)
+                val bottom = runCatching { edgeColor(bmp, bottomY) }.getOrNull()
                 val topKnown = top != null
                 // No pictures of private pages, not even in memory: only the two colours.
                 val small = if (thumbnail && !tab.isPrivate) {

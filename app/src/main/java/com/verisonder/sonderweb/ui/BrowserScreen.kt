@@ -175,6 +175,7 @@ fun BrowserScreen(activity: MainActivity) {
     val overOffset = { barOffsetState.value.coerceIn(0f, overPage.toFloat()) }
     LaunchedEffect(overPage, safeBottom, activity.inFullscreen) {
         activity.geckoView.setDynamicToolbarMaxHeight(if (activity.inFullscreen) 0 else overPage + safeBottom)
+        com.verisonder.sonderweb.browser.Delegates.coveredBottom = if (activity.inFullscreen) 0 else overPage + safeBottom
         // Follows the bar frame by frame without recomposing anything.
         androidx.compose.runtime.snapshotFlow { if (activity.inFullscreen) 0 else -overOffset().roundToInt() }
             .collect { activity.geckoView.setVerticalClipping(it) }
@@ -225,10 +226,17 @@ fun BrowserScreen(activity: MainActivity) {
                 // Top bar: the page sits just under the visible part of the bar (its bottom
                 // runs off-screen by the same amount, which the engine accounts for).
                 val barSpace = if (barTop) PaddingValues(top = barDp) else PaddingValues(bottom = barDp)
+                // Behind the page: its own background colour, so the space around the floating bar
+                // (where the engine leaves room for it) looks like part of the page.
+                val pageBg by animateColorAsState(
+                    tab?.edgeBottom?.takeIf { tab.isBlank.not() }?.let { Color(it) } ?: palette.bg,
+                    tween(220),
+                    label = "pageBg",
+                )
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(palette.bg),
+                        .background(pageBg),
                 ) {
                     Box(Modifier.fillMaxWidth().height(with(density) { safeTop.toDp() }).background(edgeTop).align(Alignment.TopCenter))
                     AndroidView(
