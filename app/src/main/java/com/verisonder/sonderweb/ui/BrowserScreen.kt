@@ -75,6 +75,9 @@ class UiState {
     var menu by mutableStateOf(false)
     var editing by mutableStateOf(false)
     var query by mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(""))
+    var finding by mutableStateOf(false)
+    var findQuery by mutableStateOf("")
+    var findResult by mutableStateOf("")
     var themeVersion by mutableStateOf(0)
 }
 
@@ -114,7 +117,7 @@ fun BrowserScreen(activity: MainActivity) {
     val hideMode = remember(ui.themeVersion) { Browser.prefs.barHide }
     LaunchedEffect(hideMode) { Bar.setMode(hideMode) }
     var barPx by remember { mutableIntStateOf(0) }
-    val pinned = ui.editing || ui.menu || tab == null || activity.inFullscreen ||
+    val pinned = ui.editing || ui.menu || ui.finding || tab == null || activity.inFullscreen ||
         hideMode == Bar.ALWAYS || (hideMode == Bar.SLIDE && tab.isBlank)
     val collapsed = Bar.hidden && !pinned
     val barOffset by animateFloatAsState(
@@ -144,6 +147,10 @@ fun BrowserScreen(activity: MainActivity) {
             ui.menu -> ui.menu = false
             ui.panel != Panel.None -> ui.panel = Panel.None
             ui.editing -> ui.editing = false
+            ui.finding -> {
+                tab?.session?.finder?.clear()
+                ui.finding = false
+            }
             tab != null && tab.canGoBack -> tab.session.goBack()
             tab != null && tab.openerId != null -> Browser.close(tab)
             else -> activity.moveTaskToBack(true)

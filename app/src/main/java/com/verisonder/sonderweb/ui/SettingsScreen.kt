@@ -241,7 +241,7 @@ private fun MainPage(
         NavRow(
             Icons.Outlined.Shield,
             "uBlock Origin",
-            if (Ublock.extension != null) "On · version " + BuildConfig.UBLOCK_VERSION else "Starting…",
+            ublockStatus(),
         ) { onOpen(Page.Shields) }
         NavRow(Icons.Outlined.Dashboard, "Start page", null, last = true) { onOpen(Page.Start) }
     }
@@ -263,6 +263,12 @@ private fun MainPage(
             onOpen(Page.About)
         }
     }
+}
+
+private fun ublockStatus(): String = when {
+    Ublock.extension != null -> "On · version " + BuildConfig.UBLOCK_VERSION
+    Ublock.error != null -> "Couldn't start: " + Ublock.error
+    else -> "Starting…"
 }
 
 private fun iconFor(page: Page): ImageVector = when (page) {
@@ -321,7 +327,7 @@ private fun ShieldsPage(ui: UiState) {
     Group {
         Action(
             "Filters and settings",
-            if (Ublock.extension != null) "uBlock Origin " + BuildConfig.UBLOCK_VERSION + " · built in" else "Starting…",
+            ublockStatus(),
         ) {
             if (Ublock.extension != null) {
                 ui.panel = Panel.None

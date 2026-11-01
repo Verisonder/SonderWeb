@@ -66,6 +66,12 @@ android {
         buildConfig = true
     }
 
+    androidResources {
+        // The default pattern drops asset folders starting with "_", which removes uBlock
+        // Origin's _locales folder and stops it from loading. Keep everything but VCS junk.
+        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~"
+    }
+
     packaging {
         // Compress the engine's native libraries: about 75 MB less to download. They are
         // unpacked once at install.

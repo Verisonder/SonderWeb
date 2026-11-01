@@ -20,6 +20,10 @@ object Ublock {
     var extension by mutableStateOf<WebExtension?>(null)
         private set
 
+    /** Why uBlock Origin couldn't start, shown in Settings (null while fine or still starting). */
+    var error by mutableStateOf<String?>(null)
+        private set
+
     /** The popup's engine session while the sheet is open. */
     var popup by mutableStateOf<GeckoSession?>(null)
         private set
@@ -31,9 +35,12 @@ object Ublock {
     fun install(runtime: GeckoRuntime) {
         val controller = runtime.webExtensionController
         controller.ensureBuiltIn(LOCATION, ID).accept({ ext ->
-            if (ext == null) return@accept
-            Browser.main.post { ready(runtime, ext) }
-        }, { _ -> })
+            Browser.main.post {
+                if (ext == null) error = "The engine returned no extension" else ready(runtime, ext)
+            }
+        }, { e ->
+            Browser.main.post { error = e?.message ?: e?.javaClass?.simpleName ?: "Unknown error" }
+        })
     }
 
     private fun ready(runtime: GeckoRuntime, ext: WebExtension) {

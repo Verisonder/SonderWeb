@@ -22,6 +22,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import org.mozilla.geckoview.GeckoSession
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Home
@@ -95,7 +99,9 @@ fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (ui.editing) {
+            if (ui.finding && tab != null && !ui.editing) {
+                FindBar(ui, tab)
+            } else if (ui.editing) {
                 IconButtonSmall(Icons.AutoMirrored.Outlined.ArrowBack, "Cancel", size = 44) { ui.editing = false }
                 Row(
                     Modifier
@@ -121,13 +127,71 @@ fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
                 }
                 Box {
                     IconButtonSmall(Icons.Outlined.MoreVert, "Menu", size = 44, tint = p.mute) { ui.menu = true }
-                    if (tab != null) BrowserMenu(ui, tab)
+                    if (tab != null) BrowserMenu(ui, tab, top)
                 }
             }
         }
         if (top) {
             if (showLoad) LoadLine(tab!!.progress, p.accent) else Spacer(Modifier.height(2.dp))
         }
+    }
+}
+
+/** Find in page: type, see "3/12", step up and down. */
+@Composable
+private fun RowScope.FindBar(ui: UiState, tab: Tab) {
+    val p = LocalPalette.current
+    val finder = tab.session.finder
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    fun seek(backwards: Boolean, fresh: Boolean) {
+        val q = if (fresh) ui.findQuery.ifEmpty { null } else null
+        if (fresh && q == null) {
+            finder.clear()
+            ui.findResult = ""
+            return
+        }
+        finder.find(q, if (backwards) GeckoSession.FINDER_FIND_BACKWARDS else 0).accept({ r ->
+            Browser.main.post {
+                ui.findResult = when {
+                    r == null || !r.found -> if (ui.findQuery.isEmpty()) "" else "0/0"
+                    else -> "${r.current}/${r.total}"
+                }
+            }
+        }, { _ -> })
+    }
+    LaunchedEffect(ui.findQuery) { seek(backwards = false, fresh = true) }
+
+    Row(
+        Modifier
+            .weight(1f)
+            .height(40.dp)
+            .padding(start = 8.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(p.field)
+            .padding(start = 16.dp, end = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            if (ui.findQuery.isEmpty()) Text("Find in page", color = p.faint, fontSize = 15.sp)
+            BasicTextField(
+                value = ui.findQuery,
+                onValueChange = { ui.findQuery = it },
+                singleLine = true,
+                textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 15.sp),
+                cursorBrush = SolidColor(p.accent),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { seek(backwards = false, fresh = false) }),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus),
+            )
+        }
+        if (ui.findResult.isNotEmpty()) Text(ui.findResult, color = p.faint, fontSize = 13.sp)
+    }
+    IconButtonSmall(Icons.Outlined.KeyboardArrowUp, "Previous", size = 40, tint = p.mute) { seek(backwards = true, fresh = false) }
+    IconButtonSmall(Icons.Outlined.KeyboardArrowDown, "Next", size = 40, tint = p.mute) { seek(backwards = false, fresh = false) }
+    IconButtonSmall(Icons.Outlined.Close, "Close", size = 40, tint = p.mute) {
+        finder.clear()
+        ui.finding = false
     }
 }
 
