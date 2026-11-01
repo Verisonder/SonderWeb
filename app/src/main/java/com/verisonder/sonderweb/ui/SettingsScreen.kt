@@ -114,6 +114,7 @@ private val index: List<Pair<String, Page>> = listOf(
     "Theme" to Page.Look,
     "Dark mode" to Page.Look,
     "Address bar position" to Page.Look,
+    "Floating address bar" to Page.Look,
     "Hide address bar" to Page.Look,
     "Status bar" to Page.Look,
     "Reopen tabs" to Page.Tabs,
@@ -383,6 +384,7 @@ private fun LookPage(ui: UiState) {
     var theme by remember { mutableStateOf(prefs.theme) }
     var barTop by remember { mutableStateOf(prefs.barOnTop) }
     var barHide by remember { mutableStateOf(prefs.barHide) }
+    var floating by remember { mutableStateOf(prefs.barFloating) }
     var status by remember { mutableStateOf(prefs.showStatusBar) }
     val changed = {
         Browser.applySettings()
@@ -399,13 +401,24 @@ private fun LookPage(ui: UiState) {
     GroupTitle("Address bar")
     Group {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 18.dp, vertical = 8.dp),
+            Modifier.fillMaxWidth().background(p.field).heightIn(min = 56.dp).padding(horizontal = 18.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Position", color = p.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
             Segmented(listOf("Top", "Bottom"), if (barTop) 0 else 1, p.accent) {
                 barTop = it == 0
                 prefs.barOnTop = barTop
+                changed()
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth().background(p.field).heightIn(min = 56.dp).padding(horizontal = 18.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Style", color = p.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            Segmented(listOf("Floating", "Docked"), if (floating) 0 else 1, p.accent) {
+                floating = it == 0
+                prefs.barFloating = floating
                 changed()
             }
         }

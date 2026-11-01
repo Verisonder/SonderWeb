@@ -41,6 +41,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("bar_top", true)
         set(v) = sp.edit().putBoolean("bar_top", v).apply()
 
+    /** Floating rounded bar (true) or docked to the screen edge (false). */
+    var barFloating: Boolean
+        get() = sp.getBoolean("bar_floating", true)
+        set(v) = sp.edit().putBoolean("bar_floating", v).apply()
+
     /** How the address bar gets out of the way: 0 = always shown, 1 = slides away while
      *  scrolling, 2 = shrinks into a small button you tap to bring it back. */
     var barHide: Int

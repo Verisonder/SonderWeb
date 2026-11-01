@@ -22,6 +22,25 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -93,19 +112,30 @@ fun submit(ui: UiState, text: String) {
 @Composable
 fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
     val p = LocalPalette.current
-    // The bar's colour reaches the screen edge; its contents keep clear of the camera hole
-    // (top) or the gesture bar (bottom).
+    val floating = remember(ui.themeVersion) { Browser.prefs.barFloating }
+    val insets = if (top) {
+        Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top))
+    } else {
+        Modifier.navigationBarsPadding()
+    }
+    val shape = RoundedCornerShape(28.dp)
+    // Docked: the bar's colour reaches the screen edge and its contents keep clear of the camera
+    // hole (top) or the gesture bar (bottom). Floating: a rounded pill with the page around it.
     Column(
-        Modifier
-            .fillMaxWidth()
-            .background(p.bar)
-            .then(
-                if (top) {
-                    Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top))
-                } else {
-                    Modifier.navigationBarsPadding()
-                },
-            ),
+        if (floating) {
+            Modifier
+                .fillMaxWidth()
+                .then(insets)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .shadow(14.dp, shape)
+                .clip(shape)
+                .background(p.card)
+        } else {
+            Modifier
+                .fillMaxWidth()
+                .background(p.bar)
+                .then(insets)
+        },
     ) {
         val showLoad = tab != null && tab.loading && !ui.editing
         if (!top) {
@@ -145,7 +175,11 @@ fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
                     IconButtonSmall(Icons.Outlined.Home, "Home", size = 44, tint = p.mute) { Browser.home(tab) }
                     Omnibox(ui, tab, Modifier.weight(1f))
                 }
-                TabCountButton(Browser.tabs.count { it.isPrivate == (tab?.isPrivate ?: false) }) {
+                TabCountButton(
+                    Browser.tabs.count { it.isPrivate == (tab?.isPrivate ?: false) },
+                    top = top,
+                    onNewTab = { Browser.newTab(null, isPrivate = tab?.isPrivate ?: false) },
+                ) {
                     tab?.let { Delegates.capture(it) }
                     ui.panel = Panel.Tabs
                 }
@@ -304,14 +338,69 @@ private fun ShieldButton(tab: Tab) {
 }
 
 /** Chromium's tab button: a rounded square with the number of tabs, centred. */
+/**
+ * Chromium's tab button: a rounded square with the number of tabs.
+ * Tap: the tab switcher. Hold, then slide up (down when the bar is on top) onto the "+" that
+ * pops out, and let go: a new tab. One continuous gesture; letting go elsewhere cancels.
+ */
 @Composable
-private fun TabCountButton(count: Int, onClick: () -> Unit) {
+private fun TabCountButton(count: Int, top: Boolean, onNewTab: () -> Unit, onClick: () -> Unit) {
     val p = LocalPalette.current
+    val haptics = LocalHapticFeedback.current
+    val density = LocalDensity.current
+    val reach = with(density) { 44.dp.toPx() }
+    val tap by rememberUpdatedState(onClick)
+    val newTab by rememberUpdatedState(onNewTab)
+    var holding by remember { mutableStateOf(false) }
+    var armed by remember { mutableStateOf(false) }
+    val pop by animateFloatAsState(if (holding) 1f else 0f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "pop")
+    val lit by animateFloatAsState(if (armed) 1f else 0f, spring(dampingRatio = 0.7f, stiffness = 700f), label = "lit")
+
     Box(
         Modifier
             .size(44.dp)
             .clip(CircleShape)
-            .clickable(onClick = onClick),
+            .pointerInput(top) {
+                val slop = viewConfiguration.touchSlop
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    var moved = false
+                    // Tap or hold?
+                    var released = false
+                    withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        while (true) {
+                            val c = awaitPointerEvent().changes.first()
+                            if ((c.position - down.position).getDistance() > slop) moved = true
+                            if (!c.pressed) {
+                                released = true
+                                break
+                            }
+                        }
+                    }
+                    if (released) {
+                        if (!moved) tap()
+                        return@awaitEachGesture
+                    }
+                    if (moved) return@awaitEachGesture
+                    holding = true
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    while (true) {
+                        val e = awaitPointerEvent()
+                        val c = e.changes.first()
+                        val dy = c.position.y - down.position.y
+                        val over = if (top) dy > reach * 0.6f else dy < -reach * 0.6f
+                        if (over != armed) {
+                            armed = over
+                            if (over) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        }
+                        c.consume()
+                        if (!c.pressed) break
+                    }
+                    if (armed) newTab()
+                    armed = false
+                    holding = false
+                }
+            },
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -328,6 +417,32 @@ private fun TabCountButton(count: Int, onClick: () -> Unit) {
                 textAlign = TextAlign.Center,
                 style = TextStyle(lineHeight = 11.sp, lineHeightStyle = Centered),
             )
+        }
+        if (pop > 0.01f) {
+            // The "+" pops out above the button (below it when the bar is on top).
+            val offset = with(density) { (if (top) 60.dp else (-60).dp).roundToPx() }
+            Popup(
+                alignment = Alignment.Center,
+                offset = IntOffset(0, offset),
+                properties = PopupProperties(focusable = false, clippingEnabled = false),
+            ) {
+                Box(
+                    Modifier
+                        .graphicsLayer {
+                            val k = (0.4f + 0.6f * pop) * (1f + 0.15f * lit)
+                            scaleX = k
+                            scaleY = k
+                            alpha = pop.coerceIn(0f, 1f)
+                        }
+                        .size(48.dp)
+                        .shadow(10.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(lerp(p.field, p.accent, lit)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Outlined.Add, "New tab", tint = lerp(p.text, p.onAccent, lit), modifier = Modifier.size(24.dp))
+                }
+            }
         }
     }
 }
