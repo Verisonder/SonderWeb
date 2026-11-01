@@ -2,7 +2,6 @@ import java.net.URI
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -10,7 +9,7 @@ val ublockVersion: String = libs.versions.ublock.get()
 
 android {
     namespace = "com.verisonder.sonderweb"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.verisonder.sonderweb"
@@ -59,10 +58,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -71,8 +66,6 @@ android {
     packaging {
         jniLibs.useLegacyPackaging = false
     }
-
-    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/ublockAssets"))
 
     testOptions {
         unitTests {
@@ -87,7 +80,7 @@ android {
 }
 
 // uBlock Origin ships inside the app as a built-in extension. The signed Firefox build is
-// downloaded once per version and unpacked into the assets.
+// downloaded once per version and unpacked into src/main/assets/extensions/ublock (not committed).
 val ublockXpi = layout.buildDirectory.file("ublock/uBlock0_$ublockVersion.firefox.signed.xpi")
 
 val downloadUblock by tasks.registering {
@@ -112,7 +105,7 @@ val unpackUblock by tasks.registering(Sync::class) {
         // Signature files only matter for installed add-ons, not built-in ones.
         exclude("META-INF/**")
     }
-    into(layout.buildDirectory.dir("generated/ublockAssets/extensions/ublock"))
+    into(layout.projectDirectory.dir("src/main/assets/extensions/ublock"))
 }
 
 tasks.named("preBuild") { dependsOn(unpackUblock) }

@@ -8,3 +8,4 @@ local.properties
 *.jks
 *.keystore
 docs/HANDOFF.md
+app/src/main/assets/extensions/ublock/
