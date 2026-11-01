@@ -113,7 +113,10 @@ object Extensions {
             ): GeckoResult<AllowOrDeny>? = GeckoResult.allow()
         })
         controller.setAddonManagerDelegate(object : WebExtensionController.AddonManagerDelegate {
-            override fun onInstalled(extension: WebExtension) = refresh()
+            override fun onInstalled(extension: WebExtension) {
+                refresh()
+                Browser.main.post { started(extension) }
+            }
             override fun onUninstalled(extension: WebExtension) = refresh()
             override fun onEnabled(extension: WebExtension) = refresh()
             override fun onDisabled(extension: WebExtension) = refresh()
@@ -122,6 +125,29 @@ object Extensions {
             }
         })
         refresh()
+    }
+
+    /**
+     * A newly added extension, ready to work straight away: it gets the sites it asked for (newer
+     * extensions only ask for them "optionally" and otherwise sit idle until granted), and the
+     * page you're on reloads so it runs there too.
+     */
+    private fun started(ext: WebExtension, reload: Boolean = true) {
+        if (ext.id == Ublock.ID || ext.id == Look.ID) return
+        if (ext.id in Browser.prefs.extensionsSetUp && !reload) return
+        Browser.prefs.extensionsSetUp = Browser.prefs.extensionsSetUp + ext.id
+        val m = ext.metaData
+        val origins = (m.optionalOrigins.toList() - m.grantedOptionalOrigins.toSet()).toTypedArray()
+        val done = {
+            if (origins.isNotEmpty()) refresh()
+            if (reload) Browser.current?.let { t -> if (!t.isBlank && t.ready) t.session.reload() }
+        }
+        if (origins.isEmpty()) {
+            done()
+        } else {
+            controller.addOptionalPermissions(ext.id, emptyArray(), origins, emptyArray())
+                .accept({ Browser.main.post { done() } }, { _ -> Browser.main.post { done() } })
+        }
     }
 
     /** Your answer to an install request. */
@@ -140,6 +166,8 @@ object Extensions {
                 // uBlock Origin first, then by name.
                 list.addAll(exts.sortedWith(compareBy({ it.id != Ublock.ID }, { it.metaData.name ?: it.id })))
                 exts.forEach { register(it) }
+                // Ones added before this version: give them their sites once, too.
+                exts.filter { it.id !in Browser.prefs.extensionsSetUp }.forEach { started(it, reload = false) }
             }
         }, { _ -> })
     }

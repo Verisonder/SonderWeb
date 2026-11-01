@@ -24,6 +24,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("strict", true)
         set(v) = sp.edit().putBoolean("strict", v).apply()
 
+    /** Extensions already given the sites they asked for (done once, so your own later choice stands). */
+    var extensionsSetUp: Set<String>
+        get() = sp.getStringSet("ext_setup", emptySet()) ?: emptySet()
+        set(v) = sp.edit().putStringSet("ext_setup", v).apply()
+
     /** DuckDuckGo restyled to look like the browser (a small built-in extension). */
     var cleanDdg: Boolean
         get() = sp.getBoolean("clean_ddg", true)
