@@ -24,6 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.AddCircleOutline
+import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.Download
@@ -66,6 +68,10 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val web = UrlText.isWeb(tab.url)
     var bookmarked by remember(tab.url, ui.menu) { mutableStateOf(web && Browser.db.isBookmarked(tab.url)) }
+    val host = UrlText.host(tab.url)
+    var pinned by remember(tab.url, ui.menu) {
+        mutableStateOf(web && Browser.prefs.shortcuts.any { UrlText.host(it.url) == host })
+    }
     val close = { ui.menu = false }
 
     DropdownMenu(
@@ -86,14 +92,22 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                     tab.session.goForward()
                     close()
                 }
+                // The star puts this site on the start page (or takes it off).
                 RoundAction(
-                    if (bookmarked) Icons.Outlined.Star else Icons.Outlined.StarBorder,
-                    if (bookmarked) "Remove bookmark" else "Bookmark",
+                    if (pinned) Icons.Outlined.Star else Icons.Outlined.StarBorder,
+                    if (pinned) "Remove from start page" else "Add to start page",
                     web && !tab.isPrivate,
-                    tint = if (bookmarked) p.accent else null,
+                    tint = if (pinned) p.accent else null,
                 ) {
-                    if (bookmarked) Browser.db.removeBookmark(tab.url) else Browser.db.addBookmark(tab.url, tab.title)
-                    bookmarked = !bookmarked
+                    val list = Browser.prefs.shortcuts
+                    if (pinned) {
+                        Browser.prefs.shortcuts = list.filter { UrlText.host(it.url) != host }
+                        Browser.host?.toast("Removed from the start page")
+                    } else {
+                        Browser.prefs.shortcuts = list + Shortcut(tab.url, tab.title.take(24).ifBlank { host })
+                        Browser.host?.toast("Added to the start page")
+                    }
+                    pinned = !pinned
                 }
                 RoundAction(Icons.Outlined.Share, "Share", web) {
                     Browser.host?.share(tab.url, tab.title)
@@ -146,14 +160,18 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                 close()
             }
             if (!tab.isPrivate) {
-                Item("Add to start page", Icons.Outlined.AddCircleOutline) {
-                    val list = Browser.prefs.shortcuts
-                    if (list.none { UrlText.host(it.url) == UrlText.host(tab.url) }) {
-                        Browser.prefs.shortcuts = list + Shortcut(tab.url, tab.title.take(24).ifBlank { UrlText.host(tab.url) })
-                        Browser.host?.toast("Added to the start page")
+                Item(
+                    if (bookmarked) "Remove bookmark" else "Add bookmark",
+                    if (bookmarked) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
+                ) {
+                    if (bookmarked) {
+                        Browser.db.removeBookmark(tab.url)
+                        Browser.host?.toast("Bookmark removed")
                     } else {
-                        Browser.host?.toast("Already on the start page")
+                        Browser.db.addBookmark(tab.url, tab.title)
+                        Browser.host?.toast("Bookmarked")
                     }
+                    bookmarked = !bookmarked
                     close()
                 }
             }
