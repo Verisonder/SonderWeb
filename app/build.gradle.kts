@@ -67,7 +67,9 @@ android {
     }
 
     packaging {
-        jniLibs.useLegacyPackaging = false
+        // Compress the engine's native libraries: about 75 MB less to download. They are
+        // unpacked once at install.
+        jniLibs.useLegacyPackaging = true
     }
 
     testOptions {
