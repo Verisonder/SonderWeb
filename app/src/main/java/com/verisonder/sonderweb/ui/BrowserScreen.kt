@@ -96,22 +96,22 @@ fun BrowserScreen(activity: MainActivity) {
     // ---- The sliding bar ----
     var barPx by remember { mutableIntStateOf(0) }
     val barDp = with(LocalDensity.current) { barPx.toDp() }
-    val pinned = ui.editing || ui.menu || tab == null || tab.isBlank || activity.fullscreen
+    val pinned = ui.editing || ui.menu || tab == null || tab.isBlank || activity.inFullscreen
     val barOffset by animateFloatAsState(
         targetValue = if (Bar.hidden && !pinned) barPx.toFloat() else 0f,
         animationSpec = tween(220, easing = FastOutSlowInEasing),
         label = "bar",
     )
-    LaunchedEffect(barPx, activity.fullscreen) {
-        activity.geckoView.setDynamicToolbarMaxHeight(if (activity.fullscreen) 0 else barPx)
+    LaunchedEffect(barPx, activity.inFullscreen) {
+        activity.geckoView.setDynamicToolbarMaxHeight(if (activity.inFullscreen) 0 else barPx)
     }
     SideEffect {
-        activity.geckoView.setVerticalClipping(if (activity.fullscreen) 0 else -barOffset.roundToInt())
+        activity.geckoView.setVerticalClipping(if (activity.inFullscreen) 0 else -barOffset.roundToInt())
     }
 
     BackHandler(enabled = true) {
         when {
-            activity.fullscreen -> tab?.session?.exitFullScreen()
+            activity.inFullscreen -> tab?.session?.exitFullScreen()
             Ublock.popup != null -> Ublock.closePopup()
             ContextMenu.request != null -> ContextMenu.dismiss()
             ui.menu -> ui.menu = false
@@ -132,7 +132,7 @@ fun BrowserScreen(activity: MainActivity) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .then(if (activity.fullscreen) Modifier else Modifier.statusBarsPadding().navigationBarsPadding())
+                    .then(if (activity.inFullscreen) Modifier else Modifier.statusBarsPadding().navigationBarsPadding())
                     .imePadding()
                     .clipToBounds(),
             ) {
@@ -154,7 +154,7 @@ fun BrowserScreen(activity: MainActivity) {
                         Box(Modifier.fillMaxSize().padding(bottom = barDp)) { Suggestions(ui, tab) }
                     }
                 }
-                if (!activity.fullscreen) {
+                if (!activity.inFullscreen) {
                     Box(
                         Modifier
                             .align(Alignment.BottomCenter)

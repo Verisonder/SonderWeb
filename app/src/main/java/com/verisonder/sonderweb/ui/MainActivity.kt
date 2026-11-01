@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
     val snackbar = SnackbarHostState()
 
     /** True while a page shows a video (or anything) in fullscreen. */
-    var fullscreen by mutableStateOf(false)
+    var inFullscreen by mutableStateOf(false)
         private set
 
     private var filesResult: ((List<Uri>) -> Unit)? = null
@@ -154,7 +154,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
     }
 
     override fun setFullscreen(on: Boolean) {
-        fullscreen = on
+        inFullscreen = on
         val c = WindowCompat.getInsetsController(window, window.decorView)
         if (on) {
             c.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
