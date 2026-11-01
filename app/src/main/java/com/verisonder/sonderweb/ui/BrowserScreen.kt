@@ -474,17 +474,8 @@ private fun BoxScope.DraggableBarButton(
                         val c = at
                         val pos = base(c) + drag.value
                         if (c == FREE) {
-                            // Advanced position: it stays exactly where you let go.
-                            val f = androidx.compose.ui.geometry.Offset(
-                                ((pos.x - left) / spanX()).coerceIn(0f, 1f),
-                                ((pos.y - top) / spanY()).coerceIn(0f, 1f),
-                            )
-                            scope.launch {
-                                drag.snapTo(pos - androidx.compose.ui.geometry.Offset(left + f.x * spanX(), top + f.y * spanY()))
-                                free = f
-                                onSpot(f)
-                                drag.animateTo(androidx.compose.ui.geometry.Offset.Zero, spring(dampingRatio = 0.72f, stiffness = 420f))
-                            }
+                            // Custom position (set in Settings): dragging doesn't move it, it glides back.
+                            scope.launch { drag.animateTo(androidx.compose.ui.geometry.Offset.Zero, spring(dampingRatio = 0.72f, stiffness = 420f)) }
                         } else {
                             val right = pos.x + size / 2f > area.width / 2f
                             val bottom = pos.y + size / 2f > area.height / 2f

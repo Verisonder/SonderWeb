@@ -588,7 +588,7 @@ private fun ButtonPlace(ui: UiState) {
         ui.themeVersion++
     }
 
-    Toggle("Custom button position", "Place the small button anywhere on the screen instead of a corner. Dragging it then leaves it exactly where you drop it.", on) {
+    Toggle("Custom button position", "Place the small button anywhere on the screen instead of a corner, with the sliders below.", on) {
         on = it
         prefs.buttonFree = it
         ui.themeVersion++
