@@ -234,6 +234,9 @@ fun BrowserScreen(activity: MainActivity) {
                                 },
                             ),
                     )
+                    // Opening the start page covers the engine view at once, so the previous page
+                    // never shows through while the start page fades in.
+                    if (tab != null && tab.isBlank) Box(Modifier.fillMaxSize().background(palette.bg))
                     AnimatedVisibility(
                         visible = tab != null && tab.isBlank,
                         enter = fadeIn(tween(180)),

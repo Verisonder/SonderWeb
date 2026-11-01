@@ -137,9 +137,11 @@ fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
                 .then(insets)
         },
     ) {
-        val showLoad = tab != null && tab.loading && !ui.editing
+        val showLoad = tab != null && tab.loading && !tab.isBlank && !ui.editing
+        // Floating: keep the line off the rounded ends so it never shows as a stray corner.
+        val lineInset = if (floating) Modifier.padding(horizontal = 24.dp) else Modifier
         if (!top) {
-            if (showLoad) LoadLine(tab!!.progress, p.accent) else Spacer(Modifier.height(2.dp))
+            if (showLoad) Box(lineInset) { LoadLine(tab!!.progress, p.accent) } else Spacer(Modifier.height(2.dp))
         }
         Row(
             Modifier
@@ -190,7 +192,7 @@ fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
             }
         }
         if (top) {
-            if (showLoad) LoadLine(tab!!.progress, p.accent) else Spacer(Modifier.height(2.dp))
+            if (showLoad) Box(lineInset) { LoadLine(tab!!.progress, p.accent) } else Spacer(Modifier.height(2.dp))
         }
     }
 }
