@@ -9,7 +9,7 @@ A private, fast and honest web browser for Android. uBlock Origin built in, Fire
 ## What it does
 
 - **uBlock Origin, built in.** Ads, trackers and malware are blocked from the first page. Tap the shield in the address bar to see what a page blocked, or to switch blocking off for that site. Add more extensions from addons.mozilla.org (⋮ › Extensions).
-- **Firefox's engine (GeckoView).** Strict tracking protection, cookies kept apart per site, tracking parameters stripped from links, Global Privacy Control on.
+- **Firefox's engine (GeckoView), hardened.** Strict tracking protection, fingerprinting protection, cookies kept apart per site and trackers' cookies purged, bounce-tracking protection, tracking parameters stripped from links, HTTPS only, sites blocked from probing your home network, Global Privacy Control on, optional encrypted DNS (Quad9, Mullvad, Cloudflare).
 - **!bangs.** Type `!w Tangier`, `!yt lofi` or `!gh sonder` to search a site directly. Common bangs are resolved on your phone; any other bang goes through DuckDuckGo.
 - **Your search engine.** DuckDuckGo by default; Brave, Startpage, Qwant, Ecosia, Kagi, Google, Bing, or your own.
 - **The page gets the whole screen**, edge to edge: the address bar shrinks into a small button (or slides away, your choice) and the phone status bar is hidden unless you want it.

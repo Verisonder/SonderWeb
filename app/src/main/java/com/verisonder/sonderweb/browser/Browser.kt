@@ -68,7 +68,12 @@ object Browser {
             .enhancedTrackingProtectionLevel(etpLevel())
             .strictSocialTrackingProtection(prefs.strictTracking)
             .cookieBehavior(ContentBlocking.CookieBehavior.ACCEPT_FIRST_PARTY_AND_ISOLATE_OTHERS)
-            .cookieBehaviorPrivateMode(ContentBlocking.CookieBehavior.ACCEPT_FIRST_PARTY_AND_ISOLATE_OTHERS)
+            // Private tabs: no cross-site cookies at all.
+            .cookieBehaviorPrivateMode(ContentBlocking.CookieBehavior.ACCEPT_FIRST_PARTY)
+            // Trackers' cookies are purged regularly; redirect "bounce" trackers are cleared too.
+            .cookiePurging(true)
+            .bounceTrackingProtectionMode(ContentBlocking.BounceTrackingProtectionMode.BOUNCE_TRACKING_PROTECTION_MODE_ENABLED)
+            .emailTrackerBlockingPrivateMode(true)
             .queryParameterStrippingEnabled(true)
             .queryParameterStrippingPrivateBrowsingEnabled(true)
             .queryParameterStrippingStripList(*stripParams)
@@ -93,6 +98,7 @@ object Browser {
 
         Bar.setMode(prefs.barHide)
         runtime = GeckoRuntime.create(app, settings)
+        applyHardening()
         Extensions.setup()
         Ublock.install(runtime)
         restoreTabs()
@@ -116,7 +122,44 @@ object Browser {
         // Private tabs always insist on encrypted connections, like Brave's.
         if (prefs.httpsOnly) GeckoRuntimeSettings.HTTPS_ONLY else GeckoRuntimeSettings.HTTPS_ONLY_PRIVATE
 
+    /** Encrypted DNS providers for Settings › Privacy (index matches [Prefs.secureDns]). */
+    val dnsProviders = listOf(
+        "Off" to "",
+        "Quad9" to "https://dns.quad9.net/dns-query",
+        "Mullvad" to "https://dns.mullvad.net/dns-query",
+        "Cloudflare" to "https://mozilla.cloudflare-dns.com/dns-query",
+    )
+
+    /** Protections on top of tracking protection and uBlock Origin. */
+    private fun applyHardening() {
+        val s = runtime.settings
+        runCatching {
+            // Fingerprinting: sites see slightly randomised details, like Brave's.
+            s.setBaselineFingerprintingProtection(true)
+            s.setFingerprintingProtection(prefs.blockFingerprinting)
+            s.setFingerprintingProtectionPrivateBrowsing(true)
+        }
+        runCatching {
+            // Sites on the internet can't probe your router or other devices on your network.
+            s.setLnaEnabled(true)
+            s.setLnaBlocking(true)
+            s.setLnaBlockTrackers(true)
+        }
+        runCatching { s.setPostQuantumKeyExchangeEnabled(true) }
+        runCatching { s.setLoginAutofillEnabled(false) }
+        runCatching {
+            val uri = dnsProviders.getOrNull(prefs.secureDns)?.second.orEmpty()
+            if (uri.isEmpty()) {
+                s.setTrustedRecursiveResolverMode(GeckoRuntimeSettings.TRR_MODE_OFF)
+            } else {
+                s.setTrustedRecursiveResolverUri(uri)
+                s.setTrustedRecursiveResolverMode(GeckoRuntimeSettings.TRR_MODE_ONLY)
+            }
+        }
+    }
+
     fun applySettings() {
+        applyHardening()
         val s = runtime.settings
         s.contentBlocking
             .setAntiTracking(antiTracking())

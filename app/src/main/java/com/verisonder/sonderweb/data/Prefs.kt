@@ -25,8 +25,18 @@ class Prefs(context: Context) {
         set(v) = sp.edit().putBoolean("strict", v).apply()
 
     var httpsOnly: Boolean
-        get() = sp.getBoolean("https_only", false)
+        get() = sp.getBoolean("https_only", true)
         set(v) = sp.edit().putBoolean("https_only", v).apply()
+
+    /** Sites get slightly altered device details (screen, fonts, canvas...) so they can't recognise you. */
+    var blockFingerprinting: Boolean
+        get() = sp.getBoolean("fingerprinting", true)
+        set(v) = sp.edit().putBoolean("fingerprinting", v).apply()
+
+    /** Encrypted DNS: 0 off (the phone's own DNS, e.g. a VPN's blocker), 1 Quad9, 2 Mullvad, 3 Cloudflare. */
+    var secureDns: Int
+        get() = sp.getInt("secure_dns", 0)
+        set(v) = sp.edit().putInt("secure_dns", v).apply()
 
     /** Private tabs: ask for your fingerprint / screen lock after you've left the app. */
     var privateLock: Boolean

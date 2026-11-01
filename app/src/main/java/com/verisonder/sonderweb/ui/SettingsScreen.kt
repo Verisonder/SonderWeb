@@ -103,6 +103,9 @@ private enum class Page(val title: String) {
 private val index: List<Pair<String, Page>> = listOf(
     "Strict tracking protection" to Page.Privacy,
     "HTTPS only" to Page.Privacy,
+    "Fingerprinting" to Page.Privacy,
+    "Secure DNS" to Page.Privacy,
+    "DNS over HTTPS" to Page.Privacy,
     "Keep history" to Page.Privacy,
     "Private tabs" to Page.Privacy,
     "Lock private tabs" to Page.Privacy,
@@ -319,6 +322,8 @@ private fun PrivacyPage(onClear: () -> Unit) {
     var strict by remember { mutableStateOf(prefs.strictTracking) }
     var httpsOnly by remember { mutableStateOf(prefs.httpsOnly) }
     var history by remember { mutableStateOf(prefs.saveHistory) }
+    var fingerprinting by remember { mutableStateOf(prefs.blockFingerprinting) }
+    var dns by remember { mutableStateOf(prefs.secureDns) }
     var lock by remember { mutableStateOf(prefs.privateLock) }
     var closeOnLeave by remember { mutableStateOf(prefs.privateCloseOnLeave) }
     var screenshots by remember { mutableStateOf(prefs.privateScreenshots) }
@@ -329,7 +334,12 @@ private fun PrivacyPage(onClear: () -> Unit) {
             prefs.strictTracking = it
             Browser.applySettings()
         }
-        Toggle("HTTPS only", "Never load a site over an unencrypted connection.", httpsOnly) {
+        Toggle("Block fingerprinting", "Sites get slightly randomised device details, so they can't recognise you without cookies.", fingerprinting) {
+            fingerprinting = it
+            prefs.blockFingerprinting = it
+            Browser.applySettings()
+        }
+        Toggle("HTTPS only", "Never load a site over an unencrypted connection. You're asked before any exception.", httpsOnly) {
             httpsOnly = it
             prefs.httpsOnly = it
             Browser.applySettings()
@@ -337,6 +347,20 @@ private fun PrivacyPage(onClear: () -> Unit) {
         Toggle("Keep history", "Off: pages you visit aren't remembered. Private tabs never are.", history) {
             history = it
             prefs.saveHistory = it
+        }
+    }
+    GroupTitle("Secure DNS")
+    Group {
+        Browser.dnsProviders.forEachIndexed { i, (name, _) ->
+            Choice(
+                name,
+                dns == i,
+                if (i == 0) "Use the phone's DNS (keeps a VPN or DNS ad blocker working)" else "Encrypted: your network can't see which sites you visit",
+            ) {
+                dns = i
+                prefs.secureDns = i
+                Browser.applySettings()
+            }
         }
     }
     GroupTitle("Private tabs")
@@ -359,7 +383,7 @@ private fun PrivacyPage(onClear: () -> Unit) {
     Hint("Always on in private tabs: nothing saved to history, no cookies or site data kept once they close, HTTPS only, the keyboard doesn't learn what you type, and no tab previews.")
     Spacer(Modifier.height(12.dp))
     Group { Action("Clear browsing data", "History, cookies, site data, cache", onClick = onClear) }
-    Hint("Always on: cookies are kept apart per site, tracking parameters are removed from links, and sites are told not to sell your data (Global Privacy Control).")
+    Hint("Always on: ads, trackers and malware blocked by uBlock Origin; cookies kept apart per site and trackers' cookies purged; bounce trackers cleared; tracking parameters removed from links; sites can't probe your home network; logins never saved; sites told not to sell your data (Global Privacy Control). Nothing is ever sent to us: no telemetry, no accounts.")
 }
 
 @Composable
