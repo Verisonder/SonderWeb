@@ -155,8 +155,9 @@ fun BrowserScreen(activity: MainActivity) {
         label = "morph",
     )
 
-    // The page keeps clear of the camera hole and the gesture bar (nothing hidden there); those
-    // two thin strips take the colour of the page's own edges so it still looks edge to edge.
+    // Top: the page keeps clear of the camera hole; that thin strip takes the colour of the page's
+    // top edge. Bottom: the page runs on under the gesture bar, one continuous surface, while the
+    // engine is told that strip is covered, so buttons pinned to the bottom of a page sit above it.
     val showStatus = remember(ui.themeVersion) { Browser.prefs.showStatusBar }
     val density = LocalDensity.current
     val safeTop = if (activity.inFullscreen || showStatus) 0 else WindowInsets.displayCutout.getTop(density)
@@ -164,8 +165,8 @@ fun BrowserScreen(activity: MainActivity) {
     // The bar already covers the strip on its side: only the rest of it lies over the page.
     val overPage = (barPx - if (barTop) safeTop else safeBottom).coerceAtLeast(0)
     val overOffset = { barOffsetState.value.coerceIn(0f, overPage.toFloat()) }
-    LaunchedEffect(overPage, activity.inFullscreen) {
-        activity.geckoView.setDynamicToolbarMaxHeight(if (activity.inFullscreen) 0 else overPage)
+    LaunchedEffect(overPage, safeBottom, activity.inFullscreen) {
+        activity.geckoView.setDynamicToolbarMaxHeight(if (activity.inFullscreen) 0 else overPage + safeBottom)
         // Follows the bar frame by frame without recomposing anything.
         androidx.compose.runtime.snapshotFlow { if (activity.inFullscreen) 0 else -overOffset().roundToInt() }
             .collect { activity.geckoView.setVerticalClipping(it) }
@@ -173,7 +174,6 @@ fun BrowserScreen(activity: MainActivity) {
     // While typing the bar is always fully shown, so suggestions sit right under (or over) it.
     val barDp = with(density) { barPx.toDp() }
     val edgeTop by animateColorAsState(tab?.edgeTop?.let { Color(it) } ?: palette.bg, tween(220), label = "edgeTop")
-    val edgeBottom by animateColorAsState(tab?.edgeBottom?.let { Color(it) } ?: palette.bg, tween(220), label = "edgeBottom")
 
     BackHandler(enabled = true) {
         when {
@@ -223,12 +223,11 @@ fun BrowserScreen(activity: MainActivity) {
                         .background(palette.bg),
                 ) {
                     Box(Modifier.fillMaxWidth().height(with(density) { safeTop.toDp() }).background(edgeTop).align(Alignment.TopCenter))
-                    Box(Modifier.fillMaxWidth().height(with(density) { safeBottom.toDp() }).background(edgeBottom).align(Alignment.BottomCenter))
                     AndroidView(
                         factory = { activity.geckoView },
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(with(density) { PaddingValues(top = safeTop.toDp(), bottom = safeBottom.toDp()) })
+                            .padding(with(density) { PaddingValues(top = safeTop.toDp()) })
                             .then(
                                 if (barTop && !activity.inFullscreen) {
                                     Modifier.offset { IntOffset(0, (overPage - overOffset()).roundToInt()) }
