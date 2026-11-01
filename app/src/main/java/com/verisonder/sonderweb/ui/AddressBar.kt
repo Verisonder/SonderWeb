@@ -23,6 +23,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import org.mozilla.geckoview.GeckoSession
@@ -87,7 +93,20 @@ fun submit(ui: UiState, text: String) {
 @Composable
 fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
     val p = LocalPalette.current
-    Column(Modifier.fillMaxWidth().background(p.bar)) {
+    // The bar's colour reaches the screen edge; its contents keep clear of the camera hole
+    // (top) or the gesture bar (bottom).
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(p.bar)
+            .then(
+                if (top) {
+                    Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top))
+                } else {
+                    Modifier.navigationBarsPadding()
+                },
+            ),
+    ) {
         val showLoad = tab != null && tab.loading && !ui.editing
         if (!top) {
             if (showLoad) LoadLine(tab!!.progress, p.accent) else Spacer(Modifier.height(2.dp))

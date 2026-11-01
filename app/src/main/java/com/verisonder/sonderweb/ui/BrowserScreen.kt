@@ -161,6 +161,7 @@ fun BrowserScreen(activity: MainActivity) {
 
     // Top padding: the status bar when it's shown, else only the camera cut-out.
     val screenInsets = WindowInsets.statusBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)
+    val showStatus = remember(ui.themeVersion) { Browser.prefs.showStatusBar }
 
     SonderTheme(palette) {
         Box(
@@ -171,7 +172,9 @@ fun BrowserScreen(activity: MainActivity) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .then(if (activity.inFullscreen) Modifier else Modifier.windowInsetsPadding(screenInsets).navigationBarsPadding())
+                    // Pages run edge to edge: under the camera hole and the gesture bar. Only the
+                    // status bar, when you choose to show it, takes space at the top.
+                    .then(if (activity.inFullscreen || !showStatus) Modifier else Modifier.statusBarsPadding())
                     .imePadding()
                     .clipToBounds(),
             ) {
@@ -235,6 +238,7 @@ fun BrowserScreen(activity: MainActivity) {
                                 tab,
                                 Modifier
                                     .align(if (barTop) Alignment.TopStart else Alignment.BottomStart)
+                                    .then(if (barTop) Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top)) else Modifier.navigationBarsPadding())
                                     .padding(14.dp)
                                     .graphicsLayer {
                                         val k = 0.6f + 0.4f * morph

@@ -69,6 +69,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
         setContent { BrowserScreen(this) }
         applySystemBars()
         preferHighRefreshRate()
+        // No grey scrim behind the gesture bar: the page shows through.
+        if (android.os.Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
         if (savedInstanceState == null) handleIntent(intent)
     }
 
