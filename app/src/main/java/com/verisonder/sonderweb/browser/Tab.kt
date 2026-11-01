@@ -30,6 +30,11 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     var desktop by mutableStateOf(false)
     var thumbnail by mutableStateOf<ImageBitmap?>(null)
 
+    /** The page's colour along its top and bottom edge (ARGB), to fill the strips by the camera
+     *  hole and the gesture bar so the page looks edge to edge without anything hidden. */
+    var edgeTop by mutableStateOf<Int?>(null)
+    var edgeBottom by mutableStateOf<Int?>(null)
+
     /** True once the engine session is open and can be shown. */
     var ready by mutableStateOf(false)
 

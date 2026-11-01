@@ -5,6 +5,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.ui.graphics.Color
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
@@ -144,12 +147,24 @@ fun BrowserScreen(activity: MainActivity) {
         label = "morph",
     )
     val visibleBarDp = with(LocalDensity.current) { (barPx - barOffset).coerceAtLeast(0f).toDp() }
-    LaunchedEffect(barPx, activity.inFullscreen) {
-        activity.geckoView.setDynamicToolbarMaxHeight(if (activity.inFullscreen) 0 else barPx)
+
+    // The page keeps clear of the camera hole and the gesture bar (nothing hidden there); those
+    // two thin strips take the colour of the page's own edges so it still looks edge to edge.
+    val showStatus = remember(ui.themeVersion) { Browser.prefs.showStatusBar }
+    val density = LocalDensity.current
+    val safeTop = if (activity.inFullscreen || showStatus) 0 else WindowInsets.displayCutout.getTop(density)
+    val safeBottom = if (activity.inFullscreen) 0 else WindowInsets.navigationBars.getBottom(density)
+    // The bar already covers the strip on its side: only the rest of it lies over the page.
+    val overPage = (barPx - if (barTop) safeTop else safeBottom).coerceAtLeast(0)
+    val overOffset = barOffset.coerceIn(0f, overPage.toFloat())
+    LaunchedEffect(overPage, activity.inFullscreen) {
+        activity.geckoView.setDynamicToolbarMaxHeight(if (activity.inFullscreen) 0 else overPage)
     }
     SideEffect {
-        activity.geckoView.setVerticalClipping(if (activity.inFullscreen) 0 else -barOffset.roundToInt())
+        activity.geckoView.setVerticalClipping(if (activity.inFullscreen) 0 else -overOffset.roundToInt())
     }
+    val edgeTop by animateColorAsState(tab?.edgeTop?.let { Color(it) } ?: palette.bg, tween(220), label = "edgeTop")
+    val edgeBottom by animateColorAsState(tab?.edgeBottom?.let { Color(it) } ?: palette.bg, tween(220), label = "edgeBottom")
 
     BackHandler(enabled = true) {
         when {
@@ -172,7 +187,6 @@ fun BrowserScreen(activity: MainActivity) {
 
     // Top padding: the status bar when it's shown, else only the camera cut-out.
     val screenInsets = WindowInsets.statusBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)
-    val showStatus = remember(ui.themeVersion) { Browser.prefs.showStatusBar }
 
     SonderTheme(palette) {
         Box(
@@ -199,13 +213,16 @@ fun BrowserScreen(activity: MainActivity) {
                         .fillMaxSize()
                         .background(palette.bg),
                 ) {
+                    Box(Modifier.fillMaxWidth().height(with(density) { safeTop.toDp() }).background(edgeTop).align(Alignment.TopCenter))
+                    Box(Modifier.fillMaxWidth().height(with(density) { safeBottom.toDp() }).background(edgeBottom).align(Alignment.BottomCenter))
                     AndroidView(
                         factory = { activity.geckoView },
                         modifier = Modifier
                             .fillMaxSize()
+                            .padding(with(density) { PaddingValues(top = safeTop.toDp(), bottom = safeBottom.toDp()) })
                             .then(
                                 if (barTop && !activity.inFullscreen) {
-                                    Modifier.offset { IntOffset(0, (barPx - barOffset).roundToInt()) }
+                                    Modifier.offset { IntOffset(0, (overPage - overOffset).roundToInt()) }
                                 } else {
                                     Modifier
                                 },

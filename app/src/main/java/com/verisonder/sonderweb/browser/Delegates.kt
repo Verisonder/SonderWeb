@@ -26,6 +26,9 @@ object Delegates {
         s.setScrollDelegate(object : GeckoSession.ScrollDelegate {
             override fun onScrollChanged(session: GeckoSession, scrollX: Int, scrollY: Int) {
                 Bar.onScroll(tab, scrollY)
+                // Once scrolling settles, pick up the colours now at the page's edges.
+                Browser.main.removeCallbacks(resample)
+                Browser.main.postDelayed(resample, 220)
             }
         })
         Extensions.attach(tab)
@@ -109,7 +112,13 @@ object Delegates {
         }
     }
 
+    private val resample = Runnable { Browser.current?.let { capture(it, thumbnail = false) } }
+
     private fun content(tab: Tab) = object : ContentDelegate {
+        override fun onFirstContentfulPaint(session: GeckoSession) {
+            capture(tab, thumbnail = false)
+        }
+
         override fun onTitleChange(session: GeckoSession, title: String?) {
             tab.title = title ?: ""
             if (!tab.isPrivate && Browser.prefs.saveHistory && UrlText.isWeb(tab.url) && !title.isNullOrBlank()) {
@@ -169,20 +178,34 @@ object Delegates {
         }
     }
 
-    /** A small picture of the page for the tab switcher. */
-    fun capture(tab: Tab) {
-        // No pictures of private pages, not even in memory.
-        if (tab.isPrivate) return
+    /** Reads the page's edge colours and, for normal tabs, keeps a small picture for the tab switcher. */
+    fun capture(tab: Tab, thumbnail: Boolean = true) {
         val view = Browser.host?.geckoViewFor(tab) ?: return
         runCatching {
             view.capturePixels().accept({ bmp: Bitmap? ->
-                if (bmp != null) {
+                if (bmp == null || bmp.width < 2 || bmp.height < 4) return@accept
+                val top = runCatching { edgeColor(bmp, 1) }.getOrNull()
+                val bottom = runCatching { edgeColor(bmp, bmp.height - 2) }.getOrNull()
+                // No pictures of private pages, not even in memory: only the two colours.
+                val small = if (thumbnail && !tab.isPrivate) {
                     val w = 360
-                    val h = (bmp.height * w / bmp.width.coerceAtLeast(1)).coerceAtLeast(1)
-                    val small = Bitmap.createScaledBitmap(bmp, w, h, true)
-                    Browser.main.post { tab.thumbnail = small.asImageBitmap() }
+                    val h = (bmp.height * w / bmp.width).coerceAtLeast(1)
+                    Bitmap.createScaledBitmap(bmp, w, h, true)
+                } else {
+                    null
+                }
+                Browser.main.post {
+                    if (top != null) tab.edgeTop = top
+                    if (bottom != null) tab.edgeBottom = bottom
+                    if (small != null) tab.thumbnail = small.asImageBitmap()
                 }
             }, { })
         }
+    }
+
+    /** The colour most of a pixel row has (a few points across it), fully opaque. */
+    private fun edgeColor(bmp: Bitmap, y: Int): Int {
+        val points = (1..9).map { i -> bmp.getPixel((bmp.width - 1) * i / 10, y) or 0xFF000000.toInt() }
+        return points.groupingBy { it }.eachCount().maxByOrNull { it.value }!!.key
     }
 }
