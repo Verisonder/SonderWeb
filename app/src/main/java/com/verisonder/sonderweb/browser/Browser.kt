@@ -148,8 +148,23 @@ object Browser {
         }
         runCatching { s.setPostQuantumKeyExchangeEnabled(true) }
         runCatching { s.setLoginAutofillEnabled(false) }
+        applyDns()
+    }
+
+    private var dnsInUse = -1
+
+    /**
+     * Encrypted DNS: your choice in Settings for normal tabs; private tabs always use Quad9
+     * (or your chosen provider), switched on while you're in them and back off when you leave.
+     */
+    fun applyDns() {
+        val s = runtime.settings
+        val choice = prefs.secureDns
+        val want = if (current?.isPrivate == true && choice == 0) 1 else choice
+        if (want == dnsInUse) return
+        dnsInUse = want
         runCatching {
-            val uri = dnsProviders.getOrNull(prefs.secureDns)?.second.orEmpty()
+            val uri = dnsProviders.getOrNull(want)?.second.orEmpty()
             if (uri.isEmpty()) {
                 s.setTrustedRecursiveResolverMode(GeckoRuntimeSettings.TRR_MODE_OFF)
             } else {
@@ -213,6 +228,7 @@ object Browser {
         // Leaving the private tabs locks them again: coming back needs your fingerprint.
         if (old?.isPrivate == true && !tab.isPrivate && prefs.privateLock) privateLocked = true
         current = tab
+        if (old?.isPrivate != tab.isPrivate) applyDns()
         Bar.show()
         if (tab.ready) activate(tab)
         saveTabs()

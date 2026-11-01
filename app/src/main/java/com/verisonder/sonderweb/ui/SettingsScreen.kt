@@ -359,7 +359,7 @@ private fun PrivacyPage(onClear: () -> Unit) {
             Choice(
                 name,
                 dns == i,
-                if (i == 0) "Use the phone's DNS (keeps a VPN or DNS ad blocker working)" else "Encrypted: your network can't see which sites you visit",
+                if (i == 0) "Use the phone's DNS (keeps a VPN or DNS ad blocker working). Private tabs still use Quad9." else "Encrypted: your network can't see which sites you look up",
             ) {
                 dns = i
                 prefs.secureDns = i
