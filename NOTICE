@@ -1,0 +1,18 @@
+SonderWeb
+Copyright 2026 Verisonder
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+It includes or downloads at build time the following third-party software,
+each under its own licence:
+
+- GeckoView, the Firefox engine for Android, by Mozilla.
+  Mozilla Public License 2.0 — https://www.mozilla.org/MPL/2.0/
+  Source: https://github.com/mozilla-firefox/firefox
+
+- uBlock Origin by Raymond Hill and contributors, bundled unmodified.
+  GNU General Public License v3.0 — https://www.gnu.org/licenses/gpl-3.0.html
+  Source: https://github.com/gorhill/uBlock
+
+SonderWeb is inspired by Helium (https://github.com/imputnet/helium) but contains
+none of its code.

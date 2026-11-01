@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A ring (the web) with a dot travelling on it. Fits the 66 dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M54,33a21,21 0,1 1,-0.01 0z"
+        android:strokeColor="@color/icon_fg"
+        android:strokeWidth="6"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M69,32m-6.5,0a6.5,6.5 0,1 1,13 0a6.5,6.5 0,1 1,-13 0"
+        android:fillColor="@color/icon_accent" />
+</vector>

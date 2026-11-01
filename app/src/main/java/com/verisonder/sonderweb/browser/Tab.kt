@@ -1,0 +1,49 @@
+package com.verisonder.sonderweb.browser
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
+import org.mozilla.geckoview.GeckoSession
+import org.mozilla.geckoview.GeckoSessionSettings
+
+/** One tab. Its fields are Compose state, so the UI follows the page as it loads. */
+class Tab(val id: Long, val isPrivate: Boolean) {
+    val session: GeckoSession = GeckoSession(
+        GeckoSessionSettings.Builder()
+            .usePrivateMode(isPrivate)
+            .useTrackingProtection(true)
+            .userAgentMode(GeckoSessionSettings.USER_AGENT_MODE_MOBILE)
+            .viewportMode(GeckoSessionSettings.VIEWPORT_MODE_MOBILE)
+            .suspendMediaWhenInactive(false)
+            .build(),
+    )
+
+    var url by mutableStateOf("")
+    var title by mutableStateOf("")
+    var progress by mutableIntStateOf(0)
+    var loading by mutableStateOf(false)
+    var canGoBack by mutableStateOf(false)
+    var canGoForward by mutableStateOf(false)
+    var secure by mutableStateOf(false)
+    var desktop by mutableStateOf(false)
+    var thumbnail by mutableStateOf<ImageBitmap?>(null)
+
+    /** True once the engine session is open and can be shown. */
+    var ready by mutableStateOf(false)
+
+    /** uBlock Origin's count of blocked requests on this page (its badge text). */
+    var blockedBadge by mutableStateOf("")
+
+    /** Address to load the first time this tab is shown (restored tabs load lazily). */
+    var pendingUrl: String? = null
+
+    /** The tab that opened this one; closing returns to it. */
+    var openerId: Long? = null
+
+    /** True while nothing has been loaded yet: the start page is shown instead of the engine. */
+    val isBlank: Boolean get() = url.isEmpty() && pendingUrl == null && !loading
+
+    val displayTitle: String get() = title.ifBlank { url.ifBlank { "New tab" } }
+}
