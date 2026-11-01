@@ -158,82 +158,86 @@ fun StartPage(ui: UiState) {
     val shortcuts = remember(version, ui.themeVersion) { prefs.shortcuts }
     var editing by remember { mutableStateOf<Int?>(null) } // index, or -1 for a new one
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(p.bg)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.height(56.dp))
-        if (prefs.showClock) {
-            Text(
-                time,
-                color = p.text,
-                fontSize = 88.sp,
-                fontWeight = FontWeight.ExtraLight,
-                letterSpacing = (-2).sp,
-                maxLines = 1,
-            )
-            Text(date, color = p.text, fontSize = 16.sp)
-            Spacer(Modifier.height(34.dp))
-        }
-        if (tab.isPrivate) {
-            Text("Private tab", color = p.text, fontSize = 27.sp, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Nothing from this tab is kept once you close it.",
-                color = p.mute,
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center,
-            )
-        } else if (prefs.showGreeting) {
-            Text(
-                WeatherCodes.greeting(hour, prefs.userName),
-                color = p.text,
-                fontSize = 27.sp,
-                textAlign = TextAlign.Center,
-            )
-        }
-        if (weather != null) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                WeatherCodes.sentence(weather.code, weather.temp, weather.unit),
-                color = p.text,
-                fontSize = 15.sp,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SkyIcon(WeatherCodes.sky(weather.code, weather.day), 34)
-                Spacer(Modifier.width(8.dp))
-                Text("${weather.temp}°${weather.unit}", color = p.text, fontSize = 26.sp, fontWeight = FontWeight.Light)
-            }
-        }
-
-        Spacer(Modifier.height(30.dp))
-        Row(
+    // Everything sits in the middle of the screen, a little below centre; it scrolls if it doesn't fit.
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(p.bg)) {
+        Column(
             Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(p.field)
-                .clickable { startEditing(ui, tab) }
-                .padding(horizontal = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = maxHeight)
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            Icon(Icons.Outlined.Search, "Search", tint = p.faint, modifier = Modifier.size(20.dp))
-        }
+            Spacer(Modifier.height(88.dp))
+            if (prefs.showClock) {
+                Text(
+                    time,
+                    color = p.text,
+                    fontSize = 88.sp,
+                    fontWeight = FontWeight.ExtraLight,
+                    letterSpacing = (-2).sp,
+                    maxLines = 1,
+                )
+                Text(date, color = p.text, fontSize = 16.sp)
+                Spacer(Modifier.height(34.dp))
+            }
+            if (tab.isPrivate) {
+                Text("Private tab", color = p.text, fontSize = 27.sp, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Nothing from this tab is kept once you close it.",
+                    color = p.mute,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center,
+                )
+            } else if (prefs.showGreeting) {
+                Text(
+                    WeatherCodes.greeting(hour, prefs.userName),
+                    color = p.text,
+                    fontSize = 27.sp,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            if (weather != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    WeatherCodes.sentence(weather.code, weather.temp, weather.unit),
+                    color = p.text,
+                    fontSize = 15.sp,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SkyIcon(WeatherCodes.sky(weather.code, weather.day), 34)
+                    Spacer(Modifier.width(8.dp))
+                    Text("${weather.temp}°${weather.unit}", color = p.text, fontSize = 26.sp, fontWeight = FontWeight.Light)
+                }
+            }
 
-        Spacer(Modifier.height(30.dp))
-        ShortcutGrid(
-            shortcuts,
-            onOpen = { Browser.load(tab, it.url) },
-            onEdit = { editing = it },
-            onAdd = { editing = -1 },
-        )
-        Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(30.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(p.field)
+                    .clickable { startEditing(ui, tab) }
+                    .padding(horizontal = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.Search, "Search", tint = p.faint, modifier = Modifier.size(20.dp))
+            }
+
+            Spacer(Modifier.height(30.dp))
+            ShortcutGrid(
+                shortcuts,
+                onOpen = { Browser.load(tab, it.url) },
+                onEdit = { editing = it },
+                onAdd = { editing = -1 },
+            )
+            Spacer(Modifier.height(32.dp))
+        }
     }
 
     editing?.let { i ->
