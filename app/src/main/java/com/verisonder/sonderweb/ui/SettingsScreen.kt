@@ -47,6 +47,8 @@ import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Tab
 import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.offset
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Home
@@ -132,6 +134,7 @@ private val index: List<Pair<String, Page>> = listOf(
     "Hide address bar" to Page.Look,
     "Address bar size" to Page.Look,
     "Button size" to Page.Look,
+    "Button position" to Page.Look,
     "Status bar" to Page.Look,
     "Reopen tabs" to Page.Tabs,
     "Version" to Page.About,
@@ -495,6 +498,9 @@ private fun LookPage(ui: UiState) {
     GroupTitle("Size")
     Group { BarSizes(ui) }
 
+    GroupTitle("Advanced")
+    Group { ButtonPlace(ui) }
+
     GroupTitle("Screen")
     Group {
         Toggle("Phone status bar", "Time and battery at the top. Off: pages use the whole screen; swipe down to peek.", status) {
@@ -554,6 +560,63 @@ private fun BarSizes(ui: UiState) {
             },
             colors = colors,
         )
+    }
+}
+
+/** Advanced: put the small button anywhere, with a little phone showing where. */
+@Composable
+private fun ButtonPlace(ui: UiState) {
+    val p = LocalPalette.current
+    val prefs = Browser.prefs
+    var on by remember { mutableStateOf(prefs.buttonFree) }
+    var x by remember { mutableStateOf(prefs.buttonX) }
+    var y by remember { mutableStateOf(prefs.buttonY) }
+    val colors = SliderDefaults.colors(thumbColor = p.accent, activeTrackColor = p.accent, inactiveTrackColor = p.line)
+    val save = {
+        prefs.buttonX = x
+        prefs.buttonY = y
+        ui.themeVersion++
+    }
+
+    Toggle("Custom button position", "Place the small button anywhere on the screen instead of a corner. Dragging it then leaves it exactly where you drop it.", on) {
+        on = it
+        prefs.buttonFree = it
+        ui.themeVersion++
+    }
+    AnimatedVisibility(on) {
+        Row(
+            Modifier.fillMaxWidth().background(p.field).padding(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Left – right  ${(x * 100).roundToInt()}%", color = p.mute, fontSize = 14.sp)
+                Slider(x, { x = it }, onValueChangeFinished = save, colors = colors)
+                Spacer(Modifier.height(4.dp))
+                Text("Top – bottom  ${(y * 100).roundToInt()}%", color = p.mute, fontSize = 14.sp)
+                Slider(y, { y = it }, onValueChangeFinished = save, colors = colors)
+            }
+            Spacer(Modifier.width(18.dp))
+            // The phone, with the button where it will be.
+            Box(
+                Modifier
+                    .size(width = 64.dp, height = 132.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .border(2.dp, p.line, RoundedCornerShape(14.dp))
+                    .background(p.bg)
+                    .padding(7.dp),
+            ) {
+                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val dot = 14.dp
+                    Box(
+                        Modifier
+                            .offset((maxWidth - dot) * x, (maxHeight - dot) * y)
+                            .size(dot)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .background(p.accent),
+                    )
+                }
+            }
+        }
     }
 }
 

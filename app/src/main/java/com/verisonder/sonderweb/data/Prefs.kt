@@ -83,6 +83,19 @@ class Prefs(context: Context) {
         get() = sp.getInt("button_corner", -1)
         set(v) = sp.edit().putInt("button_corner", v).apply()
 
+    /** Advanced: the small button sits at a free spot ([buttonX], [buttonY]) instead of a corner. */
+    var buttonFree: Boolean
+        get() = sp.getBoolean("button_free", false)
+        set(v) = sp.edit().putBoolean("button_free", v).apply()
+
+    /** Free spot of the small button, 0 = left / top edge, 1 = right / bottom edge. */
+    var buttonX: Float
+        get() = sp.getFloat("button_x", 1f)
+        set(v) = sp.edit().putFloat("button_x", v.coerceIn(0f, 1f)).apply()
+    var buttonY: Float
+        get() = sp.getFloat("button_y", 1f)
+        set(v) = sp.edit().putFloat("button_y", v.coerceIn(0f, 1f)).apply()
+
     /** Size of the address bar, in percent of normal (everything in it grows or shrinks together). */
     var barSize: Int
         get() = sp.getInt("bar_size", 100)

@@ -349,7 +349,9 @@ private fun BoxScope.BarArea(
     if (hideMode == Bar.BUTTON) {
         val saved = remember(ui.themeVersion) { Browser.prefs.buttonCorner }
         var corner by remember(saved, barTop) { mutableStateOf(if (saved in 0..3) saved else if (barTop) 1 else 3) }
-        val right = corner == 1 || corner == 3
+        val free = remember(ui.themeVersion) { Browser.prefs.buttonFree }
+        var spot by remember(ui.themeVersion) { mutableStateOf(androidx.compose.ui.geometry.Offset(Browser.prefs.buttonX, Browser.prefs.buttonY)) }
+        val right = if (free) spot.x > 0.5f else corner == 1 || corner == 3
         // The bar shrinks towards the button's corner while the button grows out of it.
         // Only these two yes/no answers recompose; the in-between frames are drawn directly.
         val barShown by remember { androidx.compose.runtime.derivedStateOf { morph() < 1f } }
@@ -373,7 +375,19 @@ private fun BoxScope.BarArea(
             }
         }
         if (buttonShown) {
-            DraggableBarButton(tab, remember(ui.themeVersion) { Browser.prefs.buttonSize }, corner, morph, { corner = it; Browser.prefs.buttonCorner = it }) { Bar.expand() }
+            DraggableBarButton(
+                tab,
+                remember(ui.themeVersion) { Browser.prefs.buttonSize },
+                if (free) FREE else corner,
+                spot,
+                morph,
+                onCorner = { corner = it; Browser.prefs.buttonCorner = it },
+                onSpot = {
+                    spot = it
+                    Browser.prefs.buttonX = it.x
+                    Browser.prefs.buttonY = it.y
+                },
+            ) { Bar.expand() }
         }
     } else {
         Box(
@@ -396,8 +410,10 @@ private fun BoxScope.DraggableBarButton(
     tab: com.verisonder.sonderweb.browser.Tab?,
     buttonDp: Int,
     corner: Int,
+    spot: androidx.compose.ui.geometry.Offset,
     morph: () -> Float,
     onCorner: (Int) -> Unit,
+    onSpot: (androidx.compose.ui.geometry.Offset) -> Unit,
     onClick: () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -408,10 +424,21 @@ private fun BoxScope.DraggableBarButton(
     val bottomInset = WindowInsets.navigationBars.getBottom(density)
     val margin = with(density) { 14.dp.roundToPx() }
     val size = with(density) { buttonDp.dp.roundToPx() }
-    fun base(c: Int) = androidx.compose.ui.geometry.Offset(
-        if (c == 1 || c == 3) (area.width - margin - size).toFloat() else margin.toFloat(),
-        if (c >= 2) (area.height - bottomInset - margin - size).toFloat() else (topInset + margin).toFloat(),
-    )
+    // The free area the button can sit in (inside the margins, clear of the hole and gesture bar).
+    val left = margin.toFloat()
+    val top = (topInset + margin).toFloat()
+    fun spanX() = (area.width - 2 * margin - size).coerceAtLeast(1).toFloat()
+    fun spanY() = (area.height - topInset - bottomInset - 2 * margin - size).coerceAtLeast(1).toFloat()
+    var free by remember { mutableStateOf(spot) }
+    LaunchedEffect(spot) { free = spot }
+    fun base(c: Int) = if (c == FREE) {
+        androidx.compose.ui.geometry.Offset(left + free.x * spanX(), top + free.y * spanY())
+    } else {
+        androidx.compose.ui.geometry.Offset(
+            if (c == 1 || c == 3) left + spanX() else left,
+            if (c >= 2) top + spanY() else top,
+        )
+    }
     val drag = remember { androidx.compose.animation.core.Animatable(androidx.compose.ui.geometry.Offset.Zero, androidx.compose.ui.geometry.Offset.VectorConverter) }
     var held by remember { mutableStateOf(false) }
     val lift by animateFloatAsState(if (held) 1.1f else 1f, spring(dampingRatio = 0.6f, stiffness = 600f), label = "lift")
@@ -429,7 +456,7 @@ private fun BoxScope.DraggableBarButton(
                 val b = base(at)
                 IntOffset((b.x + drag.value.x).roundToInt(), (b.y + drag.value.y).roundToInt())
             }
-            .pointerInput(Unit) {
+            .pointerInput(size, margin, topInset, bottomInset) {
                 detectDragGestures(
                     onDragStart = {
                         held = true
@@ -439,15 +466,29 @@ private fun BoxScope.DraggableBarButton(
                         held = false
                         val c = at
                         val pos = base(c) + drag.value
-                        val right = pos.x + size / 2f > area.width / 2f
-                        val bottom = pos.y + size / 2f > area.height / 2f
-                        val next = (if (bottom) 2 else 0) + (if (right) 1 else 0)
-                        scope.launch {
-                            // Keep it where your finger left it, then glide into the corner.
-                            drag.snapTo(pos - base(next))
-                            at = next
-                            if (next != c) onCorner(next)
-                            drag.animateTo(androidx.compose.ui.geometry.Offset.Zero, spring(dampingRatio = 0.72f, stiffness = 420f))
+                        if (c == FREE) {
+                            // Advanced position: it stays exactly where you let go.
+                            val f = androidx.compose.ui.geometry.Offset(
+                                ((pos.x - left) / spanX()).coerceIn(0f, 1f),
+                                ((pos.y - top) / spanY()).coerceIn(0f, 1f),
+                            )
+                            scope.launch {
+                                drag.snapTo(pos - androidx.compose.ui.geometry.Offset(left + f.x * spanX(), top + f.y * spanY()))
+                                free = f
+                                onSpot(f)
+                                drag.animateTo(androidx.compose.ui.geometry.Offset.Zero, spring(dampingRatio = 0.72f, stiffness = 420f))
+                            }
+                        } else {
+                            val right = pos.x + size / 2f > area.width / 2f
+                            val bottom = pos.y + size / 2f > area.height / 2f
+                            val next = (if (bottom) 2 else 0) + (if (right) 1 else 0)
+                            scope.launch {
+                                // Keep it where your finger left it, then glide into the corner.
+                                drag.snapTo(pos - base(next))
+                                at = next
+                                if (next != c) onCorner(next)
+                                drag.animateTo(androidx.compose.ui.geometry.Offset.Zero, spring(dampingRatio = 0.72f, stiffness = 420f))
+                            }
                         }
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     },
@@ -471,6 +512,9 @@ private fun BoxScope.DraggableBarButton(
         onClick = onClick,
     )
 }
+
+/** [DraggableBarButton]'s corner value for the free (advanced) position. */
+private const val FREE = 4
 
 /** From a locked private tab to your normal tabs. */
 fun leavePrivate(ui: UiState) {
