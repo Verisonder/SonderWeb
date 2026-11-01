@@ -96,6 +96,9 @@ private val index: List<Pair<String, Page>> = listOf(
     "Strict tracking protection" to Page.Privacy,
     "HTTPS only" to Page.Privacy,
     "Keep history" to Page.Privacy,
+    "Private tabs" to Page.Privacy,
+    "Lock private tabs" to Page.Privacy,
+    "Screenshots" to Page.Privacy,
     "Clear browsing data" to Page.Privacy,
     "Cookies" to Page.Privacy,
     "uBlock Origin filters" to Page.Shields,
@@ -306,6 +309,9 @@ private fun PrivacyPage(onClear: () -> Unit) {
     var strict by remember { mutableStateOf(prefs.strictTracking) }
     var httpsOnly by remember { mutableStateOf(prefs.httpsOnly) }
     var history by remember { mutableStateOf(prefs.saveHistory) }
+    var lock by remember { mutableStateOf(prefs.privateLock) }
+    var closeOnLeave by remember { mutableStateOf(prefs.privateCloseOnLeave) }
+    var screenshots by remember { mutableStateOf(prefs.privateScreenshots) }
     Spacer(Modifier.height(8.dp))
     Group {
         Toggle("Strict tracking protection", "Firefox's own blocking on top of uBlock Origin. Turn off if a site breaks.", strict) {
@@ -323,6 +329,24 @@ private fun PrivacyPage(onClear: () -> Unit) {
             prefs.saveHistory = it
         }
     }
+    GroupTitle("Private tabs")
+    Group {
+        Toggle("Lock private tabs", "Ask for your fingerprint or screen lock when you come back to the app.", lock) {
+            lock = it
+            prefs.privateLock = it
+            if (!it) Browser.privateLocked = false
+        }
+        Toggle("Close private tabs when you leave", "Everything from them is gone the moment you switch apps or lock the phone.", closeOnLeave) {
+            closeOnLeave = it
+            prefs.privateCloseOnLeave = it
+        }
+        Toggle("Allow screenshots", "Off: no screenshots, screen recording or recent-apps preview of private tabs.", screenshots) {
+            screenshots = it
+            prefs.privateScreenshots = it
+            Browser.privateScreenshots = it
+        }
+    }
+    Hint("Always on in private tabs: nothing saved to history, no cookies or site data kept once they close, HTTPS only, the keyboard doesn't learn what you type, and no tab previews.")
     Spacer(Modifier.height(12.dp))
     Group { Action("Clear browsing data", "History, cookies, site data, cache", onClick = onClear) }
     Hint("Always on: cookies are kept apart per site, tracking parameters are removed from links, and sites are told not to sell your data (Global Privacy Control).")

@@ -33,6 +33,12 @@ object Browser {
     val main = Handler(Looper.getMainLooper())
 
     val tabs = mutableStateListOf<Tab>()
+
+    /** Private tabs are hidden behind your fingerprint / screen lock after you leave the app. */
+    var privateLocked by mutableStateOf(false)
+
+    /** Settings › Privacy: allow screenshots of private tabs. Off by default. */
+    var privateScreenshots by mutableStateOf(false)
     var current by mutableStateOf<Tab?>(null)
         private set
 
@@ -54,6 +60,7 @@ object Browser {
         app = context.applicationContext
         prefs = Prefs(app)
         db = Db(app)
+        privateScreenshots = prefs.privateScreenshots
 
         val blocking = ContentBlocking.Settings.Builder()
             .antiTracking(antiTracking())
@@ -105,7 +112,8 @@ object Browser {
     }
 
     private fun insecureMode() =
-        if (prefs.httpsOnly) GeckoRuntimeSettings.HTTPS_ONLY else GeckoRuntimeSettings.ALLOW_ALL
+        // Private tabs always insist on encrypted connections, like Brave's.
+        if (prefs.httpsOnly) GeckoRuntimeSettings.HTTPS_ONLY else GeckoRuntimeSettings.HTTPS_ONLY_PRIVATE
 
     fun applySettings() {
         val s = runtime.settings
@@ -210,6 +218,19 @@ object Browser {
 
     fun privateTabsOpen(): Boolean = tabs.any { it.isPrivate }
 
+    /** You left the app (home, recents, screen off): lock or close the private tabs. */
+    fun leftApp() {
+        if (!privateTabsOpen()) return
+        when {
+            prefs.privateCloseOnLeave -> {
+                val wasPrivate = current?.isPrivate == true
+                closeAll(true)
+                if (wasPrivate) tabs.lastOrNull { !it.isPrivate }?.let { select(it) }
+            }
+            prefs.privateLock -> privateLocked = true
+        }
+    }
+
     /** Address-bar submit: an address, a search or a !bang. */
     fun go(input: String, tab: Tab? = current) {
         val target = AddressInput.resolve(input, prefs.engine()) ?: return
@@ -289,6 +310,9 @@ object Browser {
         fun share(text: String, title: String?)
         fun setFullscreen(on: Boolean)
         fun applySystemBars()
+
+        /** Asks for the fingerprint or screen lock, then unlocks the private tabs. */
+        fun unlockPrivate()
         fun requestAndroidPermissions(perms: Array<String>, result: (Boolean) -> Unit)
         fun pickFiles(mimeTypes: Array<String>, multiple: Boolean, result: (List<android.net.Uri>) -> Unit)
 

@@ -101,6 +101,11 @@ fun BrowserScreen(activity: MainActivity) {
         }
     }
 
+    // Private tabs never end up in screenshots, screen recordings or the recent-apps preview.
+    val secure = !Browser.privateScreenshots &&
+        (tab?.isPrivate == true || (ui.panel == Panel.Tabs && Browser.privateTabsOpen()))
+    LaunchedEffect(secure) { activity.setSecure(secure) }
+
     // Show the current tab in the engine view.
     LaunchedEffect(tab, tab?.ready) {
         val t = tab ?: return@LaunchedEffect
@@ -143,6 +148,7 @@ fun BrowserScreen(activity: MainActivity) {
 
     BackHandler(enabled = true) {
         when {
+            Browser.privateLocked && tab?.isPrivate == true -> leavePrivate(ui)
             activity.inFullscreen -> tab?.session?.exitFullScreen()
             Ublock.popup != null -> Ublock.closePopup()
             ContextMenu.request != null -> ContextMenu.dismiss()
@@ -305,8 +311,25 @@ fun BrowserScreen(activity: MainActivity) {
             Ublock.popup?.let { UblockSheet(it) }
             Prompts.queue.firstOrNull { it.tab === tab }?.let { PromptDialog(it) }
             com.verisonder.sonderweb.browser.Extensions.pending?.let { InstallDialog(it) }
+
+            // Back from another app: the private tab stays hidden until you unlock it.
+            AnimatedVisibility(
+                visible = Browser.privateLocked && tab?.isPrivate == true,
+                enter = fadeIn(tween(160)),
+                exit = fadeOut(tween(220)),
+            ) {
+                PrivateLock(onLeave = { leavePrivate(ui) })
+            }
         }
     }
+}
+
+/** From a locked private tab to your normal tabs. */
+fun leavePrivate(ui: UiState) {
+    ui.panel = Panel.None
+    ui.editing = false
+    val normal = Browser.tabs.lastOrNull { !it.isPrivate }
+    if (normal != null) Browser.select(normal) else Browser.newTab(null, isPrivate = false)
 }
 
 /** The small round button the bar shrinks into. Tap it to bring the bar back. */

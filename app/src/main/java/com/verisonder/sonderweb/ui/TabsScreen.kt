@@ -100,6 +100,8 @@ fun TabsScreen(ui: UiState) {
                     }
                 }
             }
+            // Locked: the private tabs' titles stay hidden too.
+            if (privateMode && Browser.privateLocked && list.isNotEmpty()) PrivateLock(onLeave = null)
         }
 
         Row(

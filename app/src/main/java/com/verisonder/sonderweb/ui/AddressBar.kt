@@ -232,16 +232,18 @@ private fun RowScope.FindBar(ui: UiState, tab: Tab) {
     ) {
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
             if (ui.findQuery.isEmpty()) Text("Find in page", color = p.faint, fontSize = 15.sp)
-            BasicTextField(
-                value = ui.findQuery,
-                onValueChange = { ui.findQuery = it },
-                singleLine = true,
-                textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 15.sp),
-                cursorBrush = SolidColor(p.accent),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { seek(backwards = false, fresh = false) }),
-                modifier = Modifier.fillMaxWidth().focusRequester(focus),
-            )
+            IncognitoKeyboard(Browser.current?.isPrivate == true) {
+                BasicTextField(
+                    value = ui.findQuery,
+                    onValueChange = { ui.findQuery = it },
+                    singleLine = true,
+                    textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 15.sp),
+                    cursorBrush = SolidColor(p.accent),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { seek(backwards = false, fresh = false) }),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                )
+            }
         }
         if (ui.findResult.isNotEmpty()) Text(ui.findResult, color = p.faint, fontSize = 13.sp)
     }
@@ -294,20 +296,22 @@ private fun EditField(ui: UiState, modifier: Modifier) {
     LaunchedEffect(Unit) { focus.requestFocus() }
     Box(modifier, contentAlignment = Alignment.CenterStart) {
         if (ui.query.text.isEmpty()) Text("Search or type address", color = p.faint, fontSize = 15.sp, maxLines = 1)
-        BasicTextField(
-            value = ui.query,
-            onValueChange = { ui.query = it },
-            singleLine = true,
-            textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 15.sp),
-            cursorBrush = SolidColor(p.accent),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Uri,
-                imeAction = ImeAction.Go,
-                autoCorrectEnabled = false,
-            ),
-            keyboardActions = KeyboardActions(onGo = { submit(ui, ui.query.text) }),
-            modifier = Modifier.fillMaxWidth().focusRequester(focus),
-        )
+        IncognitoKeyboard(Browser.current?.isPrivate == true) {
+            BasicTextField(
+                value = ui.query,
+                onValueChange = { ui.query = it },
+                singleLine = true,
+                textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 15.sp),
+                cursorBrush = SolidColor(p.accent),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Uri,
+                    imeAction = ImeAction.Go,
+                    autoCorrectEnabled = false,
+                ),
+                keyboardActions = KeyboardActions(onGo = { submit(ui, ui.query.text) }),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus),
+            )
+        }
     }
 }
 

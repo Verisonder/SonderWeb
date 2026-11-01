@@ -14,7 +14,7 @@ A private, fast and honest web browser for Android. uBlock Origin built in, Fire
 - **Your search engine.** DuckDuckGo by default; Brave, Startpage, Qwant, Ecosia, Kagi, Google, Bing, or your own.
 - **The page gets the whole screen**, edge to edge: the address bar shrinks into a small button (or slides away, your choice) and the phone status bar is hidden unless you want it.
 - **A start page** with the time, a greeting, the weather (Open-Meteo, only the place you pick is sent) and the shortcuts you add.
-- **Tabs and private tabs.** Private tabs keep no history, cookies or site data once closed.
+- **Tabs and private tabs.** Private tabs keep no history, cookies or site data once closed, load only over HTTPS, lock behind your fingerprint when you leave the app (or close themselves), block screenshots and the recent-apps preview, and ask the keyboard not to learn what you type.
 - **History, bookmarks, downloads**, all stored only on your phone.
 - **No accounts, no telemetry, no tracking.**
 

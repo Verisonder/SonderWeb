@@ -171,6 +171,8 @@ object Delegates {
 
     /** A small picture of the page for the tab switcher. */
     fun capture(tab: Tab) {
+        // No pictures of private pages, not even in memory.
+        if (tab.isPrivate) return
         val view = Browser.host?.geckoViewFor(tab) ?: return
         runCatching {
             view.capturePixels().accept({ bmp: Bitmap? ->

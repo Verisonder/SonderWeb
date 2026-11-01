@@ -1,13 +1,18 @@
 package com.verisonder.sonderweb.ui
 
+import android.app.Activity
 import android.app.DatePickerDialog
+import android.app.KeyguardManager
 import android.app.SearchManager
 import android.app.TimePickerDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.CancellationSignal
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -35,6 +40,14 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity(), Browser.Host {
 
+    private companion object {
+        val NO_BIOMETRICS = setOf(
+            android.hardware.biometrics.BiometricPrompt.BIOMETRIC_ERROR_HW_UNAVAILABLE,
+            android.hardware.biometrics.BiometricPrompt.BIOMETRIC_ERROR_NO_BIOMETRICS,
+            android.hardware.biometrics.BiometricPrompt.BIOMETRIC_ERROR_HW_NOT_PRESENT,
+        )
+    }
+
     lateinit var geckoView: GeckoView
         private set
     val snackbar = SnackbarHostState()
@@ -46,6 +59,14 @@ class MainActivity : ComponentActivity(), Browser.Host {
     private var filesResult: ((List<Uri>) -> Unit)? = null
     private var permsResult: ((Boolean) -> Unit)? = null
 
+    /** True while we've sent you to a screen of our own (file picker, share sheet, screen lock):
+     *  that isn't leaving the app, so private tabs stay unlocked. */
+    private var ownScreen = false
+
+    private val confirmLock = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        if (r.resultCode == Activity.RESULT_OK) Browser.privateLocked = false
+    }
+
     private val pickOne = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         filesResult?.invoke(listOfNotNull(uri))
         filesResult = null
@@ -55,6 +76,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
         filesResult = null
     }
     private val askPerms = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
+        ownScreen = false
         permsResult?.invoke(r.isNotEmpty() && r.values.all { it })
         permsResult = null
     }
@@ -84,6 +106,11 @@ class MainActivity : ComponentActivity(), Browser.Host {
         Browser.host = this
     }
 
+    override fun onStart() {
+        super.onStart()
+        ownScreen = false
+    }
+
     override fun onDestroy() {
         if (Browser.host === this) Browser.host = null
         super.onDestroy()
@@ -92,6 +119,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun onStop() {
         super.onStop()
         Browser.saveTabs()
+        if (!ownScreen && !isChangingConfigurations) Browser.leftApp()
     }
 
     /** Links from other apps open in a new tab; shared text and searches too. */
@@ -136,6 +164,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
         }
         return try {
             startActivity(intent)
+            ownScreen = true
             true
         } catch (_: ActivityNotFoundException) {
             val fallback = intent.getStringExtra("browser_fallback_url")
@@ -154,7 +183,10 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun share(text: String, title: String?) {
         val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
         if (!title.isNullOrBlank()) send.putExtra(Intent.EXTRA_SUBJECT, title)
-        runCatching { startActivity(Intent.createChooser(send, null)) }
+        runCatching {
+            startActivity(Intent.createChooser(send, null))
+            ownScreen = true
+        }
     }
 
     override fun setFullscreen(on: Boolean) {
@@ -176,6 +208,66 @@ class MainActivity : ComponentActivity(), Browser.Host {
         } else {
             c.hide(WindowInsetsCompat.Type.statusBars())
         }
+    }
+
+    /** No screenshots, screen recording or recent-apps preview while private tabs are on screen. */
+    fun setSecure(on: Boolean) {
+        if (on) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+
+    override fun unlockPrivate() {
+        val km = getSystemService(KeyguardManager::class.java)
+        // No screen lock on the phone: nothing to check against.
+        if (km == null || !km.isDeviceSecure) {
+            Browser.privateLocked = false
+            return
+        }
+        if (Build.VERSION.SDK_INT < 28) {
+            confirmScreenLock(km)
+            return
+        }
+        val b = android.hardware.biometrics.BiometricPrompt.Builder(this)
+            .setTitle("Unlock private tabs")
+        when {
+            Build.VERSION.SDK_INT >= 30 -> b.setAllowedAuthenticators(
+                android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                    android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+            )
+            Build.VERSION.SDK_INT == 29 -> @Suppress("DEPRECATION") b.setDeviceCredentialAllowed(true)
+            else -> b.setNegativeButton("Use screen lock", mainExecutor) { _, _ -> confirmScreenLock(km) }
+        }
+        ownScreen = true
+        b.build().authenticate(
+            CancellationSignal(),
+            mainExecutor,
+            object : android.hardware.biometrics.BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: android.hardware.biometrics.BiometricPrompt.AuthenticationResult?) {
+                    ownScreen = false
+                    Browser.privateLocked = false
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
+                    ownScreen = false
+                    // Android 9 without a fingerprint: fall back to the PIN / pattern.
+                    if (Build.VERSION.SDK_INT == 28 && errorCode in NO_BIOMETRICS) confirmScreenLock(km)
+                }
+            },
+        )
+    }
+
+    @Suppress("DEPRECATION")
+    private fun confirmScreenLock(km: KeyguardManager) {
+        val i = km.createConfirmDeviceCredentialIntent("Unlock private tabs", null)
+        if (i == null) {
+            Browser.privateLocked = false
+            return
+        }
+        ownScreen = true
+        runCatching { confirmLock.launch(i) }
     }
 
     /** Ask for the screen's fastest refresh rate (120 Hz on the 12T); some phones keep apps at 60 Hz otherwise. */
@@ -206,6 +298,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
         }
         permsResult?.invoke(false)
         permsResult = result
+        ownScreen = true
         askPerms.launch(missing.toTypedArray())
     }
 
@@ -214,6 +307,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
         filesResult = result
         val types = mimeTypes.ifEmpty { arrayOf("*/*") }
         try {
+            ownScreen = true
             if (multiple) pickMany.launch(types) else pickOne.launch(types)
         } catch (_: ActivityNotFoundException) {
             filesResult = null

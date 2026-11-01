@@ -28,6 +28,21 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("https_only", false)
         set(v) = sp.edit().putBoolean("https_only", v).apply()
 
+    /** Private tabs: ask for your fingerprint / screen lock after you've left the app. */
+    var privateLock: Boolean
+        get() = sp.getBoolean("private_lock", true)
+        set(v) = sp.edit().putBoolean("private_lock", v).apply()
+
+    /** Private tabs: close them all as soon as you leave the app. */
+    var privateCloseOnLeave: Boolean
+        get() = sp.getBoolean("private_close", false)
+        set(v) = sp.edit().putBoolean("private_close", v).apply()
+
+    /** Private tabs: allow screenshots and the preview in recent apps. Off: blocked. */
+    var privateScreenshots: Boolean
+        get() = sp.getBoolean("private_screens", false)
+        set(v) = sp.edit().putBoolean("private_screens", v).apply()
+
     var saveHistory: Boolean
         get() = sp.getBoolean("history", true)
         set(v) = sp.edit().putBoolean("history", v).apply()
