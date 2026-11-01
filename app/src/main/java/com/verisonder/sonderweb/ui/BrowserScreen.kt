@@ -258,7 +258,7 @@ fun BrowserScreen(activity: MainActivity) {
                         .navigationBarsPadding()
                         .padding(14.dp),
                 ) {
-                    tab?.let { StartControls(ui, it, Modifier) }
+                    tab?.let { Scaled(remember(ui.themeVersion) { Browser.prefs.barSize / 100f }) { StartControls(ui, it, Modifier) } }
                 }
                 AnimatedVisibility(
                     visible = !startPage && !activity.inFullscreen,
@@ -338,6 +338,7 @@ private fun BoxScope.BarArea(
     barOffset: Float,
     onBarSize: (Int) -> Unit,
 ) {
+    val barScale = remember(ui.themeVersion) { Browser.prefs.barSize / 100f }
     if (hideMode == Bar.BUTTON) {
         val saved = remember(ui.themeVersion) { Browser.prefs.buttonCorner }
         var corner by remember(saved, barTop) { mutableStateOf(if (saved in 0..3) saved else if (barTop) 0 else 2) }
@@ -355,11 +356,11 @@ private fun BoxScope.BarArea(
                         alpha = (1f - morph * 1.6f).coerceIn(0f, 1f)
                     },
             ) {
-                AddressBar(ui, tab, barTop)
+                Scaled(barScale) { AddressBar(ui, tab, barTop) }
             }
         }
         if (morph > 0f) {
-            DraggableBarButton(tab, corner, morph, { corner = it; Browser.prefs.buttonCorner = it }) { Bar.expand() }
+            DraggableBarButton(tab, remember(ui.themeVersion) { Browser.prefs.buttonSize }, corner, morph, { corner = it; Browser.prefs.buttonCorner = it }) { Bar.expand() }
         }
     } else {
         Box(
@@ -368,7 +369,7 @@ private fun BoxScope.BarArea(
                 .onSizeChanged { onBarSize(it.height) }
                 .graphicsLayer { translationY = if (barTop) -barOffset else barOffset },
         ) {
-            AddressBar(ui, tab, barTop)
+            Scaled(barScale) { AddressBar(ui, tab, barTop) }
         }
     }
 }
@@ -380,6 +381,7 @@ private fun BoxScope.BarArea(
 @Composable
 private fun BoxScope.DraggableBarButton(
     tab: com.verisonder.sonderweb.browser.Tab?,
+    buttonDp: Int,
     corner: Int,
     morph: Float,
     onCorner: (Int) -> Unit,
@@ -392,7 +394,7 @@ private fun BoxScope.DraggableBarButton(
     val topInset = WindowInsets.displayCutout.getTop(density)
     val bottomInset = WindowInsets.navigationBars.getBottom(density)
     val margin = with(density) { 14.dp.roundToPx() }
-    val size = with(density) { 46.dp.roundToPx() }
+    val size = with(density) { buttonDp.dp.roundToPx() }
     fun base(c: Int) = androidx.compose.ui.geometry.Offset(
         if (c == 1 || c == 3) (area.width - margin - size).toFloat() else margin.toFloat(),
         if (c >= 2) (area.height - bottomInset - margin - size).toFloat() else (topInset + margin).toFloat(),
@@ -408,6 +410,7 @@ private fun BoxScope.DraggableBarButton(
     if (area.width == 0) return
     BarButton(
         tab,
+        buttonDp,
         Modifier
             .offset {
                 val b = base(at)
@@ -464,22 +467,22 @@ fun leavePrivate(ui: UiState) {
 
 /** The small round button the bar shrinks into. Tap it to bring the bar back. */
 @Composable
-private fun BarButton(tab: com.verisonder.sonderweb.browser.Tab?, modifier: Modifier, onClick: () -> Unit) {
+fun BarButton(tab: com.verisonder.sonderweb.browser.Tab?, sizeDp: Int, modifier: Modifier, onClick: () -> Unit) {
     val p = LocalPalette.current
     Box(
         modifier
-            .size(46.dp)
+            .size(sizeDp.dp)
             .shadow(6.dp, CircleShape)
             .clip(CircleShape)
             .background(p.field)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        MarkLines(31, p.text)
+        MarkLines((sizeDp * 0.67f).roundToInt(), p.text)
         if (tab != null && tab.loading) {
             CircularProgressIndicator(
                 progress = { tab.progress / 100f },
-                modifier = Modifier.size(46.dp),
+                modifier = Modifier.size(sizeDp.dp),
                 color = p.accent,
                 strokeWidth = 2.dp,
                 trackColor = androidx.compose.ui.graphics.Color.Transparent,

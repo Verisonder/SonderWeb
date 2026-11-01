@@ -73,6 +73,16 @@ class Prefs(context: Context) {
         get() = sp.getInt("button_corner", -1)
         set(v) = sp.edit().putInt("button_corner", v).apply()
 
+    /** Size of the address bar, in percent of normal (everything in it grows or shrinks together). */
+    var barSize: Int
+        get() = sp.getInt("bar_size", 100)
+        set(v) = sp.edit().putInt("bar_size", v).apply()
+
+    /** Diameter of the small bar button, in dp. */
+    var buttonSize: Int
+        get() = sp.getInt("button_size", 46)
+        set(v) = sp.edit().putInt("button_size", v).apply()
+
     /** The phone's status bar (time, battery) at the top. Hidden by default: pages use the whole screen. */
     var showStatusBar: Boolean
         get() = sp.getBoolean("status_bar", false)

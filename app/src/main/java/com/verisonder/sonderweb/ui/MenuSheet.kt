@@ -74,140 +74,143 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
     }
     val close = { ui.menu = false }
 
-    DropdownMenu(
-        expanded = ui.menu,
-        onDismissRequest = close,
-        shape = RoundedCornerShape(26.dp),
-        containerColor = p.card,
-        tonalElevation = 0.dp,
-        shadowElevation = 12.dp,
-        modifier = Modifier.width(290.dp),
-    ) {
-        val actions: @Composable () -> Unit = {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                RoundAction(Icons.AutoMirrored.Outlined.ArrowForward, "Forward", tab.canGoForward) {
-                    tab.session.goForward()
-                    close()
-                }
-                // The star puts this site on the start page (or takes it off).
-                RoundAction(
-                    if (pinned) Icons.Outlined.Star else Icons.Outlined.StarBorder,
-                    if (pinned) "Remove from start page" else "Add to start page",
-                    web && !tab.isPrivate,
-                    tint = if (pinned) p.accent else null,
+    // The menu keeps its normal size however big the bar is.
+    Unscaled {
+        DropdownMenu(
+            expanded = ui.menu,
+            onDismissRequest = close,
+            shape = RoundedCornerShape(26.dp),
+            containerColor = p.card,
+            tonalElevation = 0.dp,
+            shadowElevation = 12.dp,
+            modifier = Modifier.width(290.dp),
+        ) {
+            val actions: @Composable () -> Unit = {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    val list = Browser.prefs.shortcuts
-                    if (pinned) {
-                        Browser.prefs.shortcuts = list.filter { UrlText.host(it.url) != host }
-                        Browser.host?.toast("Removed from the start page")
-                    } else {
-                        Browser.prefs.shortcuts = list + Shortcut(tab.url, tab.title.take(24).ifBlank { host })
-                        Browser.host?.toast("Added to the start page")
+                    RoundAction(Icons.AutoMirrored.Outlined.ArrowForward, "Forward", tab.canGoForward) {
+                        tab.session.goForward()
+                        close()
                     }
-                    pinned = !pinned
-                }
-                RoundAction(Icons.Outlined.Share, "Share", web) {
-                    Browser.host?.share(tab.url, tab.title)
-                    close()
-                }
-                RoundAction(
-                    if (tab.loading) Icons.Outlined.Close else Icons.Outlined.Refresh,
-                    if (tab.loading) "Stop" else "Reload",
-                    !tab.isBlank,
-                ) {
-                    if (tab.loading) tab.session.stop() else tab.session.reload()
-                    close()
+                    // The star puts this site on the start page (or takes it off).
+                    RoundAction(
+                        if (pinned) Icons.Outlined.Star else Icons.Outlined.StarBorder,
+                        if (pinned) "Remove from start page" else "Add to start page",
+                        web && !tab.isPrivate,
+                        tint = if (pinned) p.accent else null,
+                    ) {
+                        val list = Browser.prefs.shortcuts
+                        if (pinned) {
+                            Browser.prefs.shortcuts = list.filter { UrlText.host(it.url) != host }
+                            Browser.host?.toast("Removed from the start page")
+                        } else {
+                            Browser.prefs.shortcuts = list + Shortcut(tab.url, tab.title.take(24).ifBlank { host })
+                            Browser.host?.toast("Added to the start page")
+                        }
+                        pinned = !pinned
+                    }
+                    RoundAction(Icons.Outlined.Share, "Share", web) {
+                        Browser.host?.share(tab.url, tab.title)
+                        close()
+                    }
+                    RoundAction(
+                        if (tab.loading) Icons.Outlined.Close else Icons.Outlined.Refresh,
+                        if (tab.loading) "Stop" else "Reload",
+                        !tab.isBlank,
+                    ) {
+                        if (tab.loading) tab.session.stop() else tab.session.reload()
+                        close()
+                    }
                 }
             }
-        }
-        if (top) {
-            actions()
-            Divider()
-        } else {
-            Spacer(Modifier.height(6.dp))
-        }
+            if (top) {
+                actions()
+                Divider()
+            } else {
+                Spacer(Modifier.height(6.dp))
+            }
 
-        Item("New tab", Icons.Outlined.Add) {
-            Browser.newTab(null, isPrivate = false)
-            close()
-        }
-        Item("New private tab", Icons.Outlined.VisibilityOff) {
-            Browser.newTab(null, isPrivate = true)
-            close()
-        }
-        // Private tabs stay apart: no way into your normal history, downloads or bookmarks from here.
-        if (!tab.isPrivate) {
-            Divider()
-            Item("History", Icons.Outlined.History) {
-                ui.panel = Panel.History
+            Item("New tab", Icons.Outlined.Add) {
+                Browser.newTab(null, isPrivate = false)
                 close()
             }
-            Item("Downloads", Icons.Outlined.Download) {
-                ui.panel = Panel.Downloads
+            Item("New private tab", Icons.Outlined.VisibilityOff) {
+                Browser.newTab(null, isPrivate = true)
                 close()
             }
-            Item("Bookmarks", Icons.Outlined.Collections) {
-                ui.panel = Panel.Bookmarks
-                close()
-            }
-        }
-        if (web) {
-            Divider()
-            Item("Find in page", Icons.Outlined.FindInPage) {
-                ui.findQuery = ""
-                ui.findResult = ""
-                ui.finding = true
-                close()
-            }
+            // Private tabs stay apart: no way into your normal history, downloads or bookmarks from here.
             if (!tab.isPrivate) {
-                Item(
-                    if (bookmarked) "Remove bookmark" else "Add bookmark",
-                    if (bookmarked) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
-                ) {
-                    if (bookmarked) {
-                        Browser.db.removeBookmark(tab.url)
-                        Browser.host?.toast("Bookmark removed")
-                    } else {
-                        Browser.db.addBookmark(tab.url, tab.title)
-                        Browser.host?.toast("Bookmarked")
-                    }
-                    bookmarked = !bookmarked
+                Divider()
+                Item("History", Icons.Outlined.History) {
+                    ui.panel = Panel.History
+                    close()
+                }
+                Item("Downloads", Icons.Outlined.Download) {
+                    ui.panel = Panel.Downloads
+                    close()
+                }
+                Item("Bookmarks", Icons.Outlined.Collections) {
+                    ui.panel = Panel.Bookmarks
                     close()
                 }
             }
-            DropdownMenuItem(
-                text = { Text("Desktop site", fontSize = 16.sp, color = p.text) },
-                onClick = { Browser.setDesktop(tab, !tab.desktop) },
-                leadingIcon = { Icon(Icons.Outlined.Computer, null, tint = p.mute, modifier = Modifier.size(22.dp)) },
-                trailingIcon = {
-                    Checkbox(
-                        tab.desktop,
-                        { Browser.setDesktop(tab, it) },
-                        colors = CheckboxDefaults.colors(checkedColor = p.accent, uncheckedColor = p.mute),
-                    )
-                },
-                contentPadding = PaddingValues(start = 20.dp, end = 8.dp),
-                modifier = Modifier.height(54.dp),
-            )
+            if (web) {
+                Divider()
+                Item("Find in page", Icons.Outlined.FindInPage) {
+                    ui.findQuery = ""
+                    ui.findResult = ""
+                    ui.finding = true
+                    close()
+                }
+                if (!tab.isPrivate) {
+                    Item(
+                        if (bookmarked) "Remove bookmark" else "Add bookmark",
+                        if (bookmarked) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
+                    ) {
+                        if (bookmarked) {
+                            Browser.db.removeBookmark(tab.url)
+                            Browser.host?.toast("Bookmark removed")
+                        } else {
+                            Browser.db.addBookmark(tab.url, tab.title)
+                            Browser.host?.toast("Bookmarked")
+                        }
+                        bookmarked = !bookmarked
+                        close()
+                    }
+                }
+                DropdownMenuItem(
+                    text = { Text("Desktop site", fontSize = 16.sp, color = p.text) },
+                    onClick = { Browser.setDesktop(tab, !tab.desktop) },
+                    leadingIcon = { Icon(Icons.Outlined.Computer, null, tint = p.mute, modifier = Modifier.size(22.dp)) },
+                    trailingIcon = {
+                        Checkbox(
+                            tab.desktop,
+                            { Browser.setDesktop(tab, it) },
+                            colors = CheckboxDefaults.colors(checkedColor = p.accent, uncheckedColor = p.mute),
+                        )
+                    },
+                    contentPadding = PaddingValues(start = 20.dp, end = 8.dp),
+                    modifier = Modifier.height(54.dp),
+                )
+            }
+            Divider()
+            Item("Extensions", Icons.Outlined.Extension) {
+                ui.panel = Panel.Extensions
+                close()
+            }
+            Item("Settings", Icons.Outlined.Settings) {
+                ui.panel = Panel.Settings
+                close()
+            }
+            Item("Exit", Icons.AutoMirrored.Outlined.Logout) {
+                close()
+                Browser.saveTabs()
+                (ctx as? android.app.Activity)?.finishAndRemoveTask()
+            }
+            if (!top) actions()
         }
-        Divider()
-        Item("Extensions", Icons.Outlined.Extension) {
-            ui.panel = Panel.Extensions
-            close()
-        }
-        Item("Settings", Icons.Outlined.Settings) {
-            ui.panel = Panel.Settings
-            close()
-        }
-        Item("Exit", Icons.AutoMirrored.Outlined.Logout) {
-            close()
-            Browser.saveTabs()
-            (ctx as? android.app.Activity)?.finishAndRemoveTask()
-        }
-        if (!top) actions()
     }
 }
 

@@ -91,6 +91,31 @@ val Centered = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle
 
 val LocalPalette = staticCompositionLocalOf { DarkPalette }
 
+/** The normal density, kept while the address bar is drawn bigger or smaller. */
+val LocalBaseDensity = staticCompositionLocalOf<androidx.compose.ui.unit.Density?> { null }
+
+/** Draws [content] at [scale] times its normal size: text, icons and spacing together. */
+@Composable
+fun Scaled(scale: Float, content: @Composable () -> Unit) {
+    val d = androidx.compose.ui.platform.LocalDensity.current
+    CompositionLocalProvider(
+        LocalBaseDensity provides (LocalBaseDensity.current ?: d),
+        androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(d.density * scale, d.fontScale),
+        content = content,
+    )
+}
+
+/** Back to the normal size inside something [Scaled] (menus keep their usual size). */
+@Composable
+fun Unscaled(content: @Composable () -> Unit) {
+    val base = LocalBaseDensity.current
+    if (base == null) {
+        content()
+    } else {
+        CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides base, LocalBaseDensity provides null, content = content)
+    }
+}
+
 @Composable
 fun isDark(theme: Int): Boolean = when (theme) {
     1 -> false

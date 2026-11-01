@@ -47,6 +47,14 @@ import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Tab
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
+import kotlin.math.roundToInt
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
@@ -119,6 +127,8 @@ private val index: List<Pair<String, Page>> = listOf(
     "Address bar position" to Page.Look,
     "Floating address bar" to Page.Look,
     "Hide address bar" to Page.Look,
+    "Address bar size" to Page.Look,
+    "Button size" to Page.Look,
     "Status bar" to Page.Look,
     "Reopen tabs" to Page.Tabs,
     "Version" to Page.About,
@@ -458,6 +468,9 @@ private fun LookPage(ui: UiState) {
         Choice("Always shown", barHide == 0) { barHide = 0; prefs.barHide = 0; changed() }
     }
 
+    GroupTitle("Size")
+    Group { BarSizes(ui) }
+
     GroupTitle("Screen")
     Group {
         Toggle("Phone status bar", "Time and battery at the top. Off: pages use the whole screen; swipe down to peek.", status) {
@@ -465,6 +478,95 @@ private fun LookPage(ui: UiState) {
             prefs.showStatusBar = it
             Browser.host?.applySystemBars()
             changed()
+        }
+    }
+}
+
+/** Bar and button size, each with a live preview that resizes as you slide. */
+@Composable
+private fun BarSizes(ui: UiState) {
+    val p = LocalPalette.current
+    val prefs = Browser.prefs
+    var bar by remember { mutableStateOf(prefs.barSize.toFloat()) }
+    var button by remember { mutableStateOf(prefs.buttonSize.toFloat()) }
+    val colors = SliderDefaults.colors(thumbColor = p.accent, activeTrackColor = p.accent, inactiveTrackColor = p.line)
+
+    Column(Modifier.fillMaxWidth().background(p.field).padding(horizontal = 18.dp, vertical = 14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Address bar", color = p.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            Text("${bar.roundToInt()}%", color = p.faint, fontSize = 14.sp)
+        }
+        Box(Modifier.fillMaxWidth().height(84.dp), contentAlignment = Alignment.Center) {
+            Scaled(bar / 100f) { BarPreview() }
+        }
+        Slider(
+            value = bar,
+            onValueChange = { bar = it },
+            valueRange = 80f..130f,
+            steps = 9,
+            onValueChangeFinished = {
+                prefs.barSize = bar.roundToInt()
+                ui.themeVersion++
+            },
+            colors = colors,
+        )
+    }
+    Column(Modifier.fillMaxWidth().background(p.field).padding(horizontal = 18.dp, vertical = 14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Small button", color = p.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            Text("${button.roundToInt()} dp", color = p.faint, fontSize = 14.sp)
+        }
+        Box(Modifier.fillMaxWidth().height(84.dp), contentAlignment = Alignment.Center) {
+            BarButton(null, button.roundToInt(), Modifier) {}
+        }
+        Slider(
+            value = button,
+            onValueChange = { button = it },
+            valueRange = 36f..64f,
+            steps = 13,
+            onValueChangeFinished = {
+                prefs.buttonSize = button.roundToInt()
+                ui.themeVersion++
+            },
+            colors = colors,
+        )
+    }
+}
+
+/** A stand-in for the floating address bar, drawn with the same sizes. */
+@Composable
+private fun BarPreview() {
+    val p = LocalPalette.current
+    val shape = RoundedCornerShape(28.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .shadow(8.dp, shape)
+            .clip(shape)
+            .background(p.card)
+            .height(56.dp)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.Home, null, tint = p.mute, modifier = Modifier.size(22.dp))
+        }
+        Row(
+            Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(20.dp)).background(p.field).padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.Lock, null, tint = p.faint, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(10.dp))
+            Text("example.com", color = p.text, fontSize = 15.sp, maxLines = 1)
+        }
+        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.size(20.dp).border(2.dp, p.mute, RoundedCornerShape(5.dp)),
+                contentAlignment = Alignment.Center,
+            ) { Text("3", color = p.mute, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+        }
+        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.MoreVert, null, tint = p.mute, modifier = Modifier.size(22.dp))
         }
     }
 }
