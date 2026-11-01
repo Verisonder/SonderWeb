@@ -371,7 +371,7 @@ private fun BoxScope.BarArea(
                         alpha = (1f - m * 1.6f).coerceIn(0f, 1f)
                     },
             ) {
-                Scaled(barScale) { AddressBar(ui, tab, barTop) }
+                SwipeToCompact(!ui.editing && !ui.finding && hideMode != Bar.ALWAYS) { Scaled(barScale) { AddressBar(ui, tab, barTop) } }
             }
         }
         if (buttonShown) {
@@ -396,7 +396,7 @@ private fun BoxScope.BarArea(
                 .onSizeChanged { onBarSize(it.height) }
                 .graphicsLayer { translationY = if (barTop) -barOffset() else barOffset() },
         ) {
-            Scaled(barScale) { AddressBar(ui, tab, barTop) }
+            SwipeToCompact(!ui.editing && !ui.finding && hideMode != Bar.ALWAYS) { Scaled(barScale) { AddressBar(ui, tab, barTop) } }
         }
     }
 }
@@ -511,6 +511,41 @@ private fun BoxScope.DraggableBarButton(
             },
         onClick = onClick,
     )
+}
+
+/** Swipe the bar left or right to put it away; it follows your finger and springs back if you don't go far. */
+@Composable
+private fun SwipeToCompact(enabled: Boolean, content: @Composable () -> Unit) {
+    val dx = remember { androidx.compose.animation.core.Animatable(0f) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val threshold = with(LocalDensity.current) { 64.dp.toPx() }
+    val back = spring<Float>(dampingRatio = 0.75f, stiffness = 420f)
+    Box(
+        Modifier
+            .graphicsLayer {
+                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                translationX = dx.value
+                alpha = 1f - (kotlin.math.abs(dx.value) / (threshold * 4f)).coerceIn(0f, 0.35f)
+            }
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (kotlin.math.abs(dx.value) > threshold) {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            Bar.compact()
+                        }
+                        scope.launch { dx.animateTo(0f, back) }
+                    },
+                    onDragCancel = { scope.launch { dx.animateTo(0f, back) } },
+                ) { change, amount ->
+                    change.consume()
+                    // A little resistance, so it feels attached to the screen.
+                    scope.launch { dx.snapTo(dx.value + amount * 0.7f) }
+                }
+            },
+    ) { content() }
 }
 
 /** [DraggableBarButton]'s corner value for the free (advanced) position. */

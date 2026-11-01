@@ -65,6 +65,13 @@ object Bar {
         hidden = false
     }
 
+    /** You swiped the bar sideways: out of the way (into the button, or slid off). */
+    fun compact() {
+        if (mode == ALWAYS) return
+        travel = 0
+        hidden = true
+    }
+
     /** Back into the button (button mode), e.g. after you searched. */
     fun collapse() {
         if (mode == BUTTON) hidden = true
