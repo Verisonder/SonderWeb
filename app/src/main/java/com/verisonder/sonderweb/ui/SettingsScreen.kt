@@ -482,6 +482,21 @@ private fun LookPage(ui: UiState) {
         Choice("Dark", theme == 2) { theme = 2; prefs.theme = 2; changed() }
     }
 
+    GroupTitle("App icon")
+    Group {
+        val ctx = LocalContext.current
+        var squircle by remember { mutableStateOf(com.verisonder.sonderweb.data.AppIcon.isSquircle(ctx)) }
+        Choice("Round", !squircle, "The blue sphere on its own") {
+            squircle = false
+            com.verisonder.sonderweb.data.AppIcon.set(ctx, false)
+        }
+        Choice("Squircle", squircle, "The blue glass in your home screen's icon shape") {
+            squircle = true
+            com.verisonder.sonderweb.data.AppIcon.set(ctx, true)
+        }
+    }
+    Hint("Your home screen may take a moment to show the new icon.")
+
     GroupTitle("Address bar")
     Group {
         Row(
