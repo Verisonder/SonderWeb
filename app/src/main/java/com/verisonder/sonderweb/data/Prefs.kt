@@ -71,6 +71,22 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("restore_tabs", true)
         set(v) = sp.edit().putBoolean("restore_tabs", v).apply()
 
+    /** What opening the app shows: 0 = the last site, 1 = the start page, 2 = the start page
+     *  once you've been away longer than [startPageAfter]. */
+    var openOnLaunch: Int
+        get() = sp.getInt("open_on_launch", 0)
+        set(v) = sp.edit().putInt("open_on_launch", v).apply()
+
+    /** Minutes away before the start page shows (with [openOnLaunch] = 2). */
+    var startPageAfter: Int
+        get() = sp.getInt("start_page_after", 60)
+        set(v) = sp.edit().putInt("start_page_after", v).apply()
+
+    /** When you last left the app (milliseconds since 1970). */
+    var leftAt: Long
+        get() = sp.getLong("left_at", 0L)
+        set(v) = sp.edit().putLong("left_at", v).apply()
+
     /** Address bar at the top (like Chromium) or at the bottom. */
     var barOnTop: Boolean
         get() = sp.getBoolean("bar_top", true)

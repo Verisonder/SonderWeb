@@ -142,6 +142,8 @@ private val index: List<Pair<String, Page>> = listOf(
     "Version" to Page.About,
     "Status bar" to Page.Look,
     "Reopen tabs" to Page.Tabs,
+    "Open last site" to Page.Tabs,
+    "Start page when opening the app" to Page.Tabs,
     "Version" to Page.About,
     "Licences" to Page.About,
 )
@@ -692,6 +694,55 @@ private fun TabsPage() {
             prefs.restoreTabs = it
         }
     }
+    OpenOnLaunch()
+}
+
+/** Minutes the timer can be set to, from a minute to a day. */
+private val awaySteps = listOf(1, 5, 15, 30, 60, 120, 240, 480, 720, 1440)
+
+private fun awayLabel(minutes: Int): String = when {
+    minutes < 60 -> "$minutes min"
+    minutes < 1440 -> "${minutes / 60} h"
+    else -> "1 day"
+}
+
+/** What opening the app shows: the last site, the start page, or the start page after a while away. */
+@Composable
+private fun OpenOnLaunch() {
+    val p = LocalPalette.current
+    val prefs = Browser.prefs
+    var mode by remember { mutableStateOf(prefs.openOnLaunch) }
+    var step by remember {
+        mutableStateOf(awaySteps.indexOfFirst { it >= prefs.startPageAfter }.let { if (it < 0) awaySteps.lastIndex else it }.toFloat())
+    }
+    val minutes = awaySteps[step.roundToInt().coerceIn(0, awaySteps.lastIndex)]
+    fun pick(m: Int) {
+        mode = m
+        prefs.openOnLaunch = m
+    }
+    GroupTitle("When you open the app")
+    Group {
+        Choice("Last site", mode == 0, "Carry on where you left off") { pick(0) }
+        Choice("Start page", mode == 1, "Every time you come back to the app") { pick(1) }
+        Choice("Start page after a while", mode == 2, "The last site if you're back within ${awayLabel(minutes)}") { pick(2) }
+        if (mode == 2) {
+            Column(Modifier.fillMaxWidth().background(p.field).padding(horizontal = 18.dp, vertical = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Away for", color = p.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                    Text(awayLabel(minutes), color = p.faint, fontSize = 14.sp)
+                }
+                Slider(
+                    value = step,
+                    onValueChange = { step = it },
+                    valueRange = 0f..awaySteps.lastIndex.toFloat(),
+                    steps = awaySteps.size - 2,
+                    onValueChangeFinished = { prefs.startPageAfter = minutes },
+                    colors = SliderDefaults.colors(thumbColor = p.accent, activeTrackColor = p.accent, inactiveTrackColor = p.line),
+                )
+            }
+        }
+    }
+    Hint("Your tabs stay open either way.")
 }
 
 @Composable

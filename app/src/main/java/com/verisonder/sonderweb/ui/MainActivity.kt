@@ -62,6 +62,9 @@ class MainActivity : ComponentActivity(), Browser.Host {
      *  that isn't leaving the app, so private tabs stay unlocked. */
     private var ownScreen = false
 
+    /** Opening the app (or coming back to it): check whether the start page should show. */
+    private var launchCheck = true
+
     private val confirmLock = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         authenticating = false
         if (r.resultCode == Activity.RESULT_OK) Browser.privateLocked = false
@@ -84,6 +87,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Rebuilt (turned, theme changed): that isn't opening the app.
+        launchCheck = savedInstanceState == null
         Browser.start(this)
         Browser.host = this
         geckoView = com.verisonder.sonderweb.browser.PullGeckoView(this)
@@ -105,6 +110,10 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun onResume() {
         super.onResume()
         Browser.host = this
+        if (launchCheck) {
+            launchCheck = false
+            Browser.openStartPageIfDue()
+        }
         if (unlockOnResume && Browser.privateLocked) unlockPrivate()
     }
 
@@ -140,7 +149,10 @@ class MainActivity : ComponentActivity(), Browser.Host {
         Browser.saveTabs()
         // Paused while you're away (saves battery); woken again in onStart.
         Browser.current?.let { t -> if (t.ready && t.session.isOpen && !isChangingConfigurations) t.session.setActive(false) }
-        if (!ownScreen && !isChangingConfigurations) Browser.leftApp()
+        if (!ownScreen && !isChangingConfigurations) {
+            Browser.leftApp()
+            launchCheck = true
+        }
     }
 
     /** Links from other apps open in a new tab; shared text and searches too. */
@@ -156,6 +168,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
             else -> null
         }
         if (target.isNullOrBlank()) return
+        // Opened for a link: that link is what you see, not the start page.
+        launchCheck = false
         val url = if (intent.action == Intent.ACTION_VIEW) target else {
             AddressInput.resolve(target, Browser.prefs.engine())?.url ?: return
         }

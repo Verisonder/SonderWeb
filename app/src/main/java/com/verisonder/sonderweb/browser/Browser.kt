@@ -292,6 +292,7 @@ object Browser {
 
     /** You left the app (home, recents, screen off): lock or close the private tabs. */
     fun leftApp() {
+        prefs.leftAt = System.currentTimeMillis()
         if (!privateTabsOpen()) return
         when {
             prefs.privateCloseOnLeave -> {
@@ -301,6 +302,23 @@ object Browser {
             }
             prefs.privateLock -> privateLocked = true
         }
+    }
+
+    /** Whether opening the app now should show the start page (Settings › Tabs). */
+    fun startPageDue(): Boolean = when (prefs.openOnLaunch) {
+        1 -> true
+        2 -> System.currentTimeMillis() - prefs.leftAt >= prefs.startPageAfter * 60_000L
+        else -> false
+    }
+
+    /** Back in the app: the start page instead of the last site, if that's your choice. Your
+     *  tabs stay as they were; an empty tab is reused rather than adding another one. */
+    fun openStartPageIfDue() {
+        if (!startPageDue()) return
+        val cur = current
+        if (cur != null && cur.isBlank && !cur.isPrivate) return
+        val blank = tabs.lastOrNull { !it.isPrivate && it.isBlank }
+        if (blank != null) select(blank) else newTab(null, isPrivate = false)
     }
 
     /** Address-bar submit: an address, a search or a !bang. */
@@ -361,6 +379,8 @@ object Browser {
             return
         }
         val index = prefs.savedTabIndex.coerceIn(0, urls.size - 1)
+        // Opening on the start page: the old tabs come back without loading the last site.
+        val startPage = startPageDue()
         val colors = prefs.savedTabColors
         urls.forEachIndexed { i, url ->
             val tab = newTab(url, isPrivate = false, select = false, lazy = true)
@@ -368,6 +388,10 @@ object Browser {
                 tab.edgeTop = top
                 tab.edgeBottom = bottom
             }
+        }
+        if (startPage) {
+            newTab(null, isPrivate = false)
+            return
         }
         select(tabs[index])
     }

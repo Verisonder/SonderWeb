@@ -4,6 +4,9 @@
 - Opening the app no longer flashes white, grey or the start page before your tab appears: each tab waits in its own colours until the page has drawn.
 - If a page takes a moment, its icon fades in, breathing inside a ring that follows the loading progress.
 
+**Opening the app**
+- Choose what you see when you open the app: the last site, the start page, or the start page once you've been away longer than a time you set (Settings › Tabs).
+
 **Address bar**
 - "Slide away while scrolling" is now the default.
 - Swipe the bottom bar down to put it away: it stays hidden until you tap the handle at the bottom edge.
