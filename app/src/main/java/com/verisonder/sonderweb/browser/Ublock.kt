@@ -165,7 +165,7 @@ object Extensions {
      * page you're on reloads so it runs there too.
      */
     private fun started(ext: WebExtension, reload: Boolean = true) {
-        if (ext.id == Ublock.ID || ext.id == Look.ID) return
+        if (ext.id == Ublock.ID || ext.id == Look.ID || ext.id == AddonsSite.ID) return
         if (ext.id in Browser.prefs.extensionsSetUp && !reload) return
         Browser.prefs.extensionsSetUp = Browser.prefs.extensionsSetUp + ext.id
         val m = ext.metaData
@@ -192,8 +192,8 @@ object Extensions {
     fun refresh() {
         controller.list().accept({ all ->
             Browser.main.post {
-                // The browser's own look extension isn't one of yours: it stays out of the list.
-                val exts = (all ?: emptyList()).filter { !it.metaData.temporary && it.id != Look.ID }
+                // The browser's own little extensions aren't yours: they stay out of the list.
+                val exts = (all ?: emptyList()).filter { !it.metaData.temporary && it.id != Look.ID && it.id != AddonsSite.ID }
                 list.clear()
                 // uBlock Origin first, then by name.
                 list.addAll(exts.sortedWith(compareBy({ it.id != Ublock.ID }, { it.metaData.name ?: it.id })))
@@ -421,5 +421,22 @@ object Look {
         } else if (!on && enabled) {
             c.disable(ext, WebExtensionController.EnableSource.USER).accept({ e -> if (e != null) extension = e }, { _ -> })
         }
+    }
+}
+
+/**
+ * A small extension inside the app: on addons.mozilla.org the install buttons say
+ * "Add to SonderWeb" instead of "Add to Firefox". Always on.
+ */
+object AddonsSite {
+    const val ID = "amo@sonderweb"
+    private const val LOCATION = "resource://android/assets/extensions/amo/"
+
+    fun install(runtime: GeckoRuntime) {
+        runtime.webExtensionController.ensureBuiltIn(LOCATION, ID).accept({ ext ->
+            if (ext != null) {
+                Browser.main.post { runtime.webExtensionController.setAllowedInPrivateBrowsing(ext, true) }
+            }
+        }, { _ -> })
     }
 }

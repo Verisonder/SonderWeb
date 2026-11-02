@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "SonderWeb add-ons",
+  "version": "1.0",
+  "description": "Says SonderWeb instead of Firefox on the add-ons site's install buttons.",
+  "browser_specific_settings": { "gecko": { "id": "amo@sonderweb" } },
+  "permissions": ["mozillaAddons"],
+  "content_scripts": [
+    {
+      "matches": ["https://addons.mozilla.org/*"],
+      "js": ["amo.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

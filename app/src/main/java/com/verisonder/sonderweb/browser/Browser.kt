@@ -103,6 +103,7 @@ object Browser {
         Extensions.setup()
         Ublock.install(runtime)
         Look.install(runtime)
+        AddonsSite.install(runtime)
         restoreTabs()
     }
 
