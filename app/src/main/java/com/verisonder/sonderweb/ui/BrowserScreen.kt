@@ -95,6 +95,9 @@ class UiState {
 
     /** "Shred site data" asked for this site, waiting for you to confirm. */
     var shred by mutableStateOf<String?>(null)
+
+    /** The page's picture going through the shredder, and its site. */
+    var shredding by mutableStateOf<Pair<android.graphics.Bitmap, String>?>(null)
     var editing by mutableStateOf(false)
     var query by mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(""))
     var finding by mutableStateOf(false)
@@ -424,6 +427,26 @@ fun BrowserScreen(activity: MainActivity) {
                     { ui.shred = null },
                 ) {
                     ui.shred = null
+                    // A picture of the page goes through the shredder first (if it's the one on screen).
+                    val t = Browser.current
+                    val done = {
+                        Browser.shred(site)
+                        activity.toast("$site shredded")
+                    }
+                    if (t != null && !t.isPrivate && Browser.siteOf(t.url) == site) {
+                        runCatching {
+                            activity.geckoView.capturePixels().accept({ bmp ->
+                                Browser.main.post { if (bmp != null) ui.shredding = bmp to site else done() }
+                            }, { _ -> Browser.main.post { done() } })
+                        }.onFailure { done() }
+                    } else {
+                        done()
+                    }
+                }
+            }
+            ui.shredding?.let { (bmp, site) ->
+                ShredAnimation(bmp) {
+                    ui.shredding = null
                     Browser.shred(site)
                     activity.toast("$site shredded")
                 }
