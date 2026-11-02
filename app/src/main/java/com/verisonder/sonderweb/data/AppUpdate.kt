@@ -56,15 +56,52 @@ object AppUpdate {
         }
     }
 
-    /** Asks GitHub for the latest release. Returns the newer version, or null when up to date. */
+    private const val REPO = "https://github.com/Verisonder/SonderWeb"
+    private const val RAW = "https://raw.githubusercontent.com/Verisonder/SonderWeb"
+
+    /**
+     * Asks GitHub for the latest release. Returns the newer version, or null when up to date.
+     * Reads the release page's address first: GitHub's API allows only a few dozen questions an
+     * hour from one network (phones on mobile data share theirs) and then answers 403.
+     */
     suspend fun check(ctx: Context): Info? = withContext(Dispatchers.IO) {
+        val found = runCatching { fromReleasePage() }.getOrNull() ?: fromApi()
+        val info = found?.takeIf { it.apkUrl.isNotEmpty() && newer(it.version, BuildConfig.VERSION_NAME) }
+        remember(ctx, info)
+        info
+    }
+
+    /** github.com/…/releases/latest redirects to the latest release's tag; the APK and its notes
+     *  are at fixed addresses from there. */
+    private fun fromReleasePage(): Info? {
+        val c = URL("$REPO/releases/latest").openConnection() as HttpURLConnection
+        c.instanceFollowRedirects = false
+        c.connectTimeout = 15_000
+        c.readTimeout = 15_000
+        c.setRequestProperty("User-Agent", "SonderWeb")
+        val location = try {
+            if (c.responseCode !in 300..399) throw IllegalStateException("GitHub answered ${c.responseCode}")
+            c.getHeaderField("Location") ?: throw IllegalStateException("No release")
+        } finally {
+            c.disconnect()
+        }
+        val tag = location.substringAfter("/releases/tag/", "").substringBefore('?').trim('/')
+        if (tag.isEmpty()) return null
+        val version = tag.removePrefix("v")
+        val notes = Net.text("$RAW/$tag/docs/releasenote/release_notes_$tag.md")
+            ?.lines()?.dropWhile { it.isBlank() || it.startsWith("## ") }?.joinToString("\n")?.trim() ?: ""
+        return Info(version, notes, "$REPO/releases/download/$tag/SonderWeb-$version.apk", 0L)
+    }
+
+    /** The same through GitHub's API (also gives the download's size). */
+    private fun fromApi(): Info? {
         val c = URL(API).openConnection() as HttpURLConnection
         c.connectTimeout = 15_000
         c.readTimeout = 15_000
         c.setRequestProperty("Accept", "application/vnd.github+json")
         c.setRequestProperty("User-Agent", "SonderWeb")
         try {
-            if (c.responseCode == 404) return@withContext null.also { remember(ctx, null) }
+            if (c.responseCode == 404) return null
             if (c.responseCode != 200) throw IllegalStateException("GitHub answered ${c.responseCode}")
             val j = JSONObject(c.inputStream.bufferedReader().readText())
             val version = j.optString("tag_name").removePrefix("v")
@@ -79,13 +116,7 @@ object AppUpdate {
                     size = a.optLong("size")
                 }
             }
-            val info = if (url.isNotEmpty() && newer(version, BuildConfig.VERSION_NAME)) {
-                Info(version, j.optString("body"), url, size)
-            } else {
-                null
-            }
-            remember(ctx, info)
-            info
+            return Info(version, j.optString("body"), url, size)
         } finally {
             c.disconnect()
         }
