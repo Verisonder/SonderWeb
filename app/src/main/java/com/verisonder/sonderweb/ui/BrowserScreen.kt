@@ -104,6 +104,13 @@ class UiState {
 @Composable
 fun BrowserScreen(activity: MainActivity) {
     val ui = remember { UiState() }
+    // A download notification was tapped: its page.
+    LaunchedEffect(com.verisonder.sonderweb.browser.Downloads.showPage) {
+        if (com.verisonder.sonderweb.browser.Downloads.showPage) {
+            com.verisonder.sonderweb.browser.Downloads.showPage = false
+            ui.panel = Panel.Downloads
+        }
+    }
     val tab = Browser.current
     // Reading themeVersion makes a theme change in Settings recompose this screen.
     val theme = ui.themeVersion.let { Browser.prefs.theme }

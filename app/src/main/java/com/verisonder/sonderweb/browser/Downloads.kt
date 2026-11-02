@@ -41,8 +41,32 @@ object Downloads {
 
     private val cancelled: MutableSet<Long> = ConcurrentHashMap.newKeySet()
 
+    /** Cancels a download (by its id; private downloads have negative ones). */
     fun cancel(id: Long) {
         cancelled.add(id)
+    }
+
+    /** Private downloads aren't in the list: they get their own (negative) numbers. */
+    private var nextPrivate = -1L
+
+    /** Set when a notification asks for the Downloads page. */
+    var showPage by androidx.compose.runtime.mutableStateOf(false)
+
+    /** "32 MB of 94 MB · 4.1 MB/s · 15 s left" (size unknown: "32 MB · 4.1 MB/s"). */
+    fun progressText(context: Context, received: Long, total: Long, speed: Long): String {
+        val fmt = { b: Long -> android.text.format.Formatter.formatShortFileSize(context, b) }
+        return buildList {
+            add(if (total > 0) fmt(received) + " of " + fmt(total) else fmt(received))
+            if (speed > 0) add(fmt(speed) + "/s")
+            if (total > 0 && speed > 0) add(timeLeft((total - received).coerceAtLeast(0) / speed) + " left")
+        }.joinToString(" · ")
+    }
+
+    /** "25 s", "3 min", "1 h 5 min". */
+    private fun timeLeft(seconds: Long): String = when {
+        seconds < 60 -> "${seconds.coerceAtLeast(1)} s"
+        seconds < 3600 -> "${(seconds + 30) / 60} min"
+        else -> "${seconds / 3600} h ${(seconds % 3600) / 60} min"
     }
 
     private fun header(r: WebResponse, name: String): String? =
@@ -98,11 +122,15 @@ object Downloads {
 
     private fun write(body: InputStream, name: String, mime: String, url: String, length: Long, isPrivate: Boolean) {
         val id = if (isPrivate) -1L else Browser.db.addDownload(name, url, mime)
+        // Identifies it for Cancel and its notification.
+        val key = if (id >= 0) id else nextPrivate--
         if (id >= 0) {
             live[id] = Live(0, length, 0)
             changes++
         }
         Browser.host?.toast("Downloading $name")
+        DownloadNotifications.askOnce()
+        DownloadNotifications.progress(key, name, isPrivate, 0, length, 0)
         io.execute {
             var uri: Uri? = null
             var size = 0L
@@ -115,20 +143,28 @@ object Downloads {
                         var lastAt = android.os.SystemClock.elapsedRealtime()
                         var lastSize = 0L
                         var speed = 0L
+                        var notifiedAt = 0L
                         while (true) {
-                            if (id in cancelled) error("cancelled")
+                            if (key in cancelled) error("cancelled")
                             val n = input.read(buf)
                             if (n < 0) break
                             it.write(buf, 0, n)
                             size += n
                             val now = android.os.SystemClock.elapsedRealtime()
-                            if (id >= 0 && now - lastAt >= 400) {
+                            if (now - lastAt >= 400) {
                                 val instant = (size - lastSize) * 1000 / (now - lastAt)
                                 speed = if (speed == 0L) instant else (speed * 6 + instant * 4) / 10
                                 lastAt = now
                                 lastSize = size
-                                val report = Live(size, length, speed)
-                                Browser.main.post { if (live.containsKey(id)) live[id] = report }
+                                if (id >= 0) {
+                                    val report = Live(size, length, speed)
+                                    Browser.main.post { if (live.containsKey(id)) live[id] = report }
+                                }
+                                // The notification is updated about once a second (Android limits it).
+                                if (now - notifiedAt >= 1000) {
+                                    notifiedAt = now
+                                    DownloadNotifications.progress(key, name, isPrivate, size, length, speed)
+                                }
                             }
                         }
                     }
@@ -144,7 +180,7 @@ object Downloads {
                 if (length > 0 && size < length) error("short download")
             }.isSuccess
             if (!ok) uri?.let { u -> runCatching { Browser.app.contentResolver.delete(u, null, null) } }
-            val stopped = cancelled.remove(id)
+            val stopped = cancelled.remove(key)
             Browser.main.post {
                 val state = when {
                     ok -> DownloadItem.DONE
@@ -159,10 +195,14 @@ object Downloads {
                 when (state) {
                     DownloadItem.DONE -> {
                         val done = uri!!
+                        DownloadNotifications.done(key, name, isPrivate, done, mime)
                         Browser.host?.toast("Downloaded $name", "Open") { open(done, mime) }
                     }
-                    DownloadItem.CANCELLED -> Unit
-                    else -> Browser.host?.toast("Download of $name failed")
+                    DownloadItem.CANCELLED -> DownloadNotifications.remove(key)
+                    else -> {
+                        DownloadNotifications.failed(key, name, isPrivate)
+                        Browser.host?.toast("Download of $name failed")
+                    }
                 }
             }
         }

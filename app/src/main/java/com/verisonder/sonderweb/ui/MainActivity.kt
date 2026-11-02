@@ -158,6 +158,11 @@ class MainActivity : ComponentActivity(), Browser.Host {
     /** Links from other apps open in a new tab; shared text and searches too. */
     private fun handleIntent(intent: Intent?) {
         intent ?: return
+        if (intent.getBooleanExtra(com.verisonder.sonderweb.browser.DownloadNotifications.EXTRA_SHOW_DOWNLOADS, false)) {
+            launchCheck = false
+            com.verisonder.sonderweb.browser.Downloads.showPage = true
+            return
+        }
         val target: String? = when (intent.action) {
             Intent.ACTION_VIEW -> intent.dataString
             Intent.ACTION_WEB_SEARCH -> intent.getStringExtra(SearchManager.QUERY)

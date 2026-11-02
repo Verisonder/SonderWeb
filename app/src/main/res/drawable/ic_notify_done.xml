@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status bar icon for a finished download: a tick over a tray. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9.55,15.15L5.4,11l1.41,-1.41 2.74,2.73 7.64,-7.64L18.6,6.1zM5,18h14v2H5z" />
+</vector>

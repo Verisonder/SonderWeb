@@ -82,6 +82,11 @@ class Prefs(context: Context) {
         get() = sp.getInt("start_page_after", 60)
         set(v) = sp.edit().putInt("start_page_after", v).apply()
 
+    /** Android 13+ asked once (on the first download) whether notifications may show. */
+    var askedNotifications: Boolean
+        get() = sp.getBoolean("asked_notifications", false)
+        set(v) = sp.edit().putBoolean("asked_notifications", v).apply()
+
     /** When you last left the app (milliseconds since 1970). */
     var leftAt: Long
         get() = sp.getLong("left_at", 0L)

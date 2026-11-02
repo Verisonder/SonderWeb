@@ -277,11 +277,7 @@ private fun DownloadRow(d: DownloadItem, live: Downloads.Live?, modifier: Modifi
     val host = UrlText.host(d.url)
     val fmt = { b: Long -> Formatter.formatShortFileSize(ctx, b) }
     val status = when {
-        running -> buildList {
-            add(if (live!!.total > 0) fmt(live.received) + " of " + fmt(live.total) else fmt(live.received))
-            if (live.speed > 0) add(fmt(live.speed) + "/s")
-            if (live.total > 0 && live.speed > 0) add(timeLeft((live.total - live.received) / live.speed) + " left")
-        }.joinToString(" · ")
+        running -> Downloads.progressText(ctx, live!!.received, live.total, live.speed)
         d.state == DownloadItem.DONE -> listOf(
             fmt(d.size),
             host,
@@ -382,13 +378,6 @@ private fun MoreItem(label: String, icon: ImageVector, danger: Boolean = false, 
         leadingIcon = { Icon(icon, null, tint = if (danger) p.danger else p.mute, modifier = Modifier.size(20.dp)) },
         onClick = onClick,
     )
-}
-
-/** "25 s", "3 min", "1 h 5 min". */
-private fun timeLeft(seconds: Long): String = when {
-    seconds < 60 -> "${seconds.coerceAtLeast(1)} s"
-    seconds < 3600 -> "${(seconds + 30) / 60} min"
-    else -> "${seconds / 3600} h ${(seconds % 3600) / 60} min"
 }
 
 /** An icon for the kind of file. */
