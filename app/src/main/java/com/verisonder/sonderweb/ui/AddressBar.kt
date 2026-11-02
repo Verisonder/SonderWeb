@@ -232,6 +232,25 @@ fun StartControls(ui: UiState, tab: Tab, modifier: Modifier) {
     }
 }
 
+/** The start page's (+) at the bottom centre, in the same style as the tabs and menu pill:
+ *  tap it to search or type an address. */
+@Composable
+fun StartSearchButton(ui: UiState, tab: Tab, modifier: Modifier) {
+    val p = LocalPalette.current
+    val shape = RoundedCornerShape(26.dp)
+    Box(
+        modifier
+            .shadow(6.dp, shape)
+            .clip(shape)
+            .background(p.field)
+            .clickable { startEditing(ui, tab) }
+            .size(width = 68.dp, height = 44.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(androidx.compose.material.icons.Icons.Outlined.Add, "Search", tint = p.text, modifier = Modifier.size(26.dp))
+    }
+}
+
 /** Find in page: type, see "3/12", step up and down. */
 @Composable
 private fun RowScope.FindBar(ui: UiState, tab: Tab) {

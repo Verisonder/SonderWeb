@@ -320,6 +320,18 @@ fun BrowserScreen(activity: MainActivity) {
                         }
                     }
                 }
+                // The (+) in the middle: search or type an address.
+                AnimatedVisibility(
+                    visible = startPage && !activity.inFullscreen,
+                    enter = fadeIn(tween(180)) + scaleIn(spring(dampingRatio = 0.75f, stiffness = 500f), initialScale = 0.85f),
+                    exit = fadeOut(tween(120)) + scaleOut(tween(140), targetScale = 0.9f),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(2.dp),
+                ) {
+                    tab?.let { Scaled(remember(ui.themeVersion) { Browser.prefs.barSize / 100f }) { StartSearchButton(ui, it, Modifier.padding(12.dp)) } }
+                }
                 AnimatedVisibility(
                     visible = startPage && !activity.inFullscreen,
                     enter = fadeIn(tween(180)) + scaleIn(spring(dampingRatio = 0.75f, stiffness = 500f), initialScale = 0.85f),
