@@ -205,7 +205,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
             geckoView.requestLayout()
             geckoView.invalidate()
             // If it still comes back empty, the page is reloaded (see Delegates.checkPainted).
-            geckoView.postDelayed({ if (Browser.current === t) com.verisonder.sonderweb.browser.Delegates.checkPainted(t) }, 1200)
+            geckoView.postDelayed({ if (Browser.current === t) com.verisonder.sonderweb.browser.Delegates.checkPainted(t) }, 800)
         }
     }
 

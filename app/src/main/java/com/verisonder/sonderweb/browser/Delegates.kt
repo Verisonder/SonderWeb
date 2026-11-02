@@ -295,21 +295,35 @@ object Delegates {
      * Back in the app: if a page that had something on it now shows one flat colour, the engine
      * lost its drawing while you were away (it stays empty until a refresh), so it's reloaded.
      */
-    fun checkPainted(tab: Tab) {
-        if (tab.covered || tab.lastFlat != false || !UrlText.isWeb(tab.url)) return
+    fun checkPainted(tab: Tab, firstTry: Boolean = true) {
+        // A page that really is one plain colour is left alone.
+        if (tab.covered || tab.lastFlat == true || !UrlText.isWeb(tab.url)) return
         val view = Browser.host?.geckoViewFor(tab) ?: return
-        runCatching {
-            view.capturePixels().accept({ bmp: Bitmap? ->
-                if (bmp == null || bmp.width < 2 || bmp.height < 4) return@accept
-                val flat = runCatching { isFlat(bmp) }.getOrDefault(false)
-                Browser.main.post {
-                    if (flat && Browser.current === tab && tab.lastFlat == false && tab.session.isOpen) {
+        // Still empty (or the engine can't even take a picture of it): first hand the page to the
+        // view again, which makes the engine draw it; if that doesn't help, reload it.
+        val empty = {
+            Browser.main.post {
+                if (Browser.current === tab && tab.session.isOpen && view.session === tab.session) {
+                    if (firstTry) {
+                        view.releaseSession()
+                        view.setSession(tab.session)
+                        view.postDelayed({ if (Browser.current === tab) checkPainted(tab, firstTry = false) }, 900)
+                    } else {
                         tab.lastFlat = null
                         tab.session.reload()
                     }
                 }
-            }, { })
+            }
         }
+        runCatching {
+            view.capturePixels().accept({ bmp: Bitmap? ->
+                if (bmp == null || bmp.width < 2 || bmp.height < 4) {
+                    empty()
+                    return@accept
+                }
+                if (runCatching { isFlat(bmp) }.getOrDefault(false)) empty()
+            }, { empty() })
+        }.onFailure { empty() }
     }
 
     /** One colour everywhere (a grid of points over the page, leaving out the part the bar covers). */
