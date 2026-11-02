@@ -8,7 +8,8 @@ import androidx.compose.runtime.setValue
  * How the address bar gets out of the way (Settings › Appearance):
  *  0  always shown;
  *  1  slides away while you scroll down, back when you scroll up, reach the top, switch tabs
- *     or a page starts loading;
+ *     or a page starts loading (the default). Swipe it down and it stays down at the bottom
+ *     edge until you tap its handle;
  *  2  shrinks into a small button while you scroll down; tap it, or scroll back to the top
  *     of the page, to bring the bar back.
  */
@@ -18,6 +19,11 @@ object Bar {
     const val BUTTON = 2
 
     var hidden by mutableStateOf(false)
+        private set
+
+    /** You swiped the bar down (slide mode): it stays hidden at the bottom edge, whatever the page
+     *  does (scrolling up, reaching the top, a new page), until you tap its handle. */
+    var down by mutableStateOf(false)
         private set
 
     /** The small button tucked away at the bottom edge (long-press), until you tap its handle. Kept until then. */
@@ -36,12 +42,13 @@ object Bar {
         if (m == mode) return
         mode = m
         travel = 0
+        down = false
         hidden = m == BUTTON
     }
 
     fun onScroll(tab: Tab, y: Int) {
         val prev = lastY.put(tab.id, y) ?: y
-        if (tab !== Browser.current || mode == ALWAYS) return
+        if (tab !== Browser.current || mode == ALWAYS || down) return
         if (y <= 0) {
             // Back at the top of the page: the whole bar returns (in button mode only when you
             // scrolled there, not when a page simply opens at the top).
@@ -59,12 +66,13 @@ object Bar {
     /** Automatic reasons to bring the bar back (top of page, new page, other tab): slide mode only. */
     fun show() {
         travel = 0
-        if (mode == SLIDE) hidden = false
+        if (mode == SLIDE && !down) hidden = false
     }
 
-    /** You tapped the small button. */
+    /** You tapped the small button (or the handle of the bar you swiped down). */
     fun expand() {
         travel = 0
+        down = false
         hidden = false
     }
 
@@ -72,6 +80,14 @@ object Bar {
     fun compact() {
         if (mode == ALWAYS) return
         travel = 0
+        hidden = true
+    }
+
+    /** You swiped the bar down: hidden at the bottom edge until you tap its handle. */
+    fun putDown() {
+        if (mode != SLIDE) return
+        travel = 0
+        down = true
         hidden = true
     }
 

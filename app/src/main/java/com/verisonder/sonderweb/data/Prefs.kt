@@ -84,7 +84,7 @@ class Prefs(context: Context) {
     /** How the address bar gets out of the way: 0 = always shown, 1 = slides away while
      *  scrolling, 2 = shrinks into a small button you tap to bring it back. */
     var barHide: Int
-        get() = sp.getInt("bar_hide", 2)
+        get() = sp.getInt("bar_hide", 1)
         set(v) = sp.edit().putInt("bar_hide", v).apply()
 
     /** Where the small bar button sits: 0 top left, 1 top right, 2 bottom left, 3 bottom right.

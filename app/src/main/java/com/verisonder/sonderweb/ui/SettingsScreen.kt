@@ -509,7 +509,7 @@ private fun LookPage(ui: UiState) {
         Choice("Shrink to a small button", barHide == 2, "Tap it, or scroll to the top of the page, to bring the bar back") {
             barHide = 2; prefs.barHide = 2; changed()
         }
-        Choice("Slide away while scrolling", barHide == 1, "Scroll up to bring it back") {
+        Choice("Slide away while scrolling", barHide == 1, "Scroll up to bring it back. Swipe it down to keep it hidden until you tap it") {
             barHide = 1; prefs.barHide = 1; changed()
         }
         Choice("Always shown", barHide == 0) { barHide = 0; prefs.barHide = 0; changed() }

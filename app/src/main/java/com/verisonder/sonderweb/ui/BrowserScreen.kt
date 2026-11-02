@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.Refresh
 import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.animation.core.VectorConverter
@@ -421,14 +422,92 @@ private fun BoxScope.BarArea(
             ) { Bar.expand() }
         }
     } else {
+        // Bottom bar, slide mode: swipe it down and it stays down until you tap its handle.
+        val canPutDown = !barTop && hideMode == Bar.SLIDE && !ui.editing && !ui.finding
+        val pull = remember { androidx.compose.animation.core.Animatable(0f) }
         Box(
             Modifier
                 .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
                 .onSizeChanged { onBarSize(it.height) }
-                .graphicsLayer { translationY = if (barTop) -barOffset() else barOffset() },
+                .graphicsLayer { translationY = if (barTop) -barOffset() else barOffset() + pull.value },
         ) {
-            SwipeToCompact(!ui.editing && !ui.finding && hideMode != Bar.ALWAYS) { Scaled(barScale) { AddressBar(ui, tab, barTop) } }
+            SwipeDownToHide(canPutDown, pull) {
+                SwipeToCompact(!ui.editing && !ui.finding && hideMode != Bar.ALWAYS) { Scaled(barScale) { AddressBar(ui, tab, barTop) } }
+            }
         }
+        DownHandle()
+    }
+}
+
+/**
+ * Swipe the bar down to put it away at the bottom edge: it follows your finger and springs back
+ * if you don't go far. Once down it stays there until you tap its handle.
+ */
+@Composable
+private fun SwipeDownToHide(
+    enabled: Boolean,
+    pull: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    content: @Composable () -> Unit,
+) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val threshold = with(LocalDensity.current) { 40.dp.toPx() }
+    val back = spring<Float>(dampingRatio = 0.8f, stiffness = 420f)
+    Box(
+        Modifier.pointerInput(enabled) {
+            if (!enabled) return@pointerInput
+            detectVerticalDragGestures(
+                onDragEnd = {
+                    if (pull.value > threshold) {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        Bar.putDown()
+                    }
+                    // The bar's own slide takes over from where your finger left it.
+                    scope.launch { pull.animateTo(0f, back) }
+                },
+                onDragCancel = { scope.launch { pull.animateTo(0f, back) } },
+            ) { change, amount ->
+                change.consume()
+                // Down follows the finger; up only gives a little.
+                val next = pull.value + if (pull.value + amount > 0f) amount else amount * 0.15f
+                scope.launch { pull.snapTo(next.coerceAtLeast(-threshold * 0.25f)) }
+            }
+        },
+    ) { content() }
+}
+
+/** The slim handle at the bottom edge while the bar is swiped down. Tap it to bring the bar back. */
+@Composable
+private fun BoxScope.DownHandle() {
+    val shown by animateFloatAsState(if (Bar.down) 1f else 0f, spring(dampingRatio = 0.8f, stiffness = 420f), label = "downHandle")
+    if (shown < 0.01f) return
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    Box(
+        Modifier
+            .align(Alignment.BottomCenter)
+            .navigationBarsPadding()
+            .size(width = 72.dp, height = 30.dp)
+            .graphicsLayer {
+                alpha = shown
+                scaleX = 0.4f + 0.6f * shown
+            }
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+                enabled = Bar.down,
+            ) {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                Bar.expand()
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(width = 40.dp, height = 5.dp)
+                .shadow(3.dp, RoundedCornerShape(3.dp))
+                .clip(RoundedCornerShape(3.dp))
+                .background(LocalPalette.current.text.copy(alpha = 0.7f)),
+        )
     }
 }
 
