@@ -1,0 +1,137 @@
+/* SonderWeb look for uBlock Origin's panel: the app's colours, Inter, rounded cards. */
+@font-face { font-family: "Inter"; src: url("fonts/inter_regular.ttf"); font-weight: 400; }
+@font-face { font-family: "Inter"; src: url("fonts/inter_semibold.ttf"); font-weight: 600; }
+
+:root {
+    --sw-bg: #ffffff;
+    --sw-card: #f1f3f4;
+    --sw-card-press: #e3e5e8;
+    --sw-text: #202124;
+    --sw-mute: #5f6368;
+    --sw-accent: #1a73e8;
+    --sw-accent-soft: rgb(26 115 232 / 12%);
+    --sw-off: #9aa0a6;
+}
+:root.dark {
+    --sw-bg: #202124;
+    --sw-card: #303134;
+    --sw-card-press: #3c4043;
+    --sw-text: #e8eaed;
+    --sw-mute: #9aa0a6;
+    --sw-accent: #8ab4f8;
+    --sw-accent-soft: rgb(138 180 248 / 14%);
+    --sw-off: #5f6368;
+}
+
+:root, :root body {
+    background: var(--sw-bg);
+    color: var(--sw-text);
+    font-family: "Inter", system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+:root body {
+    --popup-toolbar-surface: transparent;
+    --hr-ink: transparent;
+    padding-bottom: 8px;
+}
+hr { display: none; }
+
+/* Site name: a quiet title, no grey band. */
+#sticky { background: var(--sw-bg); }
+#hostname {
+    background: transparent;
+    color: var(--sw-mute);
+    font-size: 15px;
+    padding: 2px 16px 0;
+}
+#hostname > span + span { color: var(--sw-text); }
+
+/* The power button: accent on a soft disc, grey when off. */
+#switch {
+    align-items: center;
+    flex-grow: 0;
+    margin: 16px auto 18px;
+    width: 104px;
+    height: 104px;
+    border-radius: 50%;
+    background: var(--sw-accent-soft);
+    font-size: 56px;
+    fill: var(--sw-accent);
+    color: var(--sw-accent);
+    transition: background-color .2s, fill .2s;
+}
+#switch:active { transform: scale(.96); }
+body.off #switch {
+    background: var(--sw-card);
+    fill: var(--sw-off);
+    stroke: none;
+}
+.rulesetTools { width: 64px; }
+.rulesetTools [id] {
+    background: var(--sw-card);
+    border-radius: 14px;
+    margin: 4px 12px;
+}
+.rulesetTools [id] > svg { fill: var(--sw-mute); }
+
+/* Counts: one rounded card. */
+:root.portrait #basicStats {
+    background: var(--sw-card);
+    border-radius: 18px;
+    margin: 0 16px 12px;
+    padding: 14px 18px 2px;
+    row-gap: 0;
+}
+:root.portrait #basicStats > span { margin-bottom: 12px; font-size: 14.5px; }
+#basicStats > [data-i18n] { color: var(--sw-mute); }
+#basicStats > [data-i18n] + span { color: var(--sw-text); font-weight: 600; }
+
+/* Tools: rounded tiles. */
+.toolRibbon {
+    align-items: stretch;
+    gap: 8px;
+    margin: 0 16px 12px;
+    background: transparent;
+}
+.toolRibbon .tool {
+    align-items: center;
+    background: var(--sw-card);
+    border-radius: 16px;
+    box-sizing: border-box;
+    color: var(--sw-text);
+    fill: var(--sw-text);
+    font-size: 20px;
+    justify-content: flex-start;
+    min-height: 76px;
+    padding: 12px 4px 10px;
+    width: 100%;
+}
+.toolRibbon .tool:active { background: var(--sw-card-press); }
+.toolRibbon .tool .caption {
+    color: var(--sw-mute);
+    font: 11.5px/14px "Inter", system-ui, sans-serif;
+    margin-top: 8px;
+}
+#extraTools .tool.on { background: var(--sw-accent-soft); }
+
+/* More / Less: two small pills. */
+#moreOrLess {
+    column-gap: 8px;
+    margin: 0 16px;
+}
+#moreOrLess > span,
+:root.mobile #moreOrLess > span {
+    background: var(--sw-card);
+    border: 0;
+    border-radius: 14px;
+    color: var(--sw-mute);
+    font-size: 13.5px;
+    padding: 10px 14px;
+    text-align: center;
+}
+#moreOrLess > span:active { background: var(--sw-card-press); }
+
+#unprocessedRequestWarning { border-radius: 12px; margin: 0 16px 12px; }
+
+/* The per-site rules list (shown with "More"). */
+#firewall { margin: 12px 16px 0; border-radius: 16px; overflow: hidden; }

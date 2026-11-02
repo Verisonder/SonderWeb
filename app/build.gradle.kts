@@ -115,6 +115,29 @@ val unpackUblock by tasks.registering(Sync::class) {
     from(zipTree(ublockXpi)) {
         // Signature files only matter for installed add-ons, not built-in ones.
         exclude("META-INF/**")
+        // Its panel gets SonderWeb's look (ublock-look/), loaded after uBlock's own styles.
+        filesMatching("popup-fenix.html") {
+            filter { line ->
+                line
+                    .replace(
+                        "<link rel=\"stylesheet\" href=\"css/popup-fenix.css\">",
+                        "<link rel=\"stylesheet\" href=\"css/popup-fenix.css\">\n<link rel=\"stylesheet\" href=\"css/sonderweb.css\">",
+                    )
+                    .replace("</body>", "<script src=\"js/sonderweb.js\"></script>\n</body>")
+            }
+        }
+    }
+    from(layout.projectDirectory.dir("ublock-look")) {
+        include("sonderweb.css")
+        into("css")
+    }
+    from(layout.projectDirectory.dir("ublock-look")) {
+        include("sonderweb.js")
+        into("js")
+    }
+    from(layout.projectDirectory.dir("src/main/res/font")) {
+        include("inter_regular.ttf", "inter_semibold.ttf")
+        into("css/fonts")
     }
     into(layout.projectDirectory.dir("src/main/assets/extensions/ublock"))
 }

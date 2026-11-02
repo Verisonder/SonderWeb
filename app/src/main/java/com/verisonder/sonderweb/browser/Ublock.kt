@@ -71,6 +71,10 @@ object Extensions {
     val icons = mutableStateMapOf<String, Bitmap>()
 
     var popup by mutableStateOf<GeckoSession?>(null)
+
+    /** How tall the open panel says it is (CSS px = dp), or 0 if it doesn't say. */
+    var popupHeight by mutableStateOf(0)
+        private set
         private set
 
     /** An add-on asking to be installed, waiting for you to allow it. */
@@ -275,6 +279,14 @@ object Extensions {
     private fun openPopupSession(): GeckoResult<GeckoSession> {
         popup?.let { if (it.isOpen) it.close() }
         val s = GeckoSession()
+        popupHeight = 0
+        // uBlock's panel reports its height in its title, so the sheet fits it.
+        s.setContentDelegate(object : GeckoSession.ContentDelegate {
+            override fun onTitleChange(session: GeckoSession, title: String?) {
+                val h = title?.takeIf { it.startsWith("sw-h:") }?.removePrefix("sw-h:")?.toIntOrNull() ?: return
+                Browser.main.post { if (popup === session) popupHeight = h }
+            }
+        })
         // Its dialogs and dropdowns show like a page's, and links it opens go to a new tab.
         Browser.current?.let { s.setPromptDelegate(Prompts.delegate(it)) }
         s.setNavigationDelegate(object : GeckoSession.NavigationDelegate {

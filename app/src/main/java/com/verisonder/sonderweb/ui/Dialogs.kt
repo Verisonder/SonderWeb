@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -356,6 +357,13 @@ fun UblockSheet(session: GeckoSession) {
     val ctx = LocalContext.current
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val height = LocalConfiguration.current.screenHeightDp * 0.72f
+    // Fits the panel when it says how tall it is (uBlock's does), up to most of the screen.
+    val said = com.verisonder.sonderweb.browser.Extensions.popupHeight
+    val fit by androidx.compose.animation.core.animateDpAsState(
+        if (said > 0) said.toFloat().coerceAtMost(height).dp else 420.dp,
+        androidx.compose.animation.core.spring(dampingRatio = 1f, stiffness = 500f),
+        label = "panel",
+    )
     val view = remember(session) { GeckoView(ctx) }
     DisposableEffect(session) {
         view.setSession(session)
@@ -378,8 +386,7 @@ fun UblockSheet(session: GeckoSession) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 200.dp, max = height.dp)
-                .fillMaxHeight()
+                .height(fit)
                 .navigationBarsPadding(),
         ) {
             AndroidView(factory = { view }, modifier = Modifier.fillMaxWidth().fillMaxHeight())
