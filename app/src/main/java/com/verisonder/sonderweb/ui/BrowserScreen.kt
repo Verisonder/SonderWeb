@@ -324,6 +324,11 @@ fun BrowserScreen(activity: MainActivity) {
                 )
             }
 
+            // Settings scrolls on under the gesture bar (nothing looks cut off at the bottom);
+            // remembered so it doesn't jump while the panel closes.
+            val lastPanel = remember { arrayOf(Panel.None) }
+            if (ui.panel != Panel.None) lastPanel[0] = ui.panel
+            val panelUnderGestureBar = lastPanel[0] == Panel.Settings
             AnimatedVisibility(
                 visible = ui.panel != Panel.None,
                 enter = fadeIn(tween(200)) + slideInVertically(spring(dampingRatio = 0.9f, stiffness = 600f)) { it / 14 },
@@ -334,7 +339,7 @@ fun BrowserScreen(activity: MainActivity) {
                         .fillMaxSize()
                         .background(palette.bg)
                         .windowInsetsPadding(screenInsets)
-                        .navigationBarsPadding(),
+                        .then(if (panelUnderGestureBar) Modifier else Modifier.navigationBarsPadding()),
                 ) {
                     when (ui.panel) {
                         Panel.Tabs -> TabsScreen(ui)

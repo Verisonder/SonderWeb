@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -191,6 +192,8 @@ fun SettingsScreen(ui: UiState) {
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                // The list runs on under the gesture bar and ends just above it.
+                .navigationBarsPadding()
                 .padding(bottom = 28.dp),
         ) {
             when (shown) {
