@@ -106,6 +106,15 @@ class UiState {
 @Composable
 fun BrowserScreen(activity: MainActivity) {
     val ui = remember { UiState() }
+    // Leaving the app closes the ⋮ menu, so it isn't still open (and in the recents picture) on return.
+    val owner = activity
+    androidx.compose.runtime.DisposableEffect(owner) {
+        val watch = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) ui.menu = false
+        }
+        owner.lifecycle.addObserver(watch)
+        onDispose { owner.lifecycle.removeObserver(watch) }
+    }
     // A download notification was tapped: its page.
     LaunchedEffect(com.verisonder.sonderweb.browser.Downloads.showPage) {
         if (com.verisonder.sonderweb.browser.Downloads.showPage) {

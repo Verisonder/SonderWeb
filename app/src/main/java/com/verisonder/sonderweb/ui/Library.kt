@@ -58,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -133,8 +134,13 @@ private fun EntryRow(
     onRemove: (() -> Unit)?,
     icon: ImageVector? = null,
     iconTint: androidx.compose.ui.graphics.Color? = null,
+    site: String? = null,
 ) {
     val p = LocalPalette.current
+    // The site's own icon when there is one (same as the start page and tabs).
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    if (!site.isNullOrEmpty()) androidx.compose.runtime.LaunchedEffect(site) { com.verisonder.sonderweb.data.SiteIcons.load(ctx, site) }
+    val bmp = site?.let { com.verisonder.sonderweb.data.SiteIcons.icons[it] }
     Row(
         modifier
             .fillMaxWidth()
@@ -148,6 +154,14 @@ private fun EntryRow(
         ) {
             if (icon != null) {
                 Icon(icon, null, tint = iconTint ?: p.mute, modifier = Modifier.size(18.dp))
+            } else if (bmp != null) {
+                androidx.compose.foundation.Image(
+                    remember(bmp) { bmp.asImageBitmap() },
+                    null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                    filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+                    modifier = Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)),
+                )
             } else {
                 Text(letter, color = p.mute, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
@@ -197,6 +211,7 @@ fun HistoryScreen(ui: UiState) {
                         UrlText.host(h.url) + " · " +
                             DateUtils.getRelativeTimeSpanString(h.visited, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS),
                         onClick = { open(ui, h.url) },
+                        site = UrlText.host(h.url),
                         onRemove = {
                             Browser.db.deleteHistory(h.id)
                             version++
@@ -232,6 +247,7 @@ fun BookmarksScreen(ui: UiState) {
                         b.title.ifBlank { UrlText.host(b.url) },
                         UrlText.editable(b.url),
                         onClick = { open(ui, b.url) },
+                        site = UrlText.host(b.url),
                         onRemove = {
                             Browser.db.removeBookmark(b.url)
                             version++

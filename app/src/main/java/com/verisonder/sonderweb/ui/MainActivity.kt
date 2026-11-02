@@ -200,6 +200,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
         // Extensions (uBlock's panel) see this tab as the one in front again.
         runCatching { Browser.runtime.webExtensionController.setTabActive(t.session, true) }
         if (::geckoView.isInitialized) {
+            // The page's own colour until the engine has drawn it again (no black flash on return).
+            (t.edgeBottom ?: t.edgeTop)?.let { geckoView.coverUntilFirstPaint(it) }
             geckoView.requestLayout()
             geckoView.invalidate()
             // If it still comes back empty, the page is reloaded (see Delegates.checkPainted).
