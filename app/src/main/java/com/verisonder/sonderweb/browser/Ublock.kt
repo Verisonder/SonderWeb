@@ -71,10 +71,10 @@ object Extensions {
     val icons = mutableStateMapOf<String, Bitmap>()
 
     var popup by mutableStateOf<GeckoSession?>(null)
+        private set
 
     /** How tall the open panel says it is (CSS px = dp), or 0 if it doesn't say. */
     var popupHeight by mutableStateOf(0)
-        private set
         private set
 
     /** An add-on asking to be installed, waiting for you to allow it. */
