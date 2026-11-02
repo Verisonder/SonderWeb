@@ -65,6 +65,9 @@ class MainActivity : ComponentActivity(), Browser.Host {
     /** Opening the app (or coming back to it): check whether the start page should show. */
     private var launchCheck = true
 
+    /** This screen was just opened from scratch (the app had been closed), not brought back. */
+    private var freshStart = false
+
     private val confirmLock = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         authenticating = false
         if (r.resultCode == Activity.RESULT_OK) Browser.privateLocked = false
@@ -89,6 +92,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
         super.onCreate(savedInstanceState)
         // Rebuilt (turned, theme changed): that isn't opening the app.
         launchCheck = savedInstanceState == null
+        freshStart = savedInstanceState == null
         Browser.start(this)
         Browser.host = this
         geckoView = com.verisonder.sonderweb.browser.PullGeckoView(this)
@@ -112,8 +116,9 @@ class MainActivity : ComponentActivity(), Browser.Host {
         Browser.host = this
         if (launchCheck) {
             launchCheck = false
-            Browser.openStartPageIfDue()
+            Browser.openStartPageIfDue(freshStart)
         }
+        freshStart = false
         if (unlockOnResume && Browser.privateLocked) unlockPrivate()
     }
 

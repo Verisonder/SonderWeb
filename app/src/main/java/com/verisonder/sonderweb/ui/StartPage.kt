@@ -478,15 +478,14 @@ private fun SiteTile(host: String, title: String) {
             filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
             modifier = Modifier.size(52.dp).clip(shape),
         )
-        bmp != null -> Box(
-            Modifier.size(52.dp).clip(shape).background(p.field),
-            contentAlignment = Alignment.Center,
-        ) {
+        // Only a small favicon: the icon itself, a little smaller, still without a tile.
+        bmp != null -> Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
             Image(
                 remember(bmp) { bmp.asImageBitmap() },
                 title,
+                contentScale = ContentScale.Fit,
                 filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
-                modifier = Modifier.size(30.dp),
+                modifier = Modifier.size(40.dp),
             )
         }
         else -> {

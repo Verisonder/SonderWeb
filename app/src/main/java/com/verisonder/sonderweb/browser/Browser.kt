@@ -306,17 +306,21 @@ object Browser {
         }
     }
 
-    /** Whether opening the app now should show the start page (Settings › Tabs). */
-    fun startPageDue(): Boolean = when (prefs.openOnLaunch) {
-        1 -> true
-        2 -> System.currentTimeMillis() - prefs.leftAt >= prefs.startPageAfter * 60_000L
+    /**
+     * Whether opening the app now should show the start page (Settings › Tabs). [fresh]: the app
+     * is opening after being closed, not just coming back to the front: "Start page" means only
+     * then; "after a while" also when you come back after being away that long.
+     */
+    fun startPageDue(fresh: Boolean): Boolean = when (prefs.openOnLaunch) {
+        1 -> fresh
+        2 -> fresh || System.currentTimeMillis() - prefs.leftAt >= prefs.startPageAfter * 60_000L
         else -> false
     }
 
     /** Back in the app: the start page instead of the last site, if that's your choice. Your
      *  tabs stay as they were; an empty tab is reused rather than adding another one. */
-    fun openStartPageIfDue() {
-        if (!startPageDue()) return
+    fun openStartPageIfDue(fresh: Boolean) {
+        if (!startPageDue(fresh)) return
         val cur = current
         if (cur != null && cur.isBlank && !cur.isPrivate) return
         val blank = tabs.lastOrNull { !it.isPrivate && it.isBlank }
@@ -383,7 +387,7 @@ object Browser {
         }
         val index = prefs.savedTabIndex.coerceIn(0, urls.size - 1)
         // Opening on the start page: the old tabs come back without loading the last site.
-        val startPage = startPageDue()
+        val startPage = startPageDue(fresh = true)
         val colors = prefs.savedTabColors
         val titles = prefs.savedTabTitles
         urls.forEachIndexed { i, url ->

@@ -870,8 +870,8 @@ private fun OpenOnLaunch() {
     GroupTitle("When you open the app")
     Group {
         Choice("Last site", mode == 0, "Carry on where you left off") { pick(0) }
-        Choice("Start page", mode == 1, "Every time you come back to the app") { pick(1) }
-        Choice("Start page after a while", mode == 2, "The last site if you're back within ${awayLabel(minutes)}") { pick(2) }
+        Choice("Start page", mode == 1, "When you open the app after closing it") { pick(1) }
+        Choice("Start page after a while", mode == 2, "Also when you come back after ${awayLabel(minutes)} away") { pick(2) }
         if (mode == 2) {
             Column(Modifier.fillMaxWidth().background(p.field).padding(horizontal = 18.dp, vertical = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

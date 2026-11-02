@@ -8,7 +8,8 @@ object Net {
     /** A phone browser's name, for pages that only send their full head (with icons) to browsers. */
     const val BROWSER_AGENT = "Mozilla/5.0 (Android 14; Mobile; rv:159.0) Gecko/159.0 Firefox/159.0"
 
-    fun get(url: String, maxBytes: Int = 2_000_000, agent: String = "SonderWeb"): ByteArray? = runCatching {
+    /** [partial]: past [maxBytes], keep what came so far instead of giving up (enough for a page's head). */
+    fun get(url: String, maxBytes: Int = 2_000_000, agent: String = "SonderWeb", partial: Boolean = false): ByteArray? = runCatching {
         val c = URL(url).openConnection() as HttpURLConnection
         c.connectTimeout = 8000
         c.readTimeout = 8000
@@ -24,7 +25,10 @@ object Net {
                     val n = input.read(buf)
                     if (n < 0) break
                     out.write(buf, 0, n)
-                    if (out.size() > maxBytes) return@runCatching null
+                    if (out.size() > maxBytes) {
+                        if (partial) break
+                        return@runCatching null
+                    }
                 }
                 out.toByteArray()
             }

@@ -26,7 +26,7 @@ object SiteIcons {
 
     fun load(context: Context, host: String) {
         if (host.isEmpty() || icons.containsKey(host) || !loading.add(host)) return
-        val dir = File(context.filesDir, "icons2").apply { mkdirs() }
+        val dir = File(context.filesDir, "icons3").apply { mkdirs() }
         val file = File(dir, host.replace(Regex("[^a-zA-Z0-9.-]"), "_") + ".png")
         scope.launch {
             val bmp = withContext(Dispatchers.IO) {
@@ -47,7 +47,8 @@ object SiteIcons {
     private fun fetch(host: String): Bitmap? {
         val home = "https://$host/"
         val candidates = LinkedHashSet<String>()
-        Net.get(home, 1_500_000, Net.BROWSER_AGENT)?.toString(Charsets.UTF_8)?.let { html ->
+        // Big pages (YouTube's is over 1 MB): the icons are in the head, near the start.
+        Net.get(home, 400_000, Net.BROWSER_AGENT, partial = true)?.toString(Charsets.UTF_8)?.let { html ->
             candidates += manifestIcons(html, home)
             candidates += headIcons(html, home)
         }
