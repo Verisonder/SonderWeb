@@ -6,33 +6,40 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M54,29a25,25 0,1 1,-0.01 0z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="radial"
-                android:centerX="48"
-                android:centerY="46"
-                android:gradientRadius="35"
-                android:startColor="#8AB4F8"
-                android:endColor="#1A4FD6" />
-        </aapt:attr>
-    </path>
-    <path
-        android:pathData="M38,50 A17,17 0,0 1,52 37"
-        android:strokeColor="#D9FFFFFF"
-        android:strokeWidth="5"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000" />
-    <path
-        android:pathData="M47.25,47.25 A17,17 0,0 1,60.75 60.75"
-        android:strokeColor="#D9FFFFFF"
-        android:strokeWidth="5"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000" />
-    <path
-        android:pathData="M70,58 A17,17 0,0 1,56 71"
-        android:strokeColor="#D9FFFFFF"
-        android:strokeWidth="5"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000" />
+    <!-- Scaled up so the sphere fills the icon by itself, with no plate behind it. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="1.44"
+        android:scaleY="1.44">
+        <path android:pathData="M54,29a25,25 0,1 1,-0.01 0z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="radial"
+                    android:centerX="48"
+                    android:centerY="46"
+                    android:gradientRadius="35"
+                    android:startColor="#8AB4F8"
+                    android:endColor="#1A4FD6" />
+            </aapt:attr>
+        </path>
+        <path
+            android:pathData="M38,50 A17,17 0,0 1,52 37"
+            android:strokeColor="#D9FFFFFF"
+            android:strokeWidth="5"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000" />
+        <path
+            android:pathData="M47.25,47.25 A17,17 0,0 1,60.75 60.75"
+            android:strokeColor="#D9FFFFFF"
+            android:strokeWidth="5"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000" />
+        <path
+            android:pathData="M70,58 A17,17 0,0 1,56 71"
+            android:strokeColor="#D9FFFFFF"
+            android:strokeWidth="5"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000" />
+    </group>
 </vector>
