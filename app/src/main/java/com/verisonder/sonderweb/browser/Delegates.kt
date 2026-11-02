@@ -285,6 +285,7 @@ object Delegates {
                         tab.thumbnail = small.asImageBitmap()
                         // Kept for next time the app opens (normal tabs only; private ones never get here).
                         com.verisonder.sonderweb.data.Thumbs.save(Browser.app, tab.url, small)
+                        tab.thumbUrl = tab.url
                     }
                 }
             }, { })

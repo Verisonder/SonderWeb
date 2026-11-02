@@ -214,6 +214,12 @@ class MainActivity : ComponentActivity(), Browser.Host {
         super.onDestroy()
     }
 
+    override fun onPause() {
+        // A fresh picture of the page you're leaving, for the tab switcher next time.
+        Browser.current?.let { com.verisonder.sonderweb.browser.Delegates.capture(it) }
+        super.onPause()
+    }
+
     override fun onStop() {
         super.onStop()
         Browser.saveTabs()

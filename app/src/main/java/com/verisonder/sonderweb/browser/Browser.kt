@@ -2,6 +2,7 @@ package com.verisonder.sonderweb.browser
 
 import android.content.Context
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.getValue
@@ -407,6 +408,15 @@ object Browser {
         // Their page colours too, so a reopened tab is covered in its own colours until it draws.
         prefs.savedTabColors = kept.map { it.edgeTop to it.edgeBottom }
         prefs.savedTabIndex = kept.indexOf(current).coerceAtLeast(0)
+        // Each tab's picture saved under the address it will reopen with.
+        kept.forEach { t ->
+            val url = t.pendingUrl ?: t.url
+            val pic = t.thumbnail
+            if (pic != null && t.thumbUrl != url) {
+                com.verisonder.sonderweb.data.Thumbs.save(app, url, pic.asAndroidBitmap())
+                t.thumbUrl = url
+            }
+        }
     }
 
     private fun restoreTabs() {
@@ -429,10 +439,14 @@ object Browser {
             // Its title and picture from last time, so the tab switcher shows the real thing.
             titles.getOrNull(i)?.let { tab.title = it }
             com.verisonder.sonderweb.data.Thumbs.load(app, url) { bmp ->
-                if (tab.thumbnail == null) tab.thumbnail = bmp.asImageBitmap()
+                if (tab.thumbnail == null) {
+                    tab.thumbnail = bmp.asImageBitmap()
+                    tab.thumbUrl = url
+                }
             }
         }
         com.verisonder.sonderweb.data.Thumbs.keepOnly(app, urls)
+        com.verisonder.sonderweb.data.Thumbs.dropOld(app)
         if (startPage) {
             newTab(null, isPrivate = false)
             return

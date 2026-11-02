@@ -14,7 +14,8 @@ import java.util.concurrent.Executors
 object Thumbs {
     private val io = Executors.newSingleThreadExecutor()
 
-    private fun dir(context: Context) = File(context.cacheDir, "thumbs").apply { mkdirs() }
+    // Kept with the app's own files, so "Clear cache" doesn't wipe them.
+    private fun dir(context: Context) = File(context.filesDir, "thumbs").apply { mkdirs() }
 
     private fun name(url: String): String {
         val d = MessageDigest.getInstance("SHA-1").digest(url.toByteArray())
@@ -40,6 +41,12 @@ object Thumbs {
             val bmp = runCatching { BitmapFactory.decodeFile(File(dir(app), name(url)).path) }.getOrNull() ?: return@execute
             android.os.Handler(android.os.Looper.getMainLooper()).post { done(bmp) }
         }
+    }
+
+    /** Old place (the cache): removed once. */
+    fun dropOld(context: Context) {
+        val app = context.applicationContext
+        io.execute { runCatching { File(app.cacheDir, "thumbs").deleteRecursively() } }
     }
 
     /** Throws away pictures of tabs that are gone. */

@@ -30,6 +30,10 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     var desktop by mutableStateOf(false)
     var thumbnail by mutableStateOf<ImageBitmap?>(null)
 
+    /** The address its picture is saved under on the phone (pages like Gmail change address
+     *  without reloading, so it's saved again under the new one). */
+    var thumbUrl: String? = null
+
     /** The page's colour along its top and bottom edge (ARGB), to fill the strips by the camera
      *  hole and the gesture bar so the page looks edge to edge without anything hidden. */
     var edgeTop by mutableStateOf<Int?>(null)
