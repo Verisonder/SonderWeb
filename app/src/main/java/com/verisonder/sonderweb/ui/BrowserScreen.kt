@@ -427,18 +427,25 @@ fun BrowserScreen(activity: MainActivity) {
                     { ui.shred = null },
                 ) {
                     ui.shred = null
-                    // A picture of the page goes through the shredder first (if it's the one on screen).
+                    // The keyboard goes away first, so only the page gets shredded.
+                    ui.editing = false
+                    androidx.core.view.WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+                        .hide(androidx.core.view.WindowInsetsCompat.Type.ime())
+                    // A picture of the page gets clawed apart first (if it's the one on screen).
                     val t = Browser.current
                     val done = {
                         Browser.shred(site)
                         activity.toast("$site shredded")
                     }
                     if (t != null && !t.isPrivate && Browser.siteOf(t.url) == site) {
-                        runCatching {
-                            activity.geckoView.capturePixels().accept({ bmp ->
-                                Browser.main.post { if (bmp != null) ui.shredding = bmp to site else done() }
-                            }, { _ -> Browser.main.post { done() } })
-                        }.onFailure { done() }
+                        // A moment for the keyboard to go and the page to settle.
+                        activity.geckoView.postDelayed({
+                            runCatching {
+                                activity.geckoView.capturePixels().accept({ bmp ->
+                                    Browser.main.post { if (bmp != null) ui.shredding = bmp to site else done() }
+                                }, { _ -> Browser.main.post { done() } })
+                            }.onFailure { done() }
+                        }, 280)
                     } else {
                         done()
                     }

@@ -2,7 +2,6 @@ package com.verisonder.sonderweb.ui
 
 import android.graphics.Bitmap
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -11,23 +10,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import kotlin.math.hypot
+
+/** How long the whole thing takes. */
+private const val SHRED_MS = 1400f
 
 /**
- * The page goes into a shredder: it slides down into a glowing slot and comes out the other side
- * as strips that curl apart and fall away. About a second; [onDone] runs at the end.
+ * The page gets clawed, like Brave's shred icon: three slashes rip across it one after another,
+ * then it falls apart along them, the pieces tumbling away. [onDone] runs at the end.
  */
 @Composable
 fun ShredAnimation(page: Bitmap, onDone: () -> Unit) {
@@ -35,68 +36,78 @@ fun ShredAnimation(page: Bitmap, onDone: () -> Unit) {
     val haptics = LocalHapticFeedback.current
     val image = remember(page) { page.asImageBitmap() }
     val run = remember { Animatable(0f) }
-    val slot = remember { Animatable(0f) }
     LaunchedEffect(page) {
-        slot.animateTo(1f, tween(180, easing = FastOutSlowInEasing))
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-        run.animateTo(1f, tween(1100, easing = LinearEasing))
-        slot.animateTo(0f, tween(160))
+        run.animateTo(1f, tween(SHRED_MS.toInt(), easing = LinearEasing))
         onDone()
     }
-    val strips = 16
     Canvas(Modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
-        val t = run.value
-        // The real page is hidden behind this; its picture is what moves.
+        val ms = run.value * SHRED_MS
+        fun clamp(v: Float) = v.coerceIn(0f, 1f)
+        // Sizes below are for a 412 dp wide screen, scaled to this one.
+        val u = w / 412f
+
+        // Three claw lines, from top right to bottom left: (x at the top, x at the bottom).
+        val lines = listOf(0.65f to -0.35f, 0.90f to -0.10f, 1.15f to 0.15f).map { (a, b) -> (w * a) to (w * b) }
+        val y0 = -40f * u
+        val y1 = h + 40f * u
+        fun xAt(line: Pair<Float, Float>, y: Float) = line.first + (line.second - line.first) * (y - y0) / (y1 - y0)
+
         drawRect(p.bg)
-        if (t == 0f) drawImage(image, IntOffset.Zero, IntSize(image.width, image.height), IntOffset.Zero, IntSize(w.toInt(), h.toInt()))
-        drawRect(Color.Black.copy(alpha = 0.35f * slot.value))
-        val slotY = h * 0.62f
-        val pageH = w * image.height / image.width.coerceAtLeast(1)
-        // Starts where it is and slides down into the slot, smoothly speeding up then slowing.
-        val ease = t * t * (3 - 2 * t)
-        val top = ease * (pageH + h - slotY)
-        val src = IntSize(image.width, image.height)
-        if (t > 0f) {
-            // Above the slot: the page itself, still whole.
-            clipRect(0f, 0f, w, slotY) {
-                drawImage(image, IntOffset.Zero, src, IntOffset(0, top.toInt()), IntSize(w.toInt(), pageH.toInt()))
+        // The pieces between the lines, falling apart.
+        val edges = listOf(-4000f to -4000f) + lines + listOf(6000f to 6000f)
+        val fall = clamp((ms - 380f) / 900f)
+        val f = fall * fall
+        for (k in 0 until 4) {
+            val a = edges[k]
+            val b = edges[k + 1]
+            val dir = k - 1.5f
+            val piece = Path().apply {
+                moveTo(maxOf(-50f, xAt(a, y0)), y0)
+                lineTo(minOf(w + 50f, xAt(b, y0)), y0)
+                lineTo(minOf(w + 50f, xAt(b, y1)), y1)
+                lineTo(maxOf(-50f, xAt(a, y1)), y1)
+                close()
             }
-            // Below it: the same page in strips that fan out from the slot and fall at different speeds.
-            val sw = w / strips
-            val fan = (t * 1.6f).coerceAtMost(1f)
-            for (i in 0 until strips) {
-                val x0 = i * sw
-                val centre = x0 + sw / 2
-                clipRect(0f, slotY + 3f, w, h) {
-                    translate(0f, top * 0.12f * (i % 3)) {
-                        rotate((i - strips / 2f + 0.5f) * 3.2f * fan, Offset(centre, slotY)) {
-                            drawImage(
-                                image,
-                                IntOffset(image.width * i / strips, 0),
-                                IntSize(image.width / strips, image.height),
-                                IntOffset((x0 + 1).toInt(), top.toInt()),
-                                IntSize((sw - 2).toInt().coerceAtLeast(1), pageH.toInt()),
-                                alpha = (1f - fan * 0.55f).coerceIn(0f, 1f),
-                            )
-                        }
+            translate(dir * 60f * u * f, f * h * (0.9f + 0.15f * k)) {
+                rotate(dir * 9f * f, Offset(w / 2, h / 2)) {
+                    clipPath(piece) {
+                        drawImage(
+                            image,
+                            IntOffset.Zero,
+                            IntSize(image.width, image.height),
+                            IntOffset.Zero,
+                            IntSize(w.toInt(), h.toInt()),
+                            alpha = 1f - clamp((fall - 0.6f) / 0.4f),
+                        )
                     }
                 }
             }
         }
-        // The shredder's slot: a dark bar with a soft accent glow.
-        val bar = 14f
-        drawRect(
-            Brush.verticalGradient(listOf(Color.Transparent, p.accent.copy(alpha = 0.45f * slot.value), Color.Transparent), slotY - 40f, slotY + 40f),
-            Offset(0f, slotY - 40f),
-            Size(w, 80f),
-        )
-        drawRoundRect(
-            Color(0xFF0B0B0D).copy(alpha = slot.value),
-            Offset(w * 0.04f, slotY - bar / 2),
-            Size(w * 0.92f, bar),
-            CornerRadius(bar / 2),
-        )
+        // The claw marks: tapered gashes ripping in one after another, gone once it falls apart.
+        val claw = ms / 330f
+        val fade = 1f - clamp((fall - 0.2f) / 0.4f)
+        lines.forEachIndexed { i, line ->
+            val pr = clamp(claw * 1.6f - i * 0.3f)
+            if (pr <= 0f || fade <= 0f) return@forEachIndexed
+            val sx = line.first
+            val ex = line.first + (line.second - line.first) * pr
+            val ey = y0 + (y1 - y0) * pr
+            val nx = y1 - y0
+            val ny = -(line.second - line.first)
+            val len = hypot(nx, ny)
+            val width = 11f * u
+            val mx = (sx + ex) / 2
+            val my = (y0 + ey) / 2
+            val gash = Path().apply {
+                moveTo(sx, y0)
+                quadraticTo(mx + nx / len * width, my + ny / len * width, ex, ey)
+                quadraticTo(mx - nx / len * width, my - ny / len * width, sx, y0)
+                close()
+            }
+            drawPath(gash, Color(0xFF141416).copy(alpha = fade))
+        }
     }
 }
