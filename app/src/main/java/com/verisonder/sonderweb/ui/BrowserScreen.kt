@@ -492,12 +492,14 @@ private fun SwipeDownToHide(
     ) { content() }
 }
 
-/** The slim handle at the bar's edge while the bar is put away. Tap it to bring the bar back. */
+/** The slim handle at the bar's edge while the bar is put away. Tap it, or slide it any way
+ *  (sideways, or out from the edge), to bring the bar back. */
 @Composable
 private fun BoxScope.DownHandle(barTop: Boolean) {
     val shown by animateFloatAsState(if (Bar.down) 1f else 0f, spring(dampingRatio = 0.8f, stiffness = 420f), label = "downHandle")
     if (shown < 0.01f) return
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val slide = with(LocalDensity.current) { 20.dp.toPx() }
     Box(
         Modifier
             .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
@@ -508,10 +510,28 @@ private fun BoxScope.DownHandle(barTop: Boolean) {
                     Modifier.navigationBarsPadding()
                 },
             )
-            .size(width = 80.dp, height = 30.dp)
+            .size(width = 140.dp, height = 30.dp)
             .graphicsLayer {
                 alpha = shown
                 scaleX = 0.4f + 0.6f * shown
+            }
+            .pointerInput(Unit) {
+                var moved = androidx.compose.ui.geometry.Offset.Zero
+                var done = false
+                detectDragGestures(
+                    onDragStart = {
+                        moved = androidx.compose.ui.geometry.Offset.Zero
+                        done = false
+                    },
+                ) { change, amount ->
+                    change.consume()
+                    moved += amount
+                    if (!done && Bar.down && moved.getDistance() > slide) {
+                        done = true
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        Bar.expand()
+                    }
+                }
             }
             .clickable(
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
