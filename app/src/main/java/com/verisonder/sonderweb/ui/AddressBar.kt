@@ -741,17 +741,31 @@ fun TabPickerPopup(picker: TabPicker, end: Boolean = false) {
     val show by animateFloatAsState(if (picker.open) 1f else 0f, spring(dampingRatio = 0.75f, stiffness = 520f), label = "picker")
     if (show < 0.01f || picker.tabs.isEmpty()) return
     val y = if (picker.top) picker.anchorH + picker.gapPx else -(picker.gapPx + picker.listH)
+    val edge = with(LocalDensity.current) { 12.dp.roundToPx() }
+    // Opened from the tabs button at the right: the list sits at the screen's right edge, under
+    // your thumb; from the address it lines up with the address's left edge.
+    val place = remember(end, y, edge) {
+        object : androidx.compose.ui.window.PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: androidx.compose.ui.unit.IntRect,
+                windowSize: androidx.compose.ui.unit.IntSize,
+                layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+                popupContentSize: androidx.compose.ui.unit.IntSize,
+            ): IntOffset {
+                val x = if (end) windowSize.width - popupContentSize.width - edge else anchorBounds.left
+                return IntOffset(x, anchorBounds.top + y.roundToInt())
+            }
+        }
+    }
     Popup(
-        // Opened from the tabs button at the right: the list lines up with the right edge.
-        alignment = if (end) Alignment.TopEnd else Alignment.TopStart,
-        offset = IntOffset(0, y.roundToInt()),
+        popupPositionProvider = place,
         properties = PopupProperties(focusable = false, clippingEnabled = false),
     ) {
         val shape = RoundedCornerShape(22.dp)
         Column(
             Modifier
                 .graphicsLayer {
-                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, if (picker.top) 0f else 1f)
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(if (end) 0.85f else 0.5f, if (picker.top) 0f else 1f)
                     val k = 0.85f + 0.15f * show
                     scaleX = k
                     scaleY = k
