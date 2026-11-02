@@ -42,6 +42,9 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     /** A real page (not the session's empty first page) has started loading since the start page. */
     var startedPage = false
 
+    /** The page is scrolled all the way up (the strip by the camera hole shows only then). */
+    var atTop by mutableStateOf(true)
+
     /** True once the engine session is open and can be shown. */
     var ready by mutableStateOf(false)
 

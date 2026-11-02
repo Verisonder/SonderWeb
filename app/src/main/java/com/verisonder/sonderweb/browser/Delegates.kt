@@ -26,6 +26,8 @@ object Delegates {
         s.setScrollDelegate(object : GeckoSession.ScrollDelegate {
             override fun onScrollChanged(session: GeckoSession, scrollX: Int, scrollY: Int) {
                 Bar.onScroll(tab, scrollY)
+                val top = scrollY <= 0
+                if (tab.atTop != top) tab.atTop = top
                 // Once scrolling settles, pick up the colours now at the page's edges.
                 // Again a moment later: sites often slide their own header back in after you stop.
                 Browser.main.removeCallbacks(resample)
@@ -110,6 +112,7 @@ object Delegates {
             if (tab === Browser.current) Bar.show()
             tab.loading = true
             tab.startedPage = true
+            tab.atTop = true
             tab.progress = 5
             tab.url = url
         }

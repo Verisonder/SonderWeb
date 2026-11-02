@@ -186,12 +186,31 @@ fun BrowserScreen(activity: MainActivity) {
     // The bar already covers the strip on its side: only the rest of it lies over the page.
     val overPage = (barPx - if (barTop) safeTop else safeBottom).coerceAtLeast(0)
     val overOffset = { barOffsetState.value.coerceIn(0f, overPage.toFloat()) }
-    LaunchedEffect(overPage, safeBottom, activity.inFullscreen) {
-        activity.geckoView.setDynamicToolbarMaxHeight(if (activity.inFullscreen) 0 else overPage + safeBottom)
-        com.verisonder.sonderweb.browser.Delegates.coveredBottom = if (activity.inFullscreen) 0 else overPage + safeBottom
-        // Follows the bar frame by frame without recomposing anything.
-        androidx.compose.runtime.snapshotFlow { if (activity.inFullscreen) 0 else -overOffset().roundToInt() }
-            .collect { activity.geckoView.setVerticalClipping(it) }
+    // The strip by the camera hole shows only at the top of a page: once you scroll, the page
+    // glides up and fills the screen to the very top.
+    val stripState = animateFloatAsState(
+        targetValue = if (tab?.atTop != false) safeTop.toFloat() else 0f,
+        animationSpec = spring(dampingRatio = 1f, stiffness = 500f),
+        label = "strip",
+    )
+    // How far below the screen's top the page starts (not counting a top bar). A top bar that is
+    // showing still needs the strip under it, so it only goes as the bar slides away.
+    val pageTop = {
+        if (barTop && overPage > 0) {
+            maxOf(stripState.value, safeTop * (1f - overOffset() / overPage))
+        } else {
+            stripState.value
+        }
+    }
+    LaunchedEffect(overPage, safeBottom, safeTop, activity.inFullscreen) {
+        // The page is as tall as the screen; whatever it is pushed down by runs off the bottom,
+        // so the engine counts that as covered too (fixed bottom elements stay in sight).
+        activity.geckoView.setDynamicToolbarMaxHeight(if (activity.inFullscreen) 0 else overPage + safeBottom + safeTop)
+        com.verisonder.sonderweb.browser.Delegates.coveredBottom = if (activity.inFullscreen) 0 else overPage + safeBottom + safeTop
+        // Follows the bar and the strip frame by frame without recomposing anything.
+        androidx.compose.runtime.snapshotFlow {
+            if (activity.inFullscreen) 0 else -(overOffset() + safeTop - pageTop()).roundToInt()
+        }.collect { activity.geckoView.setVerticalClipping(it) }
     }
     // While typing the bar is always fully shown, so suggestions sit right under (or over) it.
     val barDp = with(density) { barPx.toDp() }
@@ -256,17 +275,18 @@ fun BrowserScreen(activity: MainActivity) {
                         factory = { activity.geckoView },
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(with(density) { PaddingValues(top = safeTop.toDp()) })
                             .then(
-                                if (barTop && !activity.inFullscreen) {
-                                    Modifier.offset { IntOffset(0, (overPage - overOffset()).roundToInt()) }
-                                } else {
+                                if (activity.inFullscreen) {
                                     Modifier
+                                } else {
+                                    Modifier.offset {
+                                        IntOffset(0, (pageTop() + if (barTop) overPage - overOffset() else 0f).roundToInt())
+                                    }
                                 },
                             ),
                     )
                     if (tab != null && !tab.isBlank && !activity.inFullscreen) {
-                        PullIndicator(tab) { safeTop + if (barTop) (overPage - overOffset()).roundToInt() else 0 }
+                        PullIndicator(tab) { (pageTop() + if (barTop) overPage - overOffset() else 0f).roundToInt() }
                     }
                     // Opening the start page covers the engine view at once, so the previous page
                     // never shows through while the start page fades in.
