@@ -191,6 +191,17 @@ class Prefs(context: Context) {
         }
         set(v) = sp.edit().putString("tabs", JSONArray(v).toString()).apply()
 
+    /** Each saved tab's page title, in the order of [savedTabs]. */
+    var savedTabTitles: List<String>
+        get() {
+            val raw = sp.getString("tab_titles", null) ?: return emptyList()
+            return runCatching {
+                val a = JSONArray(raw)
+                List(a.length()) { a.optString(it) }
+            }.getOrDefault(emptyList())
+        }
+        set(v) = sp.edit().putString("tab_titles", JSONArray(v).toString()).apply()
+
     /** Each saved tab's page colours (top, bottom; null = unknown), in the order of [savedTabs]. */
     var savedTabColors: List<Pair<Int?, Int?>>
         get() {

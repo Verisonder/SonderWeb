@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -157,8 +159,14 @@ private fun TabCard(ui: UiState, tab: Tab, selected: Boolean, accent: Color, mod
             Modifier.padding(start = 12.dp, end = 2.dp, top = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            TabIcon(tab)
+            Spacer(Modifier.width(8.dp))
             Text(
-                if (tab.isBlank) "New tab" else tab.displayTitle,
+                when {
+                    tab.isBlank -> "New tab"
+                    tab.title.isNotBlank() -> tab.title
+                    else -> UrlText.host(tab.url).ifEmpty { tab.displayTitle }
+                },
                 color = p.text,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
@@ -218,6 +226,32 @@ private fun TabCard(ui: UiState, tab: Tab, selected: Boolean, accent: Color, mod
                 }
             }
         }
+    }
+}
+
+/** The small icon before a tab's title: the site's icon, or a plain one for new and private tabs. */
+@Composable
+private fun TabIcon(tab: Tab) {
+    val p = LocalPalette.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val host = UrlText.host(tab.url)
+    val showSite = !tab.isBlank && !tab.isPrivate && host.isNotEmpty()
+    if (showSite) androidx.compose.runtime.LaunchedEffect(host) { com.verisonder.sonderweb.data.SiteIcons.load(ctx, host) }
+    val bmp = if (showSite) com.verisonder.sonderweb.data.SiteIcons.icons[host] else null
+    if (bmp != null) {
+        Image(
+            remember(bmp) { bmp.asImageBitmap() },
+            null,
+            filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+            modifier = Modifier.size(16.dp).clip(RoundedCornerShape(4.dp)),
+        )
+    } else {
+        Icon(
+            if (tab.isBlank) Icons.Outlined.Add else Icons.Outlined.Public,
+            null,
+            tint = p.faint,
+            modifier = Modifier.size(16.dp),
+        )
     }
 }
 

@@ -1,6 +1,7 @@
 package com.verisonder.sonderweb.browser
 
 import android.content.Context
+import androidx.compose.ui.graphics.asImageBitmap
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.getValue
@@ -368,6 +369,7 @@ object Browser {
         if (!started) return
         val kept = tabs.filter { !it.isPrivate && UrlText.isWeb(it.pendingUrl ?: it.url) }
         prefs.savedTabs = kept.map { it.pendingUrl ?: it.url }
+        prefs.savedTabTitles = kept.map { it.title }
         // Their page colours too, so a reopened tab is covered in its own colours until it draws.
         prefs.savedTabColors = kept.map { it.edgeTop to it.edgeBottom }
         prefs.savedTabIndex = kept.indexOf(current).coerceAtLeast(0)
@@ -383,13 +385,20 @@ object Browser {
         // Opening on the start page: the old tabs come back without loading the last site.
         val startPage = startPageDue()
         val colors = prefs.savedTabColors
+        val titles = prefs.savedTabTitles
         urls.forEachIndexed { i, url ->
             val tab = newTab(url, isPrivate = false, select = false, lazy = true)
             colors.getOrNull(i)?.let { (top, bottom) ->
                 tab.edgeTop = top
                 tab.edgeBottom = bottom
             }
+            // Its title and picture from last time, so the tab switcher shows the real thing.
+            titles.getOrNull(i)?.let { tab.title = it }
+            com.verisonder.sonderweb.data.Thumbs.load(app, url) { bmp ->
+                if (tab.thumbnail == null) tab.thumbnail = bmp.asImageBitmap()
+            }
         }
+        com.verisonder.sonderweb.data.Thumbs.keepOnly(app, urls)
         if (startPage) {
             newTab(null, isPrivate = false)
             return

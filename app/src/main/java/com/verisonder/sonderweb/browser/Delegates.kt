@@ -279,7 +279,11 @@ object Delegates {
                     // A busy edge (a picture, not a header bar): plain page colour instead.
                     tab.edgeTop = if (topKnown) top else null
                     if (bottom != null) tab.edgeBottom = bottom
-                    if (small != null) tab.thumbnail = small.asImageBitmap()
+                    if (small != null) {
+                        tab.thumbnail = small.asImageBitmap()
+                        // Kept for next time the app opens (normal tabs only; private ones never get here).
+                        com.verisonder.sonderweb.data.Thumbs.save(Browser.app, tab.url, small)
+                    }
                 }
             }, { })
         }
