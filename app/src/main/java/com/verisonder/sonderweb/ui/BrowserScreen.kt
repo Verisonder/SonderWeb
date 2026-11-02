@@ -92,6 +92,9 @@ enum class Panel { None, Tabs, History, Bookmarks, Downloads, Settings, Extensio
 class UiState {
     var panel by mutableStateOf(Panel.None)
     var menu by mutableStateOf(false)
+
+    /** "Shred site data" asked for this site, waiting for you to confirm. */
+    var shred by mutableStateOf<String?>(null)
     var editing by mutableStateOf(false)
     var query by mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(""))
     var finding by mutableStateOf(false)
@@ -413,6 +416,18 @@ fun BrowserScreen(activity: MainActivity) {
             Prompts.queue.firstOrNull { it.tab === tab }?.let { PromptDialog(it) }
             com.verisonder.sonderweb.browser.Extensions.pending?.let { InstallDialog(it) }
             com.verisonder.sonderweb.browser.AppLinks.ask?.let { OpenAppDialog(it) }
+            ui.shred?.let { site ->
+                ConfirmDialog(
+                    "Shred $site?",
+                    "Its tabs close and its cookies and site data are deleted. History and bookmarks stay.",
+                    "Shred",
+                    { ui.shred = null },
+                ) {
+                    ui.shred = null
+                    Browser.shred(site)
+                    activity.toast("$site shredded")
+                }
+            }
 
             // Back from another app: the private tab stays hidden until you unlock it.
             AnimatedVisibility(

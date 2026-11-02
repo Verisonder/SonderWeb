@@ -283,12 +283,11 @@ object Browser {
             if (next != null) select(next)
         }
         if (tab.session.isOpen) tab.session.close()
-        forgetIfLast(tab)
         if (tabs.isEmpty()) newTab(null, isPrivate = false)
         saveTabs()
     }
 
-    /** The site a tab is on, as "Forget this site" remembers it (example.com for www.example.com). */
+    /** The site a tab is on (example.com for www.example.com). */
     fun siteOf(url: String?): String = siteKey(UrlText.host(url))
 
     private fun siteKey(host: String): String {
@@ -300,15 +299,18 @@ object Browser {
         return parts.takeLast(keep).joinToString(".")
     }
 
-    /** "Forget this site when closed": its last tab closed, so its cookies and stored data go. */
-    private fun forgetIfLast(tab: Tab) {
-        if (tab.isPrivate) return
-        val site = siteOf(tab.url)
-        if (site.isEmpty() || site !in prefs.forgetSites) return
-        if (tabs.any { !it.isPrivate && siteOf(it.url) == site }) return
+    /**
+     * "Shred site data", like Brave's: the site's tabs close and its cookies, storage and cache
+     * are deleted at once (history and bookmarks stay).
+     */
+    fun shred(site: String) {
+        if (site.isEmpty()) return
+        val open = tabs.filter { !it.isPrivate && siteOf(it.url) == site }
+        val hosts = open.map { UrlText.host(it.url) }.toSet()
+        open.forEach { close(it) }
         val flags = org.mozilla.geckoview.StorageController.ClearFlags.SITE_DATA
         runCatching { runtime.storageController.clearDataFromBaseDomain(site, flags) }
-        runCatching { runtime.storageController.clearDataFromHost(UrlText.host(tab.url), flags) }
+        hosts.forEach { h -> runCatching { runtime.storageController.clearDataFromHost(h, flags) } }
     }
 
     fun closeAll(isPrivate: Boolean) {

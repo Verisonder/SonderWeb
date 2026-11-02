@@ -249,11 +249,6 @@ class Prefs(context: Context) {
         get() = sp.getString("last_weather", "") ?: ""
         set(v) = sp.edit().putString("last_weather", v).apply()
 
-    /** Sites whose cookies and stored data are cleared when their last tab closes. */
-    var forgetSites: Set<String>
-        get() = sp.getStringSet("forget_sites", emptySet())?.toSet() ?: emptySet()
-        set(v) = sp.edit().putStringSet("forget_sites", v).apply()
-
     var fahrenheit: Boolean
         get() = sp.getBoolean("fahrenheit", false)
         set(v) = sp.edit().putBoolean("fahrenheit", v).apply()
