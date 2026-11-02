@@ -81,6 +81,65 @@ class MainActivity : ComponentActivity(), Browser.Host {
         filesResult?.invoke(uris)
         filesResult = null
     }
+    /** When the "default browser" question was shown, to tell a real answer from one the phone
+     *  refused to show (some phones, Xiaomi's among them, close it at once). */
+    private var askedDefaultAt = 0L
+
+    private val askDefault = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        ownScreen = false
+        if (isDefaultBrowser()) {
+            toast("SonderWeb is now your default browser")
+        } else if (android.os.SystemClock.elapsedRealtime() - askedDefaultAt < 700) {
+            // Closed straight away without asking: the phone's own setting instead.
+            openDefaultAppsSettings()
+        }
+    }
+
+    private fun isDefaultBrowser(): Boolean {
+        if (Build.VERSION.SDK_INT >= 29) {
+            val rm = getSystemService(android.app.role.RoleManager::class.java)
+            if (rm != null && rm.isRoleAvailable(android.app.role.RoleManager.ROLE_BROWSER)) {
+                return rm.isRoleHeld(android.app.role.RoleManager.ROLE_BROWSER)
+            }
+        }
+        val probe = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com"))
+        val info = packageManager.resolveActivity(probe, PackageManager.MATCH_DEFAULT_ONLY)
+        return info?.activityInfo?.packageName == packageName
+    }
+
+    private fun openDefaultAppsSettings() {
+        runCatching {
+            startActivity(Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+            ownScreen = true
+        }.onFailure {
+            runCatching { startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }
+        }
+    }
+
+    override fun askDefaultBrowser() {
+        if (isDefaultBrowser()) {
+            // Already the default: the phone's setting, in case you want to change it.
+            openDefaultAppsSettings()
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 29) {
+            val rm = getSystemService(android.app.role.RoleManager::class.java)
+            if (rm != null && rm.isRoleAvailable(android.app.role.RoleManager.ROLE_BROWSER)) {
+                // Android's own "Set SonderWeb as default?" question. It only works when started
+                // for a result (started any other way it closes without showing anything).
+                askedDefaultAt = android.os.SystemClock.elapsedRealtime()
+                ownScreen = true
+                runCatching { askDefault.launch(rm.createRequestRoleIntent(android.app.role.RoleManager.ROLE_BROWSER)) }
+                    .onFailure { openDefaultAppsSettings() }
+                return
+            }
+        }
+        openDefaultAppsSettings()
+    }
+
+    /** Whether SonderWeb opens links from other apps (for Settings). */
+    fun defaultBrowser(): Boolean = isDefaultBrowser()
+
     private val askPerms = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
         ownScreen = false
         permsResult?.invoke(r.isNotEmpty() && r.values.all { it })

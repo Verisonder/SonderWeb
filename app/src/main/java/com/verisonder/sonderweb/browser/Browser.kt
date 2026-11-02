@@ -441,5 +441,8 @@ object Browser {
         /** [type] is a PromptDelegate.DateTimePrompt.Type; values are HTML input formats. */
         fun pickDateTime(type: Int, value: String?, min: String?, max: String?, result: (String?) -> Unit)
         fun toast(text: String, action: String? = null, onAction: (() -> Unit)? = null)
+
+        /** Asks Android to make SonderWeb the default browser (or opens the setting for it). */
+        fun askDefaultBrowser()
     }
 }

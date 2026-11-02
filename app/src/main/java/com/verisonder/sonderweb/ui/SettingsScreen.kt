@@ -1,9 +1,5 @@
 package com.verisonder.sonderweb.ui
 
-import android.app.role.RoleManager
-import android.content.Intent
-import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.spring
@@ -290,8 +286,13 @@ private fun MainPage(
         NavRow(Icons.Outlined.Search, "Search engine", Browser.prefs.engine().name, first = true) { onOpen(Page.Search) }
         NavRow(Icons.Outlined.Palette, "Appearance", null) { onOpen(Page.Look) }
         NavRow(Icons.Outlined.Tab, "Tabs", null) { onOpen(Page.Tabs) }
-        NavRow(Icons.AutoMirrored.Outlined.OpenInNew, "Default browser", "Open links from other apps here") {
-            runCatching { ctx.startActivity(defaultBrowserIntent(ctx)) }
+        val isDefault = (ctx as? MainActivity)?.defaultBrowser() == true
+        NavRow(
+            Icons.AutoMirrored.Outlined.OpenInNew,
+            "Default browser",
+            if (isDefault) "SonderWeb opens links from other apps" else "Open links from other apps here",
+        ) {
+            Browser.host?.askDefaultBrowser()
         }
         NavRow(Icons.Outlined.DeleteSweep, "Clear browsing data", null, last = true, onClick = onClear)
     }
@@ -327,16 +328,6 @@ private fun iconFor(page: Page): ImageVector = when (page) {
     Page.Look -> Icons.Outlined.Palette
     Page.Tabs -> Icons.Outlined.Tab
     Page.About -> Icons.Outlined.Info
-}
-
-private fun defaultBrowserIntent(ctx: android.content.Context): Intent {
-    if (Build.VERSION.SDK_INT >= 29) {
-        val rm = ctx.getSystemService(RoleManager::class.java)
-        if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_BROWSER) && !rm.isRoleHeld(RoleManager.ROLE_BROWSER)) {
-            return rm.createRequestRoleIntent(RoleManager.ROLE_BROWSER)
-        }
-    }
-    return Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
 }
 
 // ---- Pages ----
