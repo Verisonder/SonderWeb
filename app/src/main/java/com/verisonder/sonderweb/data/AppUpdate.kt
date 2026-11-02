@@ -35,6 +35,10 @@ object AppUpdate {
     var progress by mutableStateOf<Float?>(null)
         private set
 
+    /** The version whose download already finished: tapping installs it straight away. */
+    var ready by mutableStateOf<String?>(null)
+        private set
+
     private const val API = "https://api.github.com/repos/Verisonder/SonderWeb/releases/latest"
     private const val PREFS = "app_update"
     private const val AUTO_EVERY_MS = 6 * 3_600_000L
@@ -48,12 +52,23 @@ object AppUpdate {
     }
 
     private fun restore(ctx: Context) {
-        if (available != null) return
+        if (available != null) return markReady(ctx)
         val sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val v = sp.getString("version", null) ?: return
         if (newer(v, BuildConfig.VERSION_NAME)) {
             available = Info(v, sp.getString("notes", "") ?: "", sp.getString("url", "") ?: "", sp.getLong("size", 0L))
         }
+        markReady(ctx)
+    }
+
+    private fun updatesDir(ctx: Context) = File(ctx.cacheDir, "updates").apply { mkdirs() }
+
+    private fun apk(ctx: Context, version: String) = File(updatesDir(ctx), "SonderWeb-$version.apk")
+
+    /** A finished download of the available version is kept, so it isn't fetched again. */
+    fun markReady(ctx: Context) {
+        val v = available?.version
+        ready = v?.takeIf { apk(ctx, it).let { f -> f.exists() && f.length() > 0 } }
     }
 
     private const val REPO = "https://github.com/Verisonder/SonderWeb"
@@ -127,7 +142,10 @@ object AppUpdate {
             .putLong("checkedAt", System.currentTimeMillis())
             .putString("version", info?.version).putString("notes", info?.notes)
             .putString("url", info?.apkUrl).putLong("size", info?.size ?: 0L).apply()
-        withContext(Dispatchers.Main) { available = info }
+        withContext(Dispatchers.Main) {
+            available = info
+            markReady(ctx)
+        }
     }
 
     /** Downloads the APK (progress in [progress]) and opens Android's installer. */
@@ -153,10 +171,17 @@ object AppUpdate {
         )
     }
 
+    /**
+     * Downloads the APK once: a finished file is reused, and a download that was cut off (app
+     * closed, network gone) carries on from where it stopped instead of starting over.
+     */
     private suspend fun download(ctx: Context, info: Info): File {
-        val dir = File(ctx.cacheDir, "updates").apply { mkdirs() }
-        dir.listFiles()?.forEach { it.delete() }
-        val out = File(dir, "SonderWeb-${info.version}.apk")
+        val dir = updatesDir(ctx)
+        val out = apk(ctx, info.version)
+        if (out.exists() && out.length() > 0) return out
+        val part = File(dir, out.name + ".part")
+        // Older versions' files aren't needed any more.
+        dir.listFiles()?.forEach { if (it != part) it.delete() }
         try {
             fun open(u: URL) = (u.openConnection() as HttpURLConnection).apply {
                 instanceFollowRedirects = false
@@ -165,19 +190,24 @@ object AppUpdate {
                 setRequestProperty("User-Agent", "SonderWeb")
             }
             // GitHub answers with a redirect to its file host (sometimes two).
-            var c = open(URL(info.apkUrl))
+            val have = if (part.exists()) part.length() else 0L
+            fun ranged(u: URL) = open(u).apply { if (have > 0) setRequestProperty("Range", "bytes=$have-") }
+            var c = ranged(URL(info.apkUrl))
             var hops = 0
             while (c.responseCode in 300..399 && hops++ < 5) {
                 val next = URL(c.url, c.getHeaderField("Location"))
                 c.disconnect()
-                c = open(next)
+                c = ranged(next)
             }
-            if (c.responseCode != 200) throw IllegalStateException("Download failed (${c.responseCode})")
-            val total = c.contentLengthLong.takeIf { it > 0 } ?: info.size
+            // 206: the rest of the file; 200: the server started over, so the file does too.
+            val resumed = c.responseCode == 206
+            if (c.responseCode != 200 && !resumed) throw IllegalStateException("Download failed (${c.responseCode})")
+            val start = if (resumed) have else 0L
+            val total = (c.contentLengthLong.takeIf { it > 0 }?.plus(start)) ?: info.size
             c.inputStream.use { input ->
-                out.outputStream().use { o ->
+                java.io.FileOutputStream(part, resumed).use { o ->
                     val buf = ByteArray(64 * 1024)
-                    var done = 0L
+                    var done = start
                     var shown = 0f
                     while (true) {
                         val n = input.read(buf)
@@ -195,9 +225,11 @@ object AppUpdate {
                 }
             }
             c.disconnect()
+            if (!part.renameTo(out)) throw IllegalStateException("Couldn't save the update")
+            withContext(Dispatchers.Main) { ready = info.version }
             return out
         } catch (e: Exception) {
-            out.delete()
+            // The part already downloaded is kept, to carry on next time.
             throw e
         }
     }

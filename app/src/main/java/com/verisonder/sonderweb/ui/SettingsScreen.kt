@@ -913,6 +913,9 @@ private fun UpdateRow() {
     val up = com.verisonder.sonderweb.data.AppUpdate
     val info = up.available
     val progress = up.progress
+    // Already downloaded (even before the app was closed): one tap installs it.
+    LaunchedEffect(info) { up.markReady(ctx) }
+    val downloaded = info != null && up.ready == info.version
     var checking by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxWidth().background(p.field).padding(horizontal = 20.dp, vertical = 16.dp)) {
@@ -927,6 +930,7 @@ private fun UpdateRow() {
                     when {
                         progress != null -> "Downloading… ${(progress * 100).roundToInt()}%"
                         checking -> "Looking for a new version…"
+                        downloaded -> "Downloaded · You have " + BuildConfig.VERSION_NAME
                         info != null -> "You have " + BuildConfig.VERSION_NAME + (if (info.size > 0) " · ${info.size / 1_000_000} MB" else "")
                         else -> note ?: ("You have " + BuildConfig.VERSION_NAME)
                     },
@@ -970,7 +974,11 @@ private fun UpdateRow() {
                         )
                     } else {
                         Text(
-                            if (info != null) "Update" else "Check",
+                            when {
+                                downloaded -> "Install"
+                                info != null -> "Update"
+                                else -> "Check"
+                            },
                             color = if (info != null) p.onAccent else p.text,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
