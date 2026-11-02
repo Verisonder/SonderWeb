@@ -244,6 +244,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("weather", true)
         set(v) = sp.edit().putBoolean("weather", v).apply()
 
+    /** The last weather reading, shown straight away on the next start until a new one comes in. */
+    var lastWeather: String
+        get() = sp.getString("last_weather", "") ?: ""
+        set(v) = sp.edit().putString("last_weather", v).apply()
+
     var fahrenheit: Boolean
         get() = sp.getBoolean("fahrenheit", false)
         set(v) = sp.edit().putBoolean("fahrenheit", v).apply()

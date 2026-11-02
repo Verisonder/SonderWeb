@@ -21,6 +21,7 @@ object Weather {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var busy = false
+    private var saved: Prefs? = null
 
     /** Refreshes when the last reading is older than 20 minutes (or the place/unit changed). */
     fun refresh(prefs: Prefs, force: Boolean = false) {
@@ -30,6 +31,9 @@ object Weather {
         }
         val place = prefs.place ?: return
         val unit = if (prefs.fahrenheit) "F" else "C"
+        saved = prefs
+        // Coming back after the app was closed: show the last reading at once (no jump when it arrives).
+        if (now == null) now = load(prefs.lastWeather)?.takeIf { it.place == place.name && it.unit == unit }
         val cur = now
         val fresh = cur != null && cur.place == place.name && cur.unit == unit &&
             System.currentTimeMillis() - cur.at < 20 * 60_000L
@@ -38,7 +42,10 @@ object Weather {
         scope.launch {
             val result = withContext(Dispatchers.IO) { fetch(place, unit) }
             busy = false
-            if (result != null) now = result
+            if (result != null) {
+                now = result
+                prefs.lastWeather = save(result)
+            }
         }
     }
 
@@ -81,5 +88,13 @@ object Weather {
 
     fun forget() {
         now = null
+        saved?.lastWeather = ""
     }
+
+    private fun save(n: Now) = listOf(n.temp, n.code, n.day, n.unit, n.at, n.place).joinToString("\u0001")
+
+    private fun load(s: String): Now? = runCatching {
+        val f = s.split('\u0001')
+        Now(f[0].toInt(), f[1].toInt(), f[2].toBooleanStrict(), f[3], f[5], f[4].toLong())
+    }.getOrNull()
 }

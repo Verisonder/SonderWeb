@@ -51,6 +51,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -323,19 +324,26 @@ private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser
                         textAlign = TextAlign.Center,
                     )
                 }
-                if (weather != null) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        WeatherCodes.sentence(weather.code, weather.temp, weather.unit),
-                        color = p.text,
-                        fontSize = 15.sp,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        SkyIcon(WeatherCodes.sky(weather.code, weather.day), 34)
-                        Spacer(Modifier.width(8.dp))
-                        Text("${weather.temp}°${weather.unit}", color = p.text, fontSize = 26.sp, fontWeight = FontWeight.Light)
+                // Until the first reading comes in its room is kept (invisible), so nothing jumps.
+                val shown = weather ?: Weather.Now(0, 0, true, "C", "", 0L).takeIf { prefs.weatherOn && prefs.place != null }
+                if (shown != null) {
+                    Column(
+                        Modifier.graphicsLayer { alpha = if (weather != null) 1f else 0f },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            WeatherCodes.sentence(shown.code, shown.temp, shown.unit),
+                            color = p.text,
+                            fontSize = 15.sp,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            SkyIcon(WeatherCodes.sky(shown.code, shown.day), 34)
+                            Spacer(Modifier.width(8.dp))
+                            Text("${shown.temp}°${shown.unit}", color = p.text, fontSize = 26.sp, fontWeight = FontWeight.Light)
+                        }
                     }
                 }
 
