@@ -12,6 +12,7 @@ import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.WebExtension
 import org.mozilla.geckoview.WebExtensionController
+import com.verisonder.sonderweb.core.UrlText
 
 /**
  * uBlock Origin, shipped inside the app as a built-in extension (unpacked into
@@ -78,13 +79,43 @@ object Extensions {
     var pending by mutableStateOf<InstallRequest?>(null)
         private set
 
+    private var lastRestart = 0L
+
+    private fun restartProcess() {
+        lastRestart = android.os.SystemClock.elapsedRealtime()
+        controller.enableExtensionProcessSpawning()
+    }
+
+    /** Back in the app: make sure extensions may run again. */
+    fun wake() {
+        if (Browser.started) controller.enableExtensionProcessSpawning()
+    }
+
     private val registered = HashSet<String>()
     private val actions = HashMap<String, WebExtension.Action>()
     private val defaults = HashMap<String, WebExtension.Action>()
 
+    // Page actions (an older kind of button some extensions use instead).
+    private val pageActions = HashMap<String, WebExtension.Action>()
+    private val pageDefaults = HashMap<String, WebExtension.Action>()
+
     private val controller get() = Browser.runtime.webExtensionController
 
     fun setup() {
+        // Android stops the extensions' process now and then (in the background, low memory).
+        // After a few times the engine stops restarting it, and every extension (uBlock Origin
+        // too) quietly stops working. Restart it: on its own once, and ask if it keeps happening.
+        controller.setExtensionProcessDelegate(object : WebExtensionController.ExtensionProcessDelegate {
+            override fun onDisabledProcessSpawning() {
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (now - lastRestart > 60_000) {
+                    restartProcess()
+                } else {
+                    Browser.host?.toast("Extensions stopped working", "Restart") { restartProcess() }
+                }
+            }
+        })
+        controller.enableExtensionProcessSpawning()
         controller.setPromptDelegate(object : WebExtensionController.PromptDelegate {
             override fun onInstallPromptRequest(
                 extension: WebExtension,
@@ -120,6 +151,7 @@ object Extensions {
             override fun onUninstalled(extension: WebExtension) = refresh()
             override fun onEnabled(extension: WebExtension) = refresh()
             override fun onDisabled(extension: WebExtension) = refresh()
+            override fun onOptionalPermissionsChanged(extension: WebExtension) = refresh()
             override fun onInstallationFailed(extension: WebExtension?, installException: WebExtension.InstallException) {
                 Browser.main.post { Browser.host?.toast("Couldn't add the extension") }
             }
@@ -176,6 +208,8 @@ object Extensions {
         if (!registered.add(ext.id)) return
         ext.setActionDelegate(actionDelegate(ext, null))
         ext.setTabDelegate(tabDelegate)
+        // browser.downloads: without this, an extension's downloads would wait forever.
+        ext.setDownloadDelegate(downloadDelegate)
         Browser.tabs.forEach { attach(ext, it) }
         ext.metaData.icon.getBitmap(96).accept({ b -> if (b != null) Browser.main.post { icons[ext.id] = b } }, { _ -> })
     }
@@ -217,8 +251,22 @@ object Extensions {
             }
         }
 
-        override fun onTogglePopup(extension: WebExtension, action: WebExtension.Action): GeckoResult<GeckoSession>? =
-            openPopupSession()
+        override fun onPageAction(extension: WebExtension, session: GeckoSession?, action: WebExtension.Action) {
+            if (tab == null) {
+                pageDefaults[ext.id] = action
+            } else {
+                pageActions[ext.id + "|" + tab.id] = pageDefaults[ext.id]?.let { action.withDefault(it) } ?: action
+            }
+        }
+
+        override fun onTogglePopup(extension: WebExtension, action: WebExtension.Action): GeckoResult<GeckoSession>? {
+            // Pressed again while its panel is open: close it.
+            if (popup != null) {
+                closePopup()
+                return null
+            }
+            return openPopupSession()
+        }
 
         override fun onOpenPopup(extension: WebExtension, action: WebExtension.Action): GeckoResult<GeckoSession>? =
             openPopupSession()
@@ -227,6 +275,17 @@ object Extensions {
     private fun openPopupSession(): GeckoResult<GeckoSession> {
         popup?.let { if (it.isOpen) it.close() }
         val s = GeckoSession()
+        // Its dialogs and dropdowns show like a page's, and links it opens go to a new tab.
+        Browser.current?.let { s.setPromptDelegate(Prompts.delegate(it)) }
+        s.setNavigationDelegate(object : GeckoSession.NavigationDelegate {
+            override fun onNewSession(session: GeckoSession, uri: String): GeckoResult<GeckoSession>? {
+                Browser.main.post { closePopup() }
+                val opener = Browser.current
+                val t = Browser.newTab(uri, isPrivate = opener?.isPrivate ?: false, select = true, opener = opener, open = false)
+                t.url = uri
+                return GeckoResult.fromValue(t.session)
+            }
+        })
         s.open(Browser.runtime)
         popup = s
         return GeckoResult.fromValue(s)
@@ -234,12 +293,13 @@ object Extensions {
 
     /** Presses an extension's toolbar button for this tab (opens its panel, if it has one). */
     fun showPopup(ext: WebExtension, tab: Tab): Boolean {
-        val action = actions[ext.id + "|" + tab.id] ?: defaults[ext.id] ?: return false
+        val key = ext.id + "|" + tab.id
+        val action = actions[key] ?: defaults[ext.id] ?: pageActions[key] ?: pageDefaults[ext.id] ?: return false
         action.click()
         return true
     }
 
-    fun hasButton(ext: WebExtension): Boolean = defaults.containsKey(ext.id)
+    fun hasButton(ext: WebExtension): Boolean = defaults.containsKey(ext.id) || pageDefaults.containsKey(ext.id)
 
     fun closePopup() {
         val s = popup ?: return
@@ -274,6 +334,38 @@ object Extensions {
     fun installFrom(url: String) {
         controller.install(url, WebExtensionController.INSTALLATION_METHOD_MANAGER)
             .accept({ refresh() }, { _ -> Browser.main.post { Browser.host?.toast("Couldn't add the extension") } })
+    }
+
+    private var nextDownloadId = 1
+
+    /** browser.downloads.download: saved like any other download. */
+    private val downloadDelegate = object : WebExtension.DownloadDelegate {
+        override fun onDownload(
+            extension: WebExtension,
+            request: WebExtension.DownloadRequest,
+        ): GeckoResult<WebExtension.DownloadInitData>? {
+            val result = GeckoResult<WebExtension.DownloadInitData>()
+            Browser.main.post {
+                val name = request.filename?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+                    ?: UrlText.fileName(null, request.request.uri, null)
+                val download = controller.createDownload(nextDownloadId++)
+                if (download == null) {
+                    result.completeExceptionally(IllegalStateException("Download not available"))
+                    return@post
+                }
+                result.complete(WebExtension.DownloadInitData(download, downloadInfo(name, WebExtension.Download.STATE_IN_PROGRESS)))
+                Downloads.fetch(request.request, isPrivate = false) { ok ->
+                    val state = if (ok) WebExtension.Download.STATE_COMPLETE else WebExtension.Download.STATE_INTERRUPTED
+                    download.update(downloadInfo(name, state))
+                }
+            }
+            return result
+        }
+    }
+
+    private fun downloadInfo(name: String, state: Int) = object : WebExtension.Download.Info {
+        override fun filename(): String = name
+        override fun state(): Int = state
     }
 
     private val tabDelegate = object : WebExtension.TabDelegate {

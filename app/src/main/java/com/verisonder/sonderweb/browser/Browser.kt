@@ -46,7 +46,8 @@ object Browser {
     var host: Host? = null
 
     private var nextId = 1L
-    private var started = false
+    var started = false
+        private set
 
     private val stripParams = arrayOf(
         "fbclid", "gclid", "dclid", "gbraid", "wbraid", "msclkid", "yclid", "twclid", "ttclid",

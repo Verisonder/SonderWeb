@@ -111,6 +111,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun onStart() {
         super.onStart()
         ownScreen = false
+        com.verisonder.sonderweb.browser.Extensions.wake()
         wake()
     }
 

@@ -43,15 +43,28 @@ object Downloads {
             Browser.host?.toast("This file can't be saved")
             return
         }
-        val req = WebRequest.Builder(url).referrer(referrer).build()
+        fetch(WebRequest.Builder(url).referrer(referrer).build(), isPrivate)
+    }
+
+    /** Downloads [req] (also for extensions); [done] says whether it got the file. */
+    fun fetch(req: WebRequest, isPrivate: Boolean, done: (Boolean) -> Unit = {}) {
         val flags = if (isPrivate) GeckoWebExecutor.FETCH_FLAGS_PRIVATE else GeckoWebExecutor.FETCH_FLAGS_NONE
         GeckoWebExecutor(Browser.runtime).fetch(req, flags).accept({ r ->
-            if (r == null) {
-                Browser.main.post { Browser.host?.toast("Download failed") }
-            } else {
-                Browser.main.post { save(r, isPrivate) }
+            Browser.main.post {
+                if (r == null) {
+                    Browser.host?.toast("Download failed")
+                    done(false)
+                } else {
+                    save(r, isPrivate)
+                    done(true)
+                }
             }
-        }, { _ -> Browser.main.post { Browser.host?.toast("Download failed") } })
+        }, { _ ->
+            Browser.main.post {
+                Browser.host?.toast("Download failed")
+                done(false)
+            }
+        })
     }
 
     private fun guessMime(url: String): String {
