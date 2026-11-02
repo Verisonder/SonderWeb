@@ -157,7 +157,17 @@ private fun LoadingMark(tab: Tab, ink: Color, accent: Color, leaving: Boolean, m
                 .background(ink.copy(alpha = 0.08f)),
             contentAlignment = Alignment.Center,
         ) {
+            // A logo (Gmail's M, YouTube's play button: wider than tall) fits whole inside the
+            // circle; a square app-style icon fills it.
+            val logo = bmp != null && bmp.width >= 64 &&
+                kotlin.math.abs(bmp.width - bmp.height) > minOf(bmp.width, bmp.height) / 8
             when {
+                logo -> Image(
+                    remember(bmp) { bmp!!.asImageBitmap() },
+                    null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(32.dp),
+                )
                 bmp != null && bmp.width >= 96 -> Image(
                     remember(bmp) { bmp.asImageBitmap() },
                     null,
