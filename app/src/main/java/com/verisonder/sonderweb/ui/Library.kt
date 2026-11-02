@@ -26,6 +26,26 @@ import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Android
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.FolderZip
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.MusicNote
+import androidx.compose.material.icons.outlined.PictureAsPdf
+import androidx.compose.material.icons.outlined.RemoveCircleOutline
+import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -225,47 +245,164 @@ fun BookmarksScreen(ui: UiState) {
 
 @Composable
 fun DownloadsScreen(ui: UiState) {
-    val p = LocalPalette.current
-    val ctx = LocalContext.current
-    var version by remember { mutableIntStateOf(0) }
-    val items = remember(version) { Browser.db.downloads() }
+    val items = remember(Downloads.changes) { Browser.db.downloads() }
     Column(Modifier.fillMaxSize()) {
         PageHeader(
             "Downloads",
             { ui.panel = Panel.None },
             action = Icons.Outlined.DeleteSweep,
             actionLabel = "Clear list",
-            onAction = {
-                Browser.db.clearDownloads()
-                version++
-            },
+            onAction = { Downloads.clear() },
         )
         if (items.isEmpty()) {
             Empty("Files you download show up here")
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
                 items(items, key = { it.id }) { d ->
-                    val status = when (d.state) {
-                        DownloadItem.RUNNING -> "Downloading…"
-                        DownloadItem.FAILED -> "Failed"
-                        else -> Formatter.formatShortFileSize(ctx, d.size) + " · " + UrlText.host(d.url)
-                    }
-                    EntryRow(
-                        modifier = Modifier.animateItem(),
-                        "",
-                        d.name,
-                        status,
-                        onClick = { if (d.state == DownloadItem.DONE) Downloads.open(d) },
-                        onRemove = {
-                            Browser.db.deleteDownload(d.id)
-                            version++
-                        },
-                        icon = if (d.state == DownloadItem.FAILED) Icons.Outlined.ErrorOutline else Icons.Outlined.InsertDriveFile,
-                        iconTint = if (d.state == DownloadItem.FAILED) p.danger else null,
+                    DownloadRow(d, Downloads.live[d.id], Modifier.animateItem()) { url -> open(ui, url) }
+                }
+            }
+        }
+    }
+}
+
+/** One download: its kind, name and what's going on (progress, speed and time left while it
+ *  runs; size, site and when once done), with a ⋮ menu for everything you can do with it. */
+@Composable
+private fun DownloadRow(d: DownloadItem, live: Downloads.Live?, modifier: Modifier, openUrl: (String) -> Unit) {
+    val p = LocalPalette.current
+    val ctx = LocalContext.current
+    val running = live != null
+    val failed = d.state == DownloadItem.FAILED || (d.state == DownloadItem.RUNNING && !running)
+    val host = UrlText.host(d.url)
+    val fmt = { b: Long -> Formatter.formatShortFileSize(ctx, b) }
+    val status = when {
+        running -> buildList {
+            add(if (live!!.total > 0) fmt(live.received) + " of " + fmt(live.total) else fmt(live.received))
+            if (live.speed > 0) add(fmt(live.speed) + "/s")
+            if (live.total > 0 && live.speed > 0) add(timeLeft((live.total - live.received) / live.speed) + " left")
+        }.joinToString(" · ")
+        d.state == DownloadItem.DONE -> listOf(
+            fmt(d.size),
+            host,
+            DateUtils.getRelativeTimeSpanString(d.added, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString(),
+        ).filter { it.isNotEmpty() }.joinToString(" · ")
+        d.state == DownloadItem.CANCELLED -> listOf("Cancelled", host).filter { it.isNotEmpty() }.joinToString(" · ")
+        else -> listOf("Failed", host).filter { it.isNotEmpty() }.joinToString(" · ")
+    }
+    var menu by remember { mutableStateOf(false) }
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clickable(enabled = d.state == DownloadItem.DONE) { Downloads.open(d) }
+            .padding(start = 16.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).background(p.field),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (failed) Icons.Outlined.ErrorOutline else kindIcon(d.name, d.mime),
+                null,
+                tint = if (failed) p.danger else p.mute,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(d.name, color = p.text, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(2.dp))
+            Text(status, color = p.faint, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (running) {
+                Spacer(Modifier.height(7.dp))
+                if (live!!.total > 0) {
+                    val shown by animateFloatAsState(
+                        (live.received.toFloat() / live.total).coerceIn(0f, 1f),
+                        tween(380),
+                        label = "download",
+                    )
+                    LinearProgressIndicator(
+                        progress = { shown },
+                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                        color = p.accent,
+                        trackColor = p.line,
+                        gapSize = 0.dp,
+                        drawStopIndicator = {},
+                    )
+                } else {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                        color = p.accent,
+                        trackColor = p.line,
                     )
                 }
             }
         }
+        Box {
+            IconButtonSmall(Icons.Outlined.MoreVert, "More", tint = p.mute) { menu = true }
+            DropdownMenu(
+                expanded = menu,
+                onDismissRequest = { menu = false },
+                containerColor = p.card,
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                val close = { menu = false }
+                if (running) {
+                    MoreItem("Cancel", Icons.Outlined.Close) { close(); Downloads.cancel(d.id) }
+                }
+                if (d.state == DownloadItem.DONE) {
+                    MoreItem("Open", Icons.AutoMirrored.Outlined.OpenInNew) { close(); Downloads.open(d) }
+                    MoreItem("Share", Icons.Outlined.Share) { close(); Downloads.share(d) }
+                }
+                if (!running && d.state != DownloadItem.DONE) {
+                    MoreItem("Try again", Icons.Outlined.Refresh) { close(); Downloads.retry(d) }
+                }
+                MoreItem("Copy download link", Icons.Outlined.Link) { close(); Downloads.copyLink(d) }
+                if (host.isNotEmpty()) {
+                    MoreItem("Go to $host", Icons.Outlined.Public) { close(); openUrl("https://$host") }
+                }
+                if (!running) {
+                    MoreItem("Remove from list", Icons.Outlined.RemoveCircleOutline) { close(); Downloads.remove(d) }
+                }
+                if (d.state == DownloadItem.DONE) {
+                    MoreItem("Delete file", Icons.Outlined.Delete, danger = true) { close(); Downloads.deleteFile(d) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoreItem(label: String, icon: ImageVector, danger: Boolean = false, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    val tint = if (danger) p.danger else p.text
+    DropdownMenuItem(
+        text = { Text(label, color = tint, fontSize = 15.sp) },
+        leadingIcon = { Icon(icon, null, tint = if (danger) p.danger else p.mute, modifier = Modifier.size(20.dp)) },
+        onClick = onClick,
+    )
+}
+
+/** "25 s", "3 min", "1 h 5 min". */
+private fun timeLeft(seconds: Long): String = when {
+    seconds < 60 -> "${seconds.coerceAtLeast(1)} s"
+    seconds < 3600 -> "${(seconds + 30) / 60} min"
+    else -> "${seconds / 3600} h ${(seconds % 3600) / 60} min"
+}
+
+/** An icon for the kind of file. */
+private fun kindIcon(name: String, mime: String): ImageVector {
+    val ext = name.substringAfterLast('.', "").lowercase()
+    return when {
+        mime.startsWith("image/") -> Icons.Outlined.Image
+        mime.startsWith("video/") -> Icons.Outlined.Movie
+        mime.startsWith("audio/") -> Icons.Outlined.MusicNote
+        mime == "application/pdf" || ext == "pdf" -> Icons.Outlined.PictureAsPdf
+        mime == "application/vnd.android.package-archive" || ext == "apk" -> Icons.Outlined.Android
+        ext in setOf("zip", "rar", "7z", "tar", "gz", "xz", "bz2") -> Icons.Outlined.FolderZip
+        mime.startsWith("text/") || ext in setOf("txt", "md", "csv", "doc", "docx", "odt") -> Icons.Outlined.Description
+        else -> Icons.Outlined.InsertDriveFile
     }
 }
 

@@ -21,6 +21,7 @@ data class DownloadItem(
         const val RUNNING = 0
         const val DONE = 1
         const val FAILED = 2
+        const val CANCELLED = 3
     }
 }
 
@@ -130,13 +131,19 @@ class Db(context: Context) : SQLiteOpenHelper(context, "sonderweb.db", null, 1) 
         return writableDatabase.insert("downloads", null, cv)
     }
 
-    fun finishDownload(id: Long, uri: String?, size: Long, ok: Boolean) {
+    fun finishDownload(id: Long, uri: String?, size: Long, state: Int) {
         val cv = ContentValues().apply {
             put("uri", uri ?: "")
             put("size", size)
-            put("state", if (ok) DownloadItem.DONE else DownloadItem.FAILED)
+            put("state", state)
         }
         writableDatabase.update("downloads", cv, "id = ?", arrayOf(id.toString()))
+    }
+
+    /** Downloads cut off when the app was closed: they show as failed (and can be retried). */
+    fun interruptRunning() {
+        val cv = ContentValues().apply { put("state", DownloadItem.FAILED) }
+        writableDatabase.update("downloads", cv, "state = ?", arrayOf(DownloadItem.RUNNING.toString()))
     }
 
     fun downloads(): List<DownloadItem> {

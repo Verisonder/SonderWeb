@@ -61,6 +61,7 @@ object Browser {
         app = context.applicationContext
         prefs = Prefs(app)
         db = Db(app)
+        db.interruptRunning()
         privateScreenshots = prefs.privateScreenshots
         privateLocked = prefs.privateLock
 
