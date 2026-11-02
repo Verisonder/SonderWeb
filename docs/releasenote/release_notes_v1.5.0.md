@@ -1,4 +1,4 @@
-## SonderWeb 1.5
+## SonderWeb 1.5.0
 
 **uBlock Origin**
 - The shield panel shows the right page's numbers (no more "0 out of 0"), and its buttons no longer flicker.
