@@ -229,9 +229,11 @@ fun BrowserScreen(activity: MainActivity) {
                 tab?.session?.finder?.clear()
                 ui.finding = false
             }
-            tab != null && tab.canGoBack -> tab.session.goBack()
-            tab != null && tab.openerId != null -> Browser.close(tab)
-            else -> activity.moveTaskToBack(true)
+            // On the start page, back leaves the app.
+            tab == null || tab.isBlank -> activity.moveTaskToBack(true)
+            tab.canGoBack -> tab.session.goBack()
+            // Nothing left to go back to on this site: the start page (back again leaves the app).
+            else -> Browser.home(tab)
         }
     }
 
