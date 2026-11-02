@@ -17,6 +17,12 @@ import java.io.File
  * and only then its small favicon through DuckDuckGo's icon service. Saved on the phone, fetched
  * once a month.
  */
+private val GMAIL = listOf(
+    "https://www.gstatic.com/images/branding/product/1x/gmail_2020q4_512dp.png",
+    "https://www.gstatic.com/images/branding/product/2x/gmail_2020q4_48dp.png",
+    "https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico",
+)
+
 object SiteIcons {
     /** host → icon; a missing key means not loaded yet, a null value means none was found. */
     val icons = mutableStateMapOf<String, Bitmap?>()
@@ -44,7 +50,18 @@ object SiteIcons {
         }
     }
 
+    /**
+     * Sites whose home page, opened signed out, only shows a sign-in page with another
+     * service's icon (Gmail shows Google's "G"): their own app icon, biggest first.
+     */
+    private val known = mapOf(
+        "mail.google.com" to GMAIL,
+        "gmail.com" to GMAIL,
+        "www.gmail.com" to GMAIL,
+    )
+
     private fun fetch(host: String): Bitmap? {
+        known[host]?.let { urls -> urls.firstNotNullOfOrNull { decode(it)?.let(::trim) }?.let { return it } }
         val home = "https://$host/"
         val candidates = LinkedHashSet<String>()
         // Big pages (YouTube's is over 1 MB): the icons are in the head, near the start.
