@@ -298,7 +298,7 @@ object Delegates {
      */
     fun checkPainted(tab: Tab, attempt: Int = 0) {
         // A page that really is one plain colour is left alone.
-        if (tab.covered || tab.lastFlat == true || !UrlText.isWeb(tab.url)) return
+        if (tab.covered || tab.flatWhenLeft == true || !UrlText.isWeb(tab.url)) return
         val view = Browser.host?.geckoViewFor(tab) ?: return
         // Still empty (or the engine can't even take a picture of it). The page itself is usually
         // fine (a refresh doesn't help): it's the screen surface it draws into that went blank.
@@ -322,7 +322,7 @@ object Delegates {
                         }
                         else -> {
                             tab.lastFlat = null
-                            tab.session.reload()
+                            Browser.refresh(tab)
                         }
                     }
                     if (attempt < 2) view.postDelayed({ if (Browser.current === tab) checkPainted(tab, attempt + 1) }, 900)

@@ -398,6 +398,21 @@ object Browser {
         tab.session.reload()
     }
 
+    /**
+     * Refresh. The page is also handed to the screen again first: after a while away the
+     * surface it draws into can go blank, and reloading alone then just loads into nothing.
+     */
+    fun refresh(tab: Tab) {
+        if (!tab.ready || !tab.session.isOpen) return
+        val view = host?.geckoViewFor(tab)
+        if (view != null && view.session === tab.session) {
+            view.releaseSession()
+            view.setSession(tab.session)
+        }
+        tab.session.setActive(true)
+        tab.session.reload()
+    }
+
     // ---- Persistence (normal tabs only) ----
 
     fun saveTabs() {

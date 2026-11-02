@@ -114,7 +114,7 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                         if (tab.loading) "Stop" else "Reload",
                         !tab.isBlank,
                     ) {
-                        if (tab.loading) tab.session.stop() else tab.session.reload()
+                        if (tab.loading) tab.session.stop() else Browser.refresh(tab)
                         close()
                     }
                 }

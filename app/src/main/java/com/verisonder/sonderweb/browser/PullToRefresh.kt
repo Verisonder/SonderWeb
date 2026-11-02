@@ -81,7 +81,7 @@ class PullGeckoView(context: Context) : GeckoView(context) {
     private fun release(cancel: Boolean) {
         if (pulling && !cancel && PullToRefresh.pull >= PullToRefresh.threshold) {
             PullToRefresh.refreshing = true
-            Browser.current?.session?.reload()
+            Browser.current?.let { Browser.refresh(it) }
         }
         pulling = false
         atTop = false

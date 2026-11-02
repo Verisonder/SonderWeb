@@ -42,6 +42,10 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     /** Whether the page looked like one flat colour the last time it was looked at (null: not yet). */
     var lastFlat: Boolean? = null
 
+    /** [lastFlat] when you left the app: whether the page had something on it before. Pictures
+     *  taken after coming back can't tell (a broken surface looks like a plain page). */
+    var flatWhenLeft: Boolean? = null
+
     /** True until the page has drawn: meanwhile a cover in the page's colours hides the engine's
      *  empty view, so nothing flashes white. */
     var covered by mutableStateOf(true)

@@ -206,6 +206,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
             geckoView.invalidate()
             // If it still comes back empty, the page is reloaded (see Delegates.checkPainted).
             geckoView.postDelayed({ if (Browser.current === t) com.verisonder.sonderweb.browser.Delegates.checkPainted(t) }, 800)
+            // Once more a bit later, for a page that's slow to come back.
+            geckoView.postDelayed({ if (Browser.current === t) com.verisonder.sonderweb.browser.Delegates.checkPainted(t) }, 3500)
         }
     }
 
@@ -222,6 +224,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
 
     override fun onStop() {
         super.onStop()
+        Browser.current?.let { it.flatWhenLeft = it.lastFlat }
         Browser.saveTabs()
         // Paused while you're away (saves battery); woken again in onStart.
         Browser.current?.let { t -> if (t.ready && t.session.isOpen && !isChangingConfigurations) t.session.setActive(false) }
