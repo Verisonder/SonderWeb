@@ -17,6 +17,12 @@ import java.io.File
  * and only then its small favicon through DuckDuckGo's icon service. Saved on the phone, fetched
  * once a month.
  */
+private val YOUTUBE = listOf(
+    "https://www.gstatic.com/images/branding/product/1x/youtube_512dp.png",
+    "https://www.gstatic.com/youtube/img/branding/favicon/favicon_192x192.png",
+    "https://www.gstatic.com/images/branding/product/2x/youtube_48dp.png",
+)
+
 private val GMAIL = listOf(
     "https://www.gstatic.com/images/branding/product/1x/gmail_2020q4_512dp.png",
     "https://www.gstatic.com/images/branding/product/2x/gmail_2020q4_48dp.png",
@@ -32,7 +38,7 @@ object SiteIcons {
 
     fun load(context: Context, host: String) {
         if (host.isEmpty() || icons.containsKey(host) || !loading.add(host)) return
-        val dir = File(context.filesDir, "icons4").apply { mkdirs() }
+        val dir = File(context.filesDir, "icons5").apply { mkdirs() }
         val file = File(dir, host.replace(Regex("[^a-zA-Z0-9.-]"), "_") + ".png")
         scope.launch {
             val bmp = withContext(Dispatchers.IO) {
@@ -58,10 +64,16 @@ object SiteIcons {
         "mail.google.com" to GMAIL,
         "gmail.com" to GMAIL,
         "www.gmail.com" to GMAIL,
+        "youtube.com" to YOUTUBE,
+        "www.youtube.com" to YOUTUBE,
+        "m.youtube.com" to YOUTUBE,
     )
 
     private fun fetch(host: String): Bitmap? {
-        known[host]?.let { urls -> urls.firstNotNullOfOrNull { decode(it)?.let(::trim) }?.let { return it } }
+        // Only a big one counts here; otherwise the site's own icons are tried as usual.
+        known[host]?.let { urls ->
+            urls.firstNotNullOfOrNull { u -> decode(u)?.let(::trim)?.takeIf { maxOf(it.width, it.height) >= 96 } }?.let { return it }
+        }
         val home = "https://$host/"
         val candidates = LinkedHashSet<String>()
         // Big pages (YouTube's is over 1 MB): the icons are in the head, near the start.

@@ -579,7 +579,19 @@ private fun SiteTile(host: String, title: String) {
     val p = LocalPalette.current
     val bmp = SiteIcons.icons[host]
     val shape = RoundedCornerShape(14.dp)
+    // A logo rather than an app-style icon (YouTube's play button, Gmail's M: wider than tall):
+    // drawn a little smaller and uncut, so it fits and stays sharp.
+    val logo = bmp != null && bmp.width >= 64 && kotlin.math.abs(bmp.width - bmp.height) > minOf(bmp.width, bmp.height) / 8
     when {
+        logo -> Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+            Image(
+                remember(bmp) { bmp!!.asImageBitmap() },
+                title,
+                contentScale = ContentScale.Fit,
+                filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+                modifier = Modifier.size(44.dp),
+            )
+        }
         bmp != null && bmp.width >= 64 -> Image(
             remember(bmp) { bmp.asImageBitmap() },
             title,
