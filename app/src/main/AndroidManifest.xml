@@ -13,6 +13,9 @@
     <uses-permission android:name="android.permission.CREDENTIAL_MANAGER_QUERY_CANDIDATE_CREDENTIALS" />
     <!-- Download progress and "download complete" notifications (asked on the first download). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Downloads keep going after you leave the app (only while something downloads). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- Only asked when a site requests it, and only after you allow that site. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -76,6 +79,11 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".browser.DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- The Cancel button on a download's notification. -->
         <receiver

@@ -35,12 +35,24 @@ object DownloadNotifications {
 
     private fun id(key: Long) = 4000 + (key % 100_000).toInt()
 
-    private fun allowed(): Boolean {
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(app, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return false
-        }
+    /** The quiet "SonderWeb is downloading" notification that keeps downloads going in the background. */
+    const val WORKING_ID = 3990
+
+    fun working(context: Context, count: Int): android.app.Notification {
+        makeChannel()
+        val text = if (count <= 1) "Downloading a file" else "Downloading $count files"
+        return NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(R.drawable.ic_notify_download)
+            .setContentTitle("SonderWeb")
+            .setContentText(text)
+            .setSilent(true)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setContentIntent(showDownloads())
+            .build()
+    }
+
+    private fun makeChannel() {
         if (!channelMade && Build.VERSION.SDK_INT >= 26) {
             val ch = NotificationChannel(CHANNEL, "Downloads", NotificationManager.IMPORTANCE_LOW)
             ch.description = "Progress of your downloads, and when they're done"
@@ -48,6 +60,15 @@ object DownloadNotifications {
             app.getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
             channelMade = true
         }
+    }
+
+    private fun allowed(): Boolean {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(app, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return false
+        }
+        makeChannel()
         return NotificationManagerCompat.from(app).areNotificationsEnabled()
     }
 

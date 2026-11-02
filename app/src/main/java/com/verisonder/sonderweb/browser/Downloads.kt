@@ -132,6 +132,8 @@ object Downloads {
         Browser.host?.toast("Downloading $name", "More") { showPage = true }
         DownloadNotifications.askOnce()
         DownloadNotifications.progress(key, name, isPrivate, 0, length, 0)
+        // Keeps going if you leave the app.
+        DownloadService.started(Browser.app)
         io.execute {
             var uri: Uri? = null
             var size = 0L
@@ -183,6 +185,7 @@ object Downloads {
             if (!ok) uri?.let { u -> runCatching { Browser.app.contentResolver.delete(u, null, null) } }
             val stopped = cancelled.remove(key)
             Browser.main.post {
+                DownloadService.ended(Browser.app)
                 val state = when {
                     ok -> DownloadItem.DONE
                     stopped -> DownloadItem.CANCELLED
