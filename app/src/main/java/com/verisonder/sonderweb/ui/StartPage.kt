@@ -224,9 +224,10 @@ fun StartPage(ui: UiState, preview: com.verisonder.sonderweb.browser.Tab? = null
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            // The time and date sit a little higher than the rest (the space they give up above
-            // goes below them, so everything else stays where it was).
-            if (preview == null) Spacer(Modifier.height(if (prefs.showClock) 60.dp else 88.dp))
+            // The time and date can sit higher or lower than the rest (Settings › Start page): the
+            // space they give up above goes below them, so everything else stays where it was.
+            val lift = if (preview == null && prefs.showClock) prefs.clockLift.coerceIn(-30, 80) else 0
+            if (preview == null) Spacer(Modifier.height((88 - lift).dp))
             if (prefs.showClock) {
                 Text(
                     time,
@@ -237,7 +238,7 @@ fun StartPage(ui: UiState, preview: com.verisonder.sonderweb.browser.Tab? = null
                     maxLines = 1,
                 )
                 Text(date, color = p.text, fontSize = 16.sp)
-                Spacer(Modifier.height(if (preview == null) 62.dp else 34.dp))
+                Spacer(Modifier.height((34 + lift).dp))
             }
             if (prefs.showGreeting) {
                 Text(

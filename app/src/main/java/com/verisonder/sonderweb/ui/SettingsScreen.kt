@@ -142,6 +142,7 @@ private val index: List<Pair<String, Page>> = listOf(
     "Version" to Page.About,
     "Status bar" to Page.Look,
     "Reopen tabs" to Page.Tabs,
+    "Clock position" to Page.Start,
     "Open last site" to Page.Tabs,
     "Start page when opening the app" to Page.Tabs,
     "Version" to Page.About,
@@ -852,6 +853,7 @@ private fun StartSettings(ui: UiState) {
     val prefs = Browser.prefs
     var name by remember { mutableStateOf(prefs.userName) }
     var clock by remember { mutableStateOf(prefs.showClock) }
+    var lift by remember { mutableStateOf(prefs.clockLift.toFloat()) }
     var greeting by remember { mutableStateOf(prefs.showGreeting) }
     var names by remember { mutableStateOf(prefs.showShortcutNames) }
     var weatherOn by remember { mutableStateOf(prefs.weatherOn) }
@@ -883,6 +885,36 @@ private fun StartSettings(ui: UiState) {
             prefs.weatherOn = it
             if (!it) Weather.forget()
             ui.themeVersion++
+        }
+    }
+
+    if (clock) {
+        GroupTitle("Time and date")
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(18.dp)).background(p.field).padding(horizontal = 18.dp, vertical = 14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Position", color = p.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                val v = lift.roundToInt()
+                Text(
+                    when {
+                        v > 0 -> "$v dp higher"
+                        v < 0 -> "${-v} dp lower"
+                        else -> "Usual place"
+                    },
+                    color = p.faint,
+                    fontSize = 14.sp,
+                )
+            }
+            Slider(
+                value = lift,
+                onValueChange = { lift = it },
+                valueRange = -30f..80f,
+                steps = 21,
+                onValueChangeFinished = {
+                    prefs.clockLift = lift.roundToInt()
+                    ui.themeVersion++
+                },
+                colors = SliderDefaults.colors(thumbColor = p.accent, activeTrackColor = p.accent, inactiveTrackColor = p.line),
+            )
         }
     }
 

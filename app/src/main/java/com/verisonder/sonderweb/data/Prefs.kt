@@ -142,6 +142,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("status_bar", false)
         set(v) = sp.edit().putBoolean("status_bar", v).apply()
 
+    /** How far above its usual place the time and date sit on the start page (dp; negative = lower). */
+    var clockLift: Int
+        get() = sp.getInt("clock_lift", 28)
+        set(v) = sp.edit().putInt("clock_lift", v).apply()
+
     var showClock: Boolean
         get() = sp.getBoolean("show_clock", true)
         set(v) = sp.edit().putBoolean("show_clock", v).apply()
