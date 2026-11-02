@@ -46,7 +46,13 @@ object Delegates {
         ) {
             // about:blank is the start page, not a site.
             // A restored tab that hasn't loaded yet keeps showing the address it will open.
-            tab.url = if (url == null || url == "about:blank") tab.pendingUrl ?: "" else url
+            // A new session reports its empty first page after the real one was asked for:
+            // while that loads it isn't the start page (it used to flash in on launch).
+            if (url == null || url == "about:blank") {
+                if (!tab.loading || tab.startedPage) tab.url = tab.pendingUrl ?: ""
+            } else {
+                tab.url = url
+            }
             tab.blockedBadge = ""
             Browser.saveTabs()
         }
@@ -103,12 +109,14 @@ object Delegates {
             if (url == "about:blank") return
             if (tab === Browser.current) Bar.show()
             tab.loading = true
+            tab.startedPage = true
             tab.progress = 5
             tab.url = url
         }
 
         override fun onPageStop(session: GeckoSession, success: Boolean) {
             tab.loading = false
+            if (tab.startedPage) tab.covered = false
             tab.progress = 100
             if (success && !tab.isPrivate && Browser.prefs.saveHistory && UrlText.isWeb(tab.url)) {
                 Browser.db.visit(tab.url, tab.title)
@@ -136,7 +144,7 @@ object Delegates {
 
     private fun content(tab: Tab) = object : ContentDelegate {
         override fun onFirstContentfulPaint(session: GeckoSession) {
-            capture(tab, thumbnail = false)
+            if (tab.covered) reveal(tab) else capture(tab, thumbnail = false)
         }
 
         override fun onTitleChange(session: GeckoSession, title: String?) {
@@ -199,7 +207,54 @@ object Delegates {
     }
 
     /** Reads the page's edge colours and, for normal tabs, keeps a small picture for the tab switcher. */
+    /**
+     * The page has drawn something: lift the cover once it looks like the page we expect.
+     * Sites often paint a plain white page first and their real colours a moment later, so with
+     * remembered colours we wait (up to ~1.8 s) until the page shows them.
+     */
+    private fun reveal(tab: Tab, tries: Int = 0) {
+        if (!tab.covered) return
+        val wantTop = tab.edgeTop
+        val wantBottom = tab.edgeBottom
+        val view = Browser.host?.geckoViewFor(tab)
+        if (view == null || (wantTop == null && wantBottom == null) || tries >= 12) {
+            tab.covered = false
+            capture(tab, thumbnail = false)
+            return
+        }
+        runCatching {
+            view.capturePixels().accept({ bmp: Bitmap? ->
+                var top: Int? = null
+                var bottom: Int? = null
+                if (bmp != null && bmp.width >= 2 && bmp.height >= 4) {
+                    val bottomY = (bmp.height - coveredBottom - 3).coerceIn(1, bmp.height - 2)
+                    top = runCatching { edgeColor(bmp, 1) }.getOrNull()
+                    bottom = runCatching { edgeColor(bmp, bottomY) }.getOrNull()
+                }
+                Browser.main.post {
+                    if (!tab.covered) return@post
+                    if (near(top, wantTop) || near(bottom, wantBottom)) {
+                        tab.covered = false
+                        capture(tab, thumbnail = false)
+                    } else {
+                        Browser.main.postDelayed({ reveal(tab, tries + 1) }, 150)
+                    }
+                }
+            }, { Browser.main.post { tab.covered = false } })
+        }.onFailure { tab.covered = false }
+    }
+
+    private fun near(a: Int?, b: Int?): Boolean {
+        if (a == null || b == null) return false
+        return (0..2).all { i ->
+            val shift = i * 8
+            kotlin.math.abs(((a shr shift) and 0xFF) - ((b shr shift) and 0xFF)) <= 28
+        }
+    }
+
     fun capture(tab: Tab, thumbnail: Boolean = true) {
+        // Still covered: the page hasn't really drawn yet, keep the remembered colours.
+        if (tab.covered) return
         val view = Browser.host?.geckoViewFor(tab) ?: return
         runCatching {
             view.capturePixels().accept({ bmp: Bitmap? ->

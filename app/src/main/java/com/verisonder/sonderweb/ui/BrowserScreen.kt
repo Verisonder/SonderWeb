@@ -258,6 +258,12 @@ fun BrowserScreen(activity: MainActivity) {
                     // Opening the start page covers the engine view at once, so the previous page
                     // never shows through while the start page fades in.
                     if (tab != null && tab.isBlank) Box(Modifier.fillMaxSize().background(palette.bg))
+                    // Until the page has drawn: its own colours and a small loading mark (no white flash).
+                    LoadingCover(
+                        tab = tab,
+                        visible = tab != null && tab.covered && !tab.isBlank && !activity.inFullscreen,
+                        safeTop = safeTop,
+                    )
                     AnimatedVisibility(
                         visible = tab != null && tab.isBlank,
                         enter = fadeIn(tween(180)),

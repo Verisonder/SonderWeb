@@ -35,6 +35,13 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     var edgeTop by mutableStateOf<Int?>(null)
     var edgeBottom by mutableStateOf<Int?>(null)
 
+    /** True until the page has drawn: meanwhile a cover in the page's colours hides the engine's
+     *  empty view, so nothing flashes white. */
+    var covered by mutableStateOf(true)
+
+    /** A real page (not the session's empty first page) has started loading since the start page. */
+    var startedPage = false
+
     /** True once the engine session is open and can be shown. */
     var ready by mutableStateOf(false)
 

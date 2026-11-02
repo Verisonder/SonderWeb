@@ -207,7 +207,12 @@ object Browser {
             tab.session.open(runtime)
             tab.ready = true
             if (!url.isNullOrBlank()) {
-                if (lazy) tab.pendingUrl = url else tab.session.loadUri(url)
+                if (lazy) {
+                    tab.pendingUrl = url
+                } else {
+                    tab.loading = true
+                    tab.session.loadUri(url)
+                }
                 tab.url = url
             }
         } else {
@@ -253,6 +258,8 @@ object Browser {
         runCatching { runtime.webExtensionController.setTabActive(tab.session, true) }
         tab.pendingUrl?.let {
             tab.pendingUrl = null
+            // Loading from now on: the session's own empty first page isn't the start page.
+            tab.loading = true
             tab.session.loadUri(it)
         }
     }
@@ -315,6 +322,8 @@ object Browser {
         tab.title = ""
         tab.loading = false
         tab.pendingUrl = null
+        tab.covered = true
+        tab.startedPage = false
         if (tab.ready) tab.session.loadUri("about:blank")
     }
 
@@ -336,9 +345,11 @@ object Browser {
 
     fun saveTabs() {
         if (!started) return
-        val normal = tabs.filter { !it.isPrivate }
-        prefs.savedTabs = normal.map { it.pendingUrl ?: it.url }.filter { UrlText.isWeb(it) }
-        prefs.savedTabIndex = normal.indexOf(current).coerceAtLeast(0)
+        val kept = tabs.filter { !it.isPrivate && UrlText.isWeb(it.pendingUrl ?: it.url) }
+        prefs.savedTabs = kept.map { it.pendingUrl ?: it.url }
+        // Their page colours too, so a reopened tab is covered in its own colours until it draws.
+        prefs.savedTabColors = kept.map { it.edgeTop to it.edgeBottom }
+        prefs.savedTabIndex = kept.indexOf(current).coerceAtLeast(0)
     }
 
     private fun restoreTabs() {
@@ -348,7 +359,14 @@ object Browser {
             return
         }
         val index = prefs.savedTabIndex.coerceIn(0, urls.size - 1)
-        urls.forEach { newTab(it, isPrivate = false, select = false, lazy = true) }
+        val colors = prefs.savedTabColors
+        urls.forEachIndexed { i, url ->
+            val tab = newTab(url, isPrivate = false, select = false, lazy = true)
+            colors.getOrNull(i)?.let { (top, bottom) ->
+                tab.edgeTop = top
+                tab.edgeBottom = bottom
+            }
+        }
         select(tabs[index])
     }
 

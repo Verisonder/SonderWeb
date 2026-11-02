@@ -150,6 +150,28 @@ class Prefs(context: Context) {
         }
         set(v) = sp.edit().putString("tabs", JSONArray(v).toString()).apply()
 
+    /** Each saved tab's page colours (top, bottom; null = unknown), in the order of [savedTabs]. */
+    var savedTabColors: List<Pair<Int?, Int?>>
+        get() {
+            val raw = sp.getString("tab_colors", null) ?: return emptyList()
+            return runCatching {
+                val a = JSONArray(raw)
+                List(a.length()) { i ->
+                    val c = a.getJSONArray(i)
+                    val top: Int? = if (c.isNull(0)) null else c.getInt(0)
+                    val bottom: Int? = if (c.isNull(1)) null else c.getInt(1)
+                    top to bottom
+                }
+            }.getOrDefault(emptyList())
+        }
+        set(v) {
+            val a = JSONArray()
+            v.forEach { (top, bottom) ->
+                a.put(JSONArray().put(top ?: JSONObject.NULL).put(bottom ?: JSONObject.NULL))
+            }
+            sp.edit().putString("tab_colors", a.toString()).apply()
+        }
+
     var savedTabIndex: Int
         get() = sp.getInt("tab_index", 0)
         set(v) = sp.edit().putInt("tab_index", v).apply()
