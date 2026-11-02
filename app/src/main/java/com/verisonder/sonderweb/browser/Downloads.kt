@@ -128,7 +128,8 @@ object Downloads {
             live[id] = Live(0, length, 0)
             changes++
         }
-        Browser.host?.toast("Downloading $name")
+        // "More" opens the Downloads page (progress, speed, time left, and what you can do with it).
+        Browser.host?.toast("Downloading $name", "More") { showPage = true }
         DownloadNotifications.askOnce()
         DownloadNotifications.progress(key, name, isPrivate, 0, length, 0)
         io.execute {
@@ -201,7 +202,7 @@ object Downloads {
                     DownloadItem.CANCELLED -> DownloadNotifications.remove(key)
                     else -> {
                         DownloadNotifications.failed(key, name, isPrivate)
-                        Browser.host?.toast("Download of $name failed")
+                        Browser.host?.toast("Download of $name failed", "More") { showPage = true }
                     }
                 }
             }
