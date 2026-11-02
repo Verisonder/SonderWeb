@@ -267,6 +267,7 @@ object Delegates {
                 val bottomY = (bmp.height - coveredBottom - 3).coerceIn(1, bmp.height - 2)
                 val bottom = runCatching { edgeColor(bmp, bottomY) }.getOrNull()
                 val topKnown = top != null
+                val flat = runCatching { isFlat(bmp) }.getOrDefault(false)
                 // No pictures of private pages, not even in memory: only the two colours.
                 val small = if (thumbnail && !tab.isPrivate) {
                     val w = 360
@@ -276,6 +277,7 @@ object Delegates {
                     null
                 }
                 Browser.main.post {
+                    tab.lastFlat = flat
                     // A busy edge (a picture, not a header bar): plain page colour instead.
                     tab.edgeTop = if (topKnown) top else null
                     if (bottom != null) tab.edgeBottom = bottom
@@ -287,6 +289,46 @@ object Delegates {
                 }
             }, { })
         }
+    }
+
+    /**
+     * Back in the app: if a page that had something on it now shows one flat colour, the engine
+     * lost its drawing while you were away (it stays empty until a refresh), so it's reloaded.
+     */
+    fun checkPainted(tab: Tab) {
+        if (tab.covered || tab.lastFlat != false || !UrlText.isWeb(tab.url)) return
+        val view = Browser.host?.geckoViewFor(tab) ?: return
+        runCatching {
+            view.capturePixels().accept({ bmp: Bitmap? ->
+                if (bmp == null || bmp.width < 2 || bmp.height < 4) return@accept
+                val flat = runCatching { isFlat(bmp) }.getOrDefault(false)
+                Browser.main.post {
+                    if (flat && Browser.current === tab && tab.lastFlat == false && tab.session.isOpen) {
+                        tab.lastFlat = null
+                        tab.session.reload()
+                    }
+                }
+            }, { })
+        }
+    }
+
+    /** One colour everywhere (a grid of points over the page, leaving out the part the bar covers). */
+    private fun isFlat(bmp: Bitmap): Boolean {
+        val bottom = (bmp.height - coveredBottom - 4).coerceIn(2, bmp.height - 1)
+        val first = bmp.getPixel(bmp.width / 2, bottom / 2)
+        fun near(a: Int, b: Int): Boolean {
+            val dr = ((a shr 16) and 0xFF) - ((b shr 16) and 0xFF)
+            val dg = ((a shr 8) and 0xFF) - ((b shr 8) and 0xFF)
+            val db = (a and 0xFF) - (b and 0xFF)
+            return kotlin.math.abs(dr) + kotlin.math.abs(dg) + kotlin.math.abs(db) <= 12
+        }
+        for (gy in 1..11) {
+            val y = (bottom * gy / 12).coerceIn(0, bmp.height - 1)
+            for (gx in 1..7) {
+                if (!near(bmp.getPixel((bmp.width - 1) * gx / 8, y), first)) return false
+            }
+        }
+        return true
     }
 
     /** The colour most of a pixel row has (a few points across it), fully opaque. */

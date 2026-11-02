@@ -35,6 +35,9 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     var edgeTop by mutableStateOf<Int?>(null)
     var edgeBottom by mutableStateOf<Int?>(null)
 
+    /** Whether the page looked like one flat colour the last time it was looked at (null: not yet). */
+    var lastFlat: Boolean? = null
+
     /** True until the page has drawn: meanwhile a cover in the page's colours hides the engine's
      *  empty view, so nothing flashes white. */
     var covered by mutableStateOf(true)
