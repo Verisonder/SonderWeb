@@ -491,8 +491,8 @@ private fun BoxScope.BarArea(
 }
 
 /**
- * Swipe the bar down to put it away at the bottom edge: it follows your finger and springs back
- * if you don't go far. Once down it stays there until you tap its handle.
+ * Swipe the bar down (or up) to put it away at the bottom edge: it follows your finger and springs
+ * back if you don't go far. Once down it stays there until you tap its handle.
  */
 @Composable
 private fun SwipeDownToHide(
@@ -509,7 +509,7 @@ private fun SwipeDownToHide(
             if (!enabled) return@pointerInput
             detectVerticalDragGestures(
                 onDragEnd = {
-                    if (pull.value > threshold) {
+                    if (pull.value > threshold || pull.value < -threshold) {
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         Bar.putDown()
                     }
@@ -519,9 +519,9 @@ private fun SwipeDownToHide(
                 onDragCancel = { scope.launch { pull.animateTo(0f, back) } },
             ) { change, amount ->
                 change.consume()
-                // Down follows the finger; up only gives a little.
-                val next = pull.value + if (pull.value + amount > 0f) amount else amount * 0.15f
-                scope.launch { pull.snapTo(next.coerceAtLeast(-threshold * 0.25f)) }
+                // Down follows the finger; up a little more stiffly, then it drops away the same.
+                val next = pull.value + if (pull.value + amount > 0f) amount else amount * 0.6f
+                scope.launch { pull.snapTo(next.coerceAtLeast(-threshold * 2.5f)) }
             }
         },
     ) { content() }
