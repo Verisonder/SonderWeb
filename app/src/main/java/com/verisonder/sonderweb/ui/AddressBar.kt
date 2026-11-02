@@ -34,7 +34,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -219,11 +221,16 @@ fun StartControls(ui: UiState, tab: Tab, modifier: Modifier) {
             .padding(horizontal = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TabCountButton(
-            Browser.tabs.count { it.isPrivate == tab.isPrivate },
-            top = false,
-            onNewTab = { Browser.newTab(null, isPrivate = tab.isPrivate) },
-        ) { ui.panel = Panel.Tabs }
+        val picker = rememberTabPicker(tab, top = false)
+        Box {
+            TabCountButton(
+                Browser.tabs.count { it.isPrivate == tab.isPrivate },
+                top = false,
+                onNewTab = { Browser.newTab(null, isPrivate = tab.isPrivate) },
+                picker = picker,
+            ) { ui.panel = Panel.Tabs }
+            TabPickerPopup(picker, end = true)
+        }
         Box {
             IconButtonSmall(Icons.Outlined.MoreVert, "Menu", size = 44, tint = p.mute) { ui.menu = true }
                     if (com.verisonder.sonderweb.data.AppUpdate.available != null) UpdateDot(Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp))
@@ -404,7 +411,7 @@ private fun ShieldButton(tab: Tab) {
  * pops out, and let go: a new tab. One continuous gesture; letting go elsewhere cancels.
  */
 @Composable
-fun TabCountButton(count: Int, top: Boolean, onNewTab: () -> Unit, onClick: () -> Unit) {
+fun TabCountButton(count: Int, top: Boolean, onNewTab: () -> Unit, picker: TabPicker? = null, onClick: () -> Unit) {
     val p = LocalPalette.current
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
@@ -420,7 +427,8 @@ fun TabCountButton(count: Int, top: Boolean, onNewTab: () -> Unit, onClick: () -
         Modifier
             .size(44.dp)
             .clip(CircleShape)
-            .pointerInput(top) {
+            .onSizeChanged { picker?.anchorH = it.height.toFloat() }
+            .pointerInput(top, picker) {
                 val slop = viewConfiguration.touchSlop
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -442,6 +450,11 @@ fun TabCountButton(count: Int, top: Boolean, onNewTab: () -> Unit, onClick: () -
                         return@awaitEachGesture
                     }
                     if (moved) return@awaitEachGesture
+                    // On the start page holding it lists your tabs instead (like holding the address).
+                    if (picker != null) {
+                        pickTab(picker, haptics)
+                        return@awaitEachGesture
+                    }
                     holding = true
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     while (true) {
@@ -683,39 +696,45 @@ private fun Modifier.tabPicker(picker: TabPicker, onTap: () -> Unit): Modifier =
                     return@awaitEachGesture
                 }
                 if (moved) return@awaitEachGesture
-                val cur = Browser.current
-                val same = Browser.tabs.filter { it.isPrivate == (cur?.isPrivate ?: false) }
-                val at = same.indexOf(cur).coerceAtLeast(0)
-                val from = (at - PICKER_MAX / 2).coerceIn(0, (same.size - PICKER_MAX).coerceAtLeast(0))
-                picker.tabs = same.drop(from).take(PICKER_MAX)
-                picker.hover = -1
-                picker.open = true
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                while (true) {
-                    val c = awaitPointerEvent().changes.first()
-                    val i = picker.rowAt(c.position.y)
-                    if (i != picker.hover) {
-                        picker.hover = i
-                        if (i >= 0) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    }
-                    c.consume()
-                    if (!c.pressed) break
-                }
-                picker.tabs.getOrNull(picker.hover)?.let { if (it !== Browser.current) Browser.select(it) }
-                picker.open = false
-                picker.hover = -1
+                pickTab(picker, haptics)
             }
         }
 }
 
+/** The held part of the gesture: the list pops out, slide onto a tab and let go to switch to it. */
+private suspend fun AwaitPointerEventScope.pickTab(picker: TabPicker, haptics: HapticFeedback) {
+    val cur = Browser.current
+    val same = Browser.tabs.filter { it.isPrivate == (cur?.isPrivate ?: false) }
+    val at = same.indexOf(cur).coerceAtLeast(0)
+    val from = (at - PICKER_MAX / 2).coerceIn(0, (same.size - PICKER_MAX).coerceAtLeast(0))
+    picker.tabs = same.drop(from).take(PICKER_MAX)
+    picker.hover = -1
+    picker.open = true
+    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    while (true) {
+        val c = awaitPointerEvent().changes.first()
+        val i = picker.rowAt(c.position.y)
+        if (i != picker.hover) {
+            picker.hover = i
+            if (i >= 0) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+        c.consume()
+        if (!c.pressed) break
+    }
+    picker.tabs.getOrNull(picker.hover)?.let { if (it !== Browser.current) Browser.select(it) }
+    picker.open = false
+    picker.hover = -1
+}
+
 @Composable
-fun TabPickerPopup(picker: TabPicker) {
+fun TabPickerPopup(picker: TabPicker, end: Boolean = false) {
     val p = LocalPalette.current
     val show by animateFloatAsState(if (picker.open) 1f else 0f, spring(dampingRatio = 0.75f, stiffness = 520f), label = "picker")
     if (show < 0.01f || picker.tabs.isEmpty()) return
     val y = if (picker.top) picker.anchorH + picker.gapPx else -(picker.gapPx + picker.listH)
     Popup(
-        alignment = Alignment.TopStart,
+        // Opened from the tabs button at the right: the list lines up with the right edge.
+        alignment = if (end) Alignment.TopEnd else Alignment.TopStart,
         offset = IntOffset(0, y.roundToInt()),
         properties = PopupProperties(focusable = false, clippingEnabled = false),
     ) {
