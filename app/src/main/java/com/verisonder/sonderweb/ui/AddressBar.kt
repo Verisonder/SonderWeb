@@ -742,9 +742,11 @@ fun TabPickerPopup(picker: TabPicker, end: Boolean = false) {
     if (show < 0.01f || picker.tabs.isEmpty()) return
     val y = if (picker.top) picker.anchorH + picker.gapPx else -(picker.gapPx + picker.listH)
     val edge = with(LocalDensity.current) { 12.dp.roundToPx() }
+    // Room around the list inside its popup window, so the shadow is never cut off.
+    val room = with(LocalDensity.current) { 24.dp.roundToPx() }
     // Opened from the tabs button at the right: the list sits at the screen's right edge, under
     // your thumb; from the address it lines up with the address's left edge.
-    val place = remember(end, y, edge) {
+    val place = remember(end, y, edge, room) {
         object : androidx.compose.ui.window.PopupPositionProvider {
             override fun calculatePosition(
                 anchorBounds: androidx.compose.ui.unit.IntRect,
@@ -752,8 +754,8 @@ fun TabPickerPopup(picker: TabPicker, end: Boolean = false) {
                 layoutDirection: androidx.compose.ui.unit.LayoutDirection,
                 popupContentSize: androidx.compose.ui.unit.IntSize,
             ): IntOffset {
-                val x = if (end) windowSize.width - popupContentSize.width - edge else anchorBounds.left
-                return IntOffset(x, anchorBounds.top + y.roundToInt())
+                val x = if (end) windowSize.width - popupContentSize.width - edge + room else anchorBounds.left - room
+                return IntOffset(x, anchorBounds.top + y.roundToInt() - room)
             }
         }
     }
@@ -764,7 +766,9 @@ fun TabPickerPopup(picker: TabPicker, end: Boolean = false) {
         val shape = RoundedCornerShape(22.dp)
         Column(
             Modifier
+                .padding(with(LocalDensity.current) { room.toDp() })
                 .graphicsLayer {
+                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
                     transformOrigin = androidx.compose.ui.graphics.TransformOrigin(if (end) 0.85f else 0.5f, if (picker.top) 0f else 1f)
                     val k = 0.85f + 0.15f * show
                     scaleX = k
