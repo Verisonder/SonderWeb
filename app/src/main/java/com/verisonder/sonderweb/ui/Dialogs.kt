@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material3.Checkbox
@@ -48,6 +50,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -392,6 +395,21 @@ fun UblockSheet(session: GeckoSession) {
                 .navigationBarsPadding(),
         ) {
             AndroidView(factory = { view }, modifier = Modifier.fillMaxWidth().fillMaxHeight())
+            // A cover in the sheet's colour until the panel has really drawn: it says so by
+            // reporting its height (uBlock's does); others get a moment. No white flash.
+            var shown by remember(session) { mutableStateOf(false) }
+            LaunchedEffect(session, said > 0) {
+                kotlinx.coroutines.delay(if (said > 0) 150 else 1200)
+                shown = true
+            }
+            val cover by androidx.compose.animation.core.animateFloatAsState(
+                if (shown) 0f else 1f,
+                androidx.compose.animation.core.tween(180),
+                label = "panelCover",
+            )
+            if (cover > 0.01f) {
+                Box(Modifier.fillMaxSize().graphicsLayer { alpha = cover }.background(p.bar))
+            }
         }
     }
 }
