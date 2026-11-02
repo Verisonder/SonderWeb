@@ -311,6 +311,9 @@ object Browser {
         val flags = org.mozilla.geckoview.StorageController.ClearFlags.SITE_DATA
         runCatching { runtime.storageController.clearDataFromBaseDomain(site, flags) }
         hosts.forEach { h -> runCatching { runtime.storageController.clearDataFromHost(h, flags) } }
+        // Then the start page: an empty tab if there is one, else a new one.
+        val blank = tabs.lastOrNull { !it.isPrivate && it.isBlank }
+        if (blank != null) select(blank) else newTab(null, isPrivate = false)
     }
 
     fun closeAll(isPrivate: Boolean) {

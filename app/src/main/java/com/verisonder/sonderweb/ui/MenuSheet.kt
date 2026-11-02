@@ -12,7 +12,6 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Computer
-import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.FindInPage
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.foundation.layout.Arrangement
@@ -191,7 +190,7 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                 )
                 // Like Brave's "Shred site data" (private tabs forget everything anyway).
                 if (!tab.isPrivate) {
-                    Item("Shred site data", Icons.Outlined.DeleteSweep) {
+                    Item("Shred site data", ShredIcon) {
                         ui.shred = Browser.siteOf(tab.url)
                         close()
                     }
