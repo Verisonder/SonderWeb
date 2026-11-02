@@ -307,6 +307,9 @@ object Extensions {
     fun showPopup(ext: WebExtension, tab: Tab): Boolean {
         val key = ext.id + "|" + tab.id
         val action = actions[key] ?: defaults[ext.id] ?: pageActions[key] ?: pageDefaults[ext.id] ?: return false
+        // The panel asks which tab is in front: say it's this one, so it shows this page's counts
+        // (otherwise it can pick up its own panel and show 0 out of 0).
+        runCatching { controller.setTabActive(tab.session, true) }
         action.click()
         return true
     }

@@ -45,6 +45,7 @@ object AppUpdate {
 
     /** On app open: the last known result straight away, then a fresh check if it's been a while. */
     suspend fun autoCheck(ctx: Context) {
+        withContext(Dispatchers.IO) { cleanUp(ctx) }
         restore(ctx)
         val sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (System.currentTimeMillis() - sp.getLong("checkedAt", 0L) < AUTO_EVERY_MS) return
@@ -59,6 +60,14 @@ object AppUpdate {
             available = Info(v, sp.getString("notes", "") ?: "", sp.getString("url", "") ?: "", sp.getLong("size", 0L))
         }
         markReady(ctx)
+    }
+
+    /** Once an update is installed its download isn't needed: delete it (it's about 100 MB). */
+    private fun cleanUp(ctx: Context) {
+        updatesDir(ctx).listFiles()?.forEach { f ->
+            val v = f.name.removePrefix("SonderWeb-").removeSuffix(".part").removeSuffix(".apk")
+            if (!newer(v, BuildConfig.VERSION_NAME)) f.delete()
+        }
     }
 
     private fun updatesDir(ctx: Context) = File(ctx.cacheDir, "updates").apply { mkdirs() }

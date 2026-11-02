@@ -197,6 +197,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
         if (!t.ready || !t.session.isOpen) return
         t.session.setActive(true)
         t.session.setFocused(true)
+        // Extensions (uBlock's panel) see this tab as the one in front again.
+        runCatching { Browser.runtime.webExtensionController.setTabActive(t.session, true) }
         if (::geckoView.isInitialized) {
             geckoView.requestLayout()
             geckoView.invalidate()

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -364,7 +365,8 @@ fun UblockSheet(session: GeckoSession) {
         androidx.compose.animation.core.spring(dampingRatio = 1f, stiffness = 500f),
         label = "panel",
     )
-    val view = remember(session) { GeckoView(ctx) }
+    // The panel's own colour until it has drawn (no white flash while it opens).
+    val view = remember(session) { GeckoView(ctx).apply { coverUntilFirstPaint(p.bar.toArgb()) } }
     DisposableEffect(session) {
         view.setSession(session)
         onDispose { view.releaseSession() }
