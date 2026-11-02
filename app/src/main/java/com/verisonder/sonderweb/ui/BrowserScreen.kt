@@ -13,6 +13,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -450,7 +451,7 @@ private fun BoxScope.BarArea(
                 SwipeToCompact(!ui.editing && !ui.finding && hideMode != Bar.ALWAYS) { Scaled(barScale) { AddressBar(ui, tab, barTop) } }
             }
         }
-        DownHandle()
+        DownHandle(barTop)
     }
 }
 
@@ -491,17 +492,23 @@ private fun SwipeDownToHide(
     ) { content() }
 }
 
-/** The slim handle at the bottom edge while the bar is swiped down. Tap it to bring the bar back. */
+/** The slim handle at the bar's edge while the bar is put away. Tap it to bring the bar back. */
 @Composable
-private fun BoxScope.DownHandle() {
+private fun BoxScope.DownHandle(barTop: Boolean) {
     val shown by animateFloatAsState(if (Bar.down) 1f else 0f, spring(dampingRatio = 0.8f, stiffness = 420f), label = "downHandle")
     if (shown < 0.01f) return
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     Box(
         Modifier
-            .align(Alignment.BottomCenter)
-            .navigationBarsPadding()
-            .size(width = 72.dp, height = 30.dp)
+            .align(if (barTop) Alignment.TopCenter else Alignment.BottomCenter)
+            .then(
+                if (barTop) {
+                    Modifier.windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top))
+                } else {
+                    Modifier.navigationBarsPadding()
+                },
+            )
+            .size(width = 80.dp, height = 30.dp)
             .graphicsLayer {
                 alpha = shown
                 scaleX = 0.4f + 0.6f * shown
@@ -516,12 +523,15 @@ private fun BoxScope.DownHandle() {
             },
         contentAlignment = Alignment.Center,
     ) {
+        // A little bolder than a hairline: a soft shadow and a thin edge keep it visible on any page.
+        val p = LocalPalette.current
         Box(
             Modifier
-                .size(width = 40.dp, height = 5.dp)
-                .shadow(3.dp, RoundedCornerShape(3.dp))
+                .size(width = 48.dp, height = 6.dp)
+                .shadow(4.dp, RoundedCornerShape(3.dp))
                 .clip(RoundedCornerShape(3.dp))
-                .background(LocalPalette.current.text.copy(alpha = 0.7f)),
+                .background(p.text.copy(alpha = 0.9f))
+                .border(0.5.dp, p.bg.copy(alpha = 0.6f), RoundedCornerShape(3.dp)),
         )
     }
 }

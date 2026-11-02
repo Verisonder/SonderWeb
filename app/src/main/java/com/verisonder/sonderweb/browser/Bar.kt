@@ -8,8 +8,8 @@ import androidx.compose.runtime.setValue
  * How the address bar gets out of the way (Settings › Appearance):
  *  0  always shown;
  *  1  slides away while you scroll down, back when you scroll up, reach the top, switch tabs
- *     or a page starts loading (the default). Swipe it down and it stays down at the bottom
- *     edge until you tap its handle;
+ *     or a page starts loading (the default). Swipe it down or sideways and it stays hidden
+ *     until you tap its handle;
  *  2  shrinks into a small button while you scroll down; tap it, or scroll back to the top
  *     of the page, to bring the bar back.
  */
@@ -76,9 +76,14 @@ object Bar {
         hidden = false
     }
 
-    /** You swiped the bar sideways: out of the way (into the button, or slid off). */
+    /** You swiped the bar sideways: out of the way (into the button; in slide mode it stays
+     *  hidden, like swiping it down, until you tap its handle). */
     fun compact() {
         if (mode == ALWAYS) return
+        if (mode == SLIDE) {
+            putDown()
+            return
+        }
         travel = 0
         hidden = true
     }
