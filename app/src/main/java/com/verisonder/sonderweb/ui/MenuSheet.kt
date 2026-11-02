@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Computer
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.FindInPage
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.foundation.layout.Arrangement
@@ -188,6 +189,29 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                     contentPadding = PaddingValues(start = 20.dp, end = 8.dp),
                     modifier = Modifier.height(54.dp),
                 )
+                // Like Brave's "Forget me when I close this site" (private tabs forget everything anyway).
+                if (!tab.isPrivate) {
+                    val site = Browser.siteOf(tab.url)
+                    var forget by remember(site) { mutableStateOf(site in Browser.prefs.forgetSites) }
+                    val toggle = { on: Boolean ->
+                        forget = on
+                        Browser.prefs.forgetSites = if (on) Browser.prefs.forgetSites + site else Browser.prefs.forgetSites - site
+                    }
+                    DropdownMenuItem(
+                        text = { Text("Forget site when closed", fontSize = 16.sp, color = p.text) },
+                        onClick = { toggle(!forget) },
+                        leadingIcon = { Icon(Icons.Outlined.DeleteSweep, null, tint = p.mute, modifier = Modifier.size(22.dp)) },
+                        trailingIcon = {
+                            Checkbox(
+                                forget,
+                                { toggle(it) },
+                                colors = CheckboxDefaults.colors(checkedColor = p.accent, uncheckedColor = p.mute),
+                            )
+                        },
+                        contentPadding = PaddingValues(start = 20.dp, end = 8.dp),
+                        modifier = Modifier.height(54.dp),
+                    )
+                }
             }
             Divider()
             Item("Extensions", Icons.Outlined.Extension) {

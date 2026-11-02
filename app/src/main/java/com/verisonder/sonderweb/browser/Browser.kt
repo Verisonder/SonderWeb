@@ -106,6 +106,7 @@ object Browser {
         Ublock.install(runtime)
         Look.install(runtime)
         AddonsSite.install(runtime)
+        Shields.install(runtime)
         restoreTabs()
     }
 
@@ -282,8 +283,32 @@ object Browser {
             if (next != null) select(next)
         }
         if (tab.session.isOpen) tab.session.close()
+        forgetIfLast(tab)
         if (tabs.isEmpty()) newTab(null, isPrivate = false)
         saveTabs()
+    }
+
+    /** The site a tab is on, as "Forget this site" remembers it (example.com for www.example.com). */
+    fun siteOf(url: String?): String = siteKey(UrlText.host(url))
+
+    private fun siteKey(host: String): String {
+        val parts = host.removePrefix("www.").split('.')
+        if (parts.size <= 2) return parts.joinToString(".")
+        // example.co.uk, example.com.au: three parts make the site.
+        val second = parts[parts.size - 2]
+        val keep = if (second.length <= 3 && second in setOf("co", "com", "org", "net", "gov", "ac", "edu", "ne", "or", "go")) 3 else 2
+        return parts.takeLast(keep).joinToString(".")
+    }
+
+    /** "Forget this site when closed": its last tab closed, so its cookies and stored data go. */
+    private fun forgetIfLast(tab: Tab) {
+        if (tab.isPrivate) return
+        val site = siteOf(tab.url)
+        if (site.isEmpty() || site !in prefs.forgetSites) return
+        if (tabs.any { !it.isPrivate && siteOf(it.url) == site }) return
+        val flags = org.mozilla.geckoview.StorageController.ClearFlags.SITE_DATA
+        runCatching { runtime.storageController.clearDataFromBaseDomain(site, flags) }
+        runCatching { runtime.storageController.clearDataFromHost(UrlText.host(tab.url), flags) }
     }
 
     fun closeAll(isPrivate: Boolean) {

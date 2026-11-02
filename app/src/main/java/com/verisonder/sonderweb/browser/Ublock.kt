@@ -452,3 +452,20 @@ object AddonsSite {
         }, { _ -> })
     }
 }
+
+/**
+ * A small extension inside the app, always on: keeps your local IP addresses out of WebRTC,
+ * opens the real page instead of an AMP copy, and skips tracking redirect links.
+ */
+object Shields {
+    const val ID = "shields@sonderweb"
+    private const val LOCATION = "resource://android/assets/extensions/shields/"
+
+    fun install(runtime: GeckoRuntime) {
+        runtime.webExtensionController.ensureBuiltIn(LOCATION, ID).accept({ ext ->
+            if (ext != null) {
+                Browser.main.post { runtime.webExtensionController.setAllowedInPrivateBrowsing(ext, true) }
+            }
+        }, { _ -> })
+    }
+}
