@@ -547,7 +547,8 @@ fun Suggestions(ui: UiState, tab: Tab, top: Boolean) {
                 .background(p.bg)
                 .clickable(interactionSource = null, indication = null) { },
             reverseLayout = !top,
-            verticalArrangement = Arrangement.Top,
+            // Bar at the bottom: the list grows up from just above the bar, not from the top of the screen.
+            verticalArrangement = if (top) Arrangement.Top else Arrangement.Bottom,
         ) {
             if (resolved != null) {
                 item {
