@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -284,68 +285,83 @@ private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            // The time and date can sit higher or lower than the rest (Settings › Start page): the
-            // space they give up above goes below them, so everything else stays where it was.
-            val lift = if (preview == null && prefs.showClock) prefs.clockLift.coerceIn(-30, 80) else 0
-            if (preview == null) Spacer(Modifier.height((88 - lift).dp))
+            // The time and date can sit higher or lower (Settings › Start page › Layout), without
+            // moving anything else.
+            val lift = if (preview == null) prefs.clockLift.coerceIn(-120, 200) else 0
+            if (preview == null) Spacer(Modifier.height(88.dp))
             if (prefs.showClock) {
-                Text(
-                    time,
-                    color = p.text,
-                    fontSize = 88.sp,
-                    fontWeight = FontWeight.ExtraLight,
-                    letterSpacing = (-2).sp,
-                    maxLines = 1,
-                )
-                Text(date, color = p.text, fontSize = 16.sp)
-                Spacer(Modifier.height((34 + lift).dp))
-            }
-            if (prefs.showGreeting) {
-                Text(
-                    WeatherCodes.greeting(hour, prefs.userName),
-                    color = p.text,
-                    fontSize = 27.sp,
-                    textAlign = TextAlign.Center,
-                )
-            }
-            if (weather != null) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    WeatherCodes.sentence(weather.code, weather.temp, weather.unit),
-                    color = p.text,
-                    fontSize = 15.sp,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    SkyIcon(WeatherCodes.sky(weather.code, weather.day), 34)
-                    Spacer(Modifier.width(8.dp))
-                    Text("${weather.temp}°${weather.unit}", color = p.text, fontSize = 26.sp, fontWeight = FontWeight.Light)
+                Column(
+                    Modifier.offset { androidx.compose.ui.unit.IntOffset(0, -lift.dp.roundToPx()) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        time,
+                        color = p.text,
+                        fontSize = 88.sp,
+                        fontWeight = FontWeight.ExtraLight,
+                        letterSpacing = (-2).sp,
+                        maxLines = 1,
+                    )
+                    Text(date, color = p.text, fontSize = 16.sp)
                 }
+                Spacer(Modifier.height(34.dp))
             }
-
-            Spacer(Modifier.height(30.dp))
-            Row(
+            // The greeting, weather, search box and shortcuts move together (Settings › Start page ›
+            // Layout); the time and date have their own setting.
+            val restLift = if (preview == null) prefs.restLift.coerceIn(-120, 200) else 0
+            Column(
                 Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(p.field)
-                    .clickable { startEditing(ui, tab) }
-                    .padding(horizontal = 18.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .offset { androidx.compose.ui.unit.IntOffset(0, -restLift.dp.roundToPx()) },
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(Icons.Outlined.Search, "Search", tint = p.faint, modifier = Modifier.size(20.dp))
-            }
+                if (prefs.showGreeting) {
+                    Text(
+                        WeatherCodes.greeting(hour, prefs.userName),
+                        color = p.text,
+                        fontSize = 27.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                if (weather != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        WeatherCodes.sentence(weather.code, weather.temp, weather.unit),
+                        color = p.text,
+                        fontSize = 15.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SkyIcon(WeatherCodes.sky(weather.code, weather.day), 34)
+                        Spacer(Modifier.width(8.dp))
+                        Text("${weather.temp}°${weather.unit}", color = p.text, fontSize = 26.sp, fontWeight = FontWeight.Light)
+                    }
+                }
 
-            Spacer(Modifier.height(30.dp))
-            ShortcutGrid(
-                shortcuts,
-                onOpen = { Browser.load(tab, it.url) },
-                onEdit = { editing = it },
-                onAdd = { editing = -1 },
-            )
-            Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(30.dp))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(p.field)
+                        .clickable { startEditing(ui, tab) }
+                        .padding(horizontal = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Outlined.Search, "Search", tint = p.faint, modifier = Modifier.size(20.dp))
+                }
+
+                Spacer(Modifier.height(30.dp))
+                ShortcutGrid(
+                    shortcuts,
+                    onOpen = { Browser.load(tab, it.url) },
+                    onEdit = { editing = it },
+                    onAdd = { editing = -1 },
+                )
+                Spacer(Modifier.height(32.dp))
+            }
         }
     }
 

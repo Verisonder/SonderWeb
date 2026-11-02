@@ -157,6 +157,11 @@ class Prefs(context: Context) {
         get() = sp.getInt("start_dim", 30)
         set(v) = sp.edit().putInt("start_dim", v).apply()
 
+    /** How far above their usual place the greeting, weather, search box and shortcuts sit (dp; negative = lower). */
+    var restLift: Int
+        get() = sp.getInt("rest_lift", 0)
+        set(v) = sp.edit().putInt("rest_lift", v).apply()
+
     /** How far above its usual place the time and date sit on the start page (dp; negative = lower). */
     var clockLift: Int
         get() = sp.getInt("clock_lift", 28)

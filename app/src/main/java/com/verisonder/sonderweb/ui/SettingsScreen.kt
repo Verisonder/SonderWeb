@@ -145,6 +145,7 @@ private val index: List<Pair<String, Page>> = listOf(
     "Status bar" to Page.Look,
     "Reopen tabs" to Page.Tabs,
     "Clock position" to Page.Start,
+    "Start page layout" to Page.Start,
     "Start page background" to Page.Start,
     "Wallpaper" to Page.Start,
     "Open last site" to Page.Tabs,
@@ -702,6 +703,36 @@ private fun TabsPage() {
     OpenOnLaunch()
 }
 
+/** Moves part of the start page up or down (5 dp steps); saved when you let go. */
+@Composable
+private fun LiftSlider(title: String, saved: Float, onDone: (Float) -> Unit) {
+    val p = LocalPalette.current
+    var v by remember(saved) { mutableStateOf(saved) }
+    Column(Modifier.fillMaxWidth().background(p.field).padding(horizontal = 18.dp, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = p.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            val n = v.roundToInt()
+            Text(
+                when {
+                    n > 0 -> "$n dp higher"
+                    n < 0 -> "${-n} dp lower"
+                    else -> "Usual place"
+                },
+                color = p.faint,
+                fontSize = 14.sp,
+            )
+        }
+        Slider(
+            value = v,
+            onValueChange = { v = it },
+            valueRange = -120f..200f,
+            steps = 63,
+            onValueChangeFinished = { onDone(v) },
+            colors = SliderDefaults.colors(thumbColor = p.accent, activeTrackColor = p.accent, inactiveTrackColor = p.line),
+        )
+    }
+}
+
 /** Colours to pick from for the start page (dark ones first, then light ones). */
 private val startColors = listOf(
     0xFF000000, 0xFF0F172A, 0xFF1E293B, 0xFF14281D, 0xFF0B2545, 0xFF2A1736, 0xFF3B0D1A,
@@ -969,6 +1000,7 @@ private fun StartSettings(ui: UiState) {
     var name by remember { mutableStateOf(prefs.userName) }
     var clock by remember { mutableStateOf(prefs.showClock) }
     var lift by remember { mutableStateOf(prefs.clockLift.toFloat()) }
+    var rest by remember { mutableStateOf(prefs.restLift.toFloat()) }
     var greeting by remember { mutableStateOf(prefs.showGreeting) }
     var names by remember { mutableStateOf(prefs.showShortcutNames) }
     var weatherOn by remember { mutableStateOf(prefs.weatherOn) }
@@ -1005,33 +1037,19 @@ private fun StartSettings(ui: UiState) {
 
     StartBackgroundSettings(ui)
 
-    if (clock) {
-        GroupTitle("Time and date")
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(18.dp)).background(p.field).padding(horizontal = 18.dp, vertical = 14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Position", color = p.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                val v = lift.roundToInt()
-                Text(
-                    when {
-                        v > 0 -> "$v dp higher"
-                        v < 0 -> "${-v} dp lower"
-                        else -> "Usual place"
-                    },
-                    color = p.faint,
-                    fontSize = 14.sp,
-                )
+    GroupTitle("Layout")
+    Group {
+        if (clock) {
+            LiftSlider("Time and date", lift) { v ->
+                lift = v
+                prefs.clockLift = v.roundToInt()
+                ui.themeVersion++
             }
-            Slider(
-                value = lift,
-                onValueChange = { lift = it },
-                valueRange = -30f..80f,
-                steps = 21,
-                onValueChangeFinished = {
-                    prefs.clockLift = lift.roundToInt()
-                    ui.themeVersion++
-                },
-                colors = SliderDefaults.colors(thumbColor = p.accent, activeTrackColor = p.accent, inactiveTrackColor = p.line),
-            )
+        }
+        LiftSlider("Greeting, weather, search and shortcuts", rest) { v ->
+            rest = v
+            prefs.restLift = v.roundToInt()
+            ui.themeVersion++
         }
     }
 
