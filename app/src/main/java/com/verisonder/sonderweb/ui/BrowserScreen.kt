@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -451,7 +452,7 @@ private fun BoxScope.BarArea(
                 SwipeToCompact(!ui.editing && !ui.finding && hideMode != Bar.ALWAYS) { Scaled(barScale) { AddressBar(ui, tab, barTop) } }
             }
         }
-        DownHandle(barTop)
+        DownHandle(barTop, tab)
     }
 }
 
@@ -495,7 +496,7 @@ private fun SwipeDownToHide(
 /** The slim handle at the bar's edge while the bar is put away. Tap it, or slide it any way
  *  (sideways, or out from the edge), to bring the bar back. */
 @Composable
-private fun BoxScope.DownHandle(barTop: Boolean) {
+private fun BoxScope.DownHandle(barTop: Boolean, tab: com.verisonder.sonderweb.browser.Tab?) {
     val shown by animateFloatAsState(if (Bar.down) 1f else 0f, spring(dampingRatio = 0.8f, stiffness = 420f), label = "downHandle")
     if (shown < 0.01f) return
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -543,15 +544,20 @@ private fun BoxScope.DownHandle(barTop: Boolean) {
             },
         contentAlignment = Alignment.Center,
     ) {
-        // A little bolder than a hairline: a soft shadow and a thin edge keep it visible on any page.
+        // Like the phone's own gesture line: dark on light pages, light on dark ones (it follows
+        // the colour of the page's edge it sits on), with a thin opposite edge for busy pages.
         val p = LocalPalette.current
+        val edge = (if (barTop) tab?.edgeTop else tab?.edgeBottom)?.let { Color(it) } ?: p.bg
+        val onLight = edge.luminance() > 0.5f
+        val ink by animateColorAsState(if (onLight) Color(0xE6202124) else Color(0xF2FFFFFF), tween(220), label = "handleInk")
+        val rim by animateColorAsState(if (onLight) Color(0x66FFFFFF) else Color(0x59000000), tween(220), label = "handleRim")
         Box(
             Modifier
                 .size(width = 48.dp, height = 6.dp)
-                .shadow(4.dp, RoundedCornerShape(3.dp))
+                .shadow(3.dp, RoundedCornerShape(3.dp))
                 .clip(RoundedCornerShape(3.dp))
-                .background(p.text.copy(alpha = 0.9f))
-                .border(0.5.dp, p.bg.copy(alpha = 0.6f), RoundedCornerShape(3.dp)),
+                .background(ink)
+                .border(0.5.dp, rim, RoundedCornerShape(3.dp)),
         )
     }
 }
