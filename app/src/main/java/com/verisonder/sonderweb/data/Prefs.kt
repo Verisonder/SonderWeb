@@ -159,12 +159,12 @@ class Prefs(context: Context) {
 
     /** How far above their usual place the greeting, weather, search box and shortcuts sit (dp; negative = lower). */
     var restLift: Int
-        get() = sp.getInt("rest_lift", 0)
+        get() = sp.getInt("rest_lift", 50)
         set(v) = sp.edit().putInt("rest_lift", v).apply()
 
     /** How far above its usual place the time and date sit on the start page (dp; negative = lower). */
     var clockLift: Int
-        get() = sp.getInt("clock_lift", 28)
+        get() = sp.getInt("clock_lift", 45)
         set(v) = sp.edit().putInt("clock_lift", v).apply()
 
     var showClock: Boolean
