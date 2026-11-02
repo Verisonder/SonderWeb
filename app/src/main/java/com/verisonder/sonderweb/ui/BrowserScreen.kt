@@ -149,6 +149,9 @@ fun BrowserScreen(activity: MainActivity) {
     val pinned = ui.editing || ui.menu || ui.finding || tab == null || activity.inFullscreen ||
         hideMode == Bar.ALWAYS || (hideMode == Bar.SLIDE && tab.isBlank)
     val collapsed = Bar.hidden && !pinned
+    // Bar swiped down: the phone's gesture bar hides with it (not over the start page or a panel).
+    val hideNavigation = Bar.down && collapsed && !startPage && ui.panel == Panel.None
+    SideEffect { activity.hideNavigation = hideNavigation }
     // The animated values are read only while laying out and drawing (never while composing),
     // so each frame of the bar's movement just moves pixels instead of rebuilding the screen.
     val barOffsetState = animateFloatAsState(

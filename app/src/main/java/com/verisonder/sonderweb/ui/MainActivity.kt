@@ -201,6 +201,14 @@ class MainActivity : ComponentActivity(), Browser.Host {
         }
     }
 
+    /** The bar is swiped down out of sight: the gesture bar goes too (swipe up from the edge to see it). */
+    var hideNavigation = false
+        set(v) {
+            if (field == v) return
+            field = v
+            applySystemBars()
+        }
+
     override fun setFullscreen(on: Boolean) {
         inFullscreen = on
         applySystemBars()
@@ -214,7 +222,11 @@ class MainActivity : ComponentActivity(), Browser.Host {
             c.hide(WindowInsetsCompat.Type.systemBars())
             return
         }
-        c.show(WindowInsetsCompat.Type.navigationBars())
+        if (hideNavigation) {
+            c.hide(WindowInsetsCompat.Type.navigationBars())
+        } else {
+            c.show(WindowInsetsCompat.Type.navigationBars())
+        }
         if (Browser.prefs.showStatusBar) {
             c.show(WindowInsetsCompat.Type.statusBars())
         } else {
