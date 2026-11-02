@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -925,6 +926,7 @@ private fun UpdateRow() {
                 Text(
                     when {
                         progress != null -> "Downloading… ${(progress * 100).roundToInt()}%"
+                        checking -> "Looking for a new version…"
                         info != null -> "You have " + BuildConfig.VERSION_NAME + (if (info.size > 0) " · ${info.size / 1_000_000} MB" else "")
                         else -> note ?: ("You have " + BuildConfig.VERSION_NAME)
                     },
@@ -933,19 +935,13 @@ private fun UpdateRow() {
                 )
             }
             Spacer(Modifier.width(12.dp))
-            val label = when {
-                progress != null -> null
-                info != null -> "Update"
-                checking -> "Checking…"
-                else -> "Check"
-            }
-            if (label != null) {
-                Text(
-                    label,
-                    color = if (info != null) p.onAccent else p.text,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier
+            // The button keeps its size while checking (a small spinner instead of its label),
+            // so the text beside it never jumps to a second line.
+            if (progress == null) {
+                Box(
+                    Modifier
+                        .widthIn(min = 92.dp)
+                        .height(38.dp)
                         .clip(RoundedCornerShape(20.dp))
                         .background(if (info != null) p.accent else p.line)
                         .clickable(enabled = !checking) {
@@ -963,8 +959,25 @@ private fun UpdateRow() {
                                 }
                             }
                         }
-                        .padding(horizontal = 18.dp, vertical = 9.dp),
-                )
+                        .padding(horizontal = 18.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (checking && info == null) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            color = p.text,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    } else {
+                        Text(
+                            if (info != null) "Update" else "Check",
+                            color = if (info != null) p.onAccent else p.text,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
         }
         if (progress != null) {
