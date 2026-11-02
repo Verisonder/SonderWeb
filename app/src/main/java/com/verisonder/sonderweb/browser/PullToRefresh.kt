@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoView
 import org.mozilla.geckoview.PanZoomController
 
@@ -29,6 +30,19 @@ class PullGeckoView(context: Context) : GeckoView(context) {
     private var startY = 0f
     private var atTop = false
     private var pulling = false
+
+    // Sign-in fields: the phone's password manager is asked to show its suggestions.
+    override fun setSession(session: GeckoSession) {
+        super.setSession(session)
+        val own = session.autofillDelegate
+        if (own != null && own !is LoginFill) session.autofillDelegate = LoginFill(this, own)
+    }
+
+    override fun releaseSession(): GeckoSession? {
+        // Hand back the engine view's own hookup so it can unhook it from this session.
+        session?.let { s -> (s.autofillDelegate as? LoginFill)?.let { s.autofillDelegate = it.inner } }
+        return super.releaseSession()
+    }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
