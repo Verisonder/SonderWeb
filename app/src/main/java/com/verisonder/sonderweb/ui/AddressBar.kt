@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedback
@@ -68,6 +69,7 @@ import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.NorthWest
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -775,17 +777,7 @@ fun TabPickerPopup(picker: TabPicker, end: Boolean = false) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val host = UrlText.host(t.url)
-                    Box(
-                        Modifier.size(28.dp).clip(CircleShape).background(p.field),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            if (t.isBlank) "+" else host.firstOrNull()?.uppercase() ?: "•",
-                            color = p.mute,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+                    PickerIcon(t, host)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
@@ -801,6 +793,38 @@ fun TabPickerPopup(picker: TabPicker, end: Boolean = false) {
                         Box(Modifier.size(8.dp).clip(CircleShape).background(p.accent))
                     }
                 }
+            }
+        }
+    }
+}
+
+/** A tab's icon in the picker: the site's own icon, or a plain one for new and private tabs. */
+@Composable
+private fun PickerIcon(t: Tab, host: String) {
+    val p = LocalPalette.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val showSite = !t.isBlank && !t.isPrivate && host.isNotEmpty()
+    if (showSite) LaunchedEffect(host) { com.verisonder.sonderweb.data.SiteIcons.load(ctx, host) }
+    val bmp = if (showSite) com.verisonder.sonderweb.data.SiteIcons.icons[host] else null
+    Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+        if (bmp != null) {
+            androidx.compose.foundation.Image(
+                remember(bmp) { bmp.asImageBitmap() },
+                null,
+                filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+                modifier = Modifier.size(26.dp).clip(RoundedCornerShape(7.dp)),
+            )
+        } else {
+            Box(
+                Modifier.fillMaxSize().clip(CircleShape).background(p.field),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (t.isBlank) Icons.Outlined.Add else Icons.Outlined.Public,
+                    null,
+                    tint = p.mute,
+                    modifier = Modifier.size(16.dp),
+                )
             }
         }
     }
