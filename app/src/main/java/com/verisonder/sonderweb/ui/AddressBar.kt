@@ -181,16 +181,15 @@ fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
                     Spacer(Modifier.weight(1f))
                 } else {
                     IconButtonSmall(Icons.Outlined.Home, "Home", size = 44, tint = p.mute) { Browser.home(tab) }
-                    val picker = rememberTabPicker(tab, top)
+                    val pop = remember { NewTabPop() }
                     Box(Modifier.weight(1f)) {
-                        Omnibox(ui, tab, Modifier.fillMaxWidth(), picker)
-                        TabPickerPopup(picker)
+                        Omnibox(ui, tab, Modifier.fillMaxWidth(), pop, top)
+                        NewTabBubble(pop, top)
                     }
                 }
                 TabCountButton(
                     Browser.tabs.count { it.isPrivate == (tab?.isPrivate ?: false) },
                     top = top,
-                    onNewTab = { Browser.newTab(null, isPrivate = tab?.isPrivate ?: false) },
                 ) {
                     tab?.let { Delegates.capture(it) }
                     ui.panel = Panel.Tabs
@@ -221,16 +220,10 @@ fun StartControls(ui: UiState, tab: Tab, modifier: Modifier) {
             .padding(horizontal = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val picker = rememberTabPicker(tab, top = false)
-        Box {
-            TabCountButton(
-                Browser.tabs.count { it.isPrivate == tab.isPrivate },
-                top = false,
-                onNewTab = { Browser.newTab(null, isPrivate = tab.isPrivate) },
-                picker = picker,
-            ) { ui.panel = Panel.Tabs }
-            TabPickerPopup(picker, end = true)
-        }
+        TabCountButton(
+            Browser.tabs.count { it.isPrivate == tab.isPrivate },
+            top = false,
+        ) { ui.panel = Panel.Tabs }
         Box {
             IconButtonSmall(Icons.Outlined.MoreVert, "Menu", size = 44, tint = p.mute) { ui.menu = true }
                     if (com.verisonder.sonderweb.data.AppUpdate.available != null) UpdateDot(Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp))
@@ -320,14 +313,14 @@ private fun RowScope.FindBar(ui: UiState, tab: Tab) {
 
 /** The rounded address field when not typing: site lock, the site's name, uBlock Origin's count. */
 @Composable
-private fun Omnibox(ui: UiState, tab: Tab?, modifier: Modifier, picker: TabPicker? = null) {
+private fun Omnibox(ui: UiState, tab: Tab?, modifier: Modifier, pop: NewTabPop? = null, top: Boolean = false) {
     val p = LocalPalette.current
     Row(
         modifier
             .height(40.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(p.field)
-            .then(if (picker != null) Modifier.tabPicker(picker) { startEditing(ui, tab) } else Modifier.clickable { startEditing(ui, tab) })
+            .then(if (pop != null) Modifier.holdForNewTab(pop, top, tab?.isPrivate ?: false) { startEditing(ui, tab) } else Modifier.clickable { startEditing(ui, tab) })
             .padding(start = 14.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -404,31 +397,24 @@ private fun ShieldButton(tab: Tab) {
     }
 }
 
-/** Chromium's tab button: a rounded square with the number of tabs, centred. */
 /**
  * Chromium's tab button: a rounded square with the number of tabs.
- * Tap: the tab switcher. Hold, then slide up (down when the bar is on top) onto the "+" that
- * pops out, and let go: a new tab. One continuous gesture; letting go elsewhere cancels.
+ * Tap: the tab switcher. Hold: a list of your open tabs pops out; slide onto one and let go to
+ * switch to it, all in one movement.
  */
 @Composable
-fun TabCountButton(count: Int, top: Boolean, onNewTab: () -> Unit, picker: TabPicker? = null, onClick: () -> Unit) {
+fun TabCountButton(count: Int, top: Boolean, onClick: () -> Unit) {
     val p = LocalPalette.current
     val haptics = LocalHapticFeedback.current
-    val density = LocalDensity.current
-    val reach = with(density) { 44.dp.toPx() }
     val tap by rememberUpdatedState(onClick)
-    val newTab by rememberUpdatedState(onNewTab)
-    var holding by remember { mutableStateOf(false) }
-    var armed by remember { mutableStateOf(false) }
-    val pop by animateFloatAsState(if (holding) 1f else 0f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "pop")
-    val lit by animateFloatAsState(if (armed) 1f else 0f, spring(dampingRatio = 0.7f, stiffness = 700f), label = "lit")
+    val picker = rememberTabPicker(null, top)
 
     Box(
         Modifier
             .size(44.dp)
             .clip(CircleShape)
-            .onSizeChanged { picker?.anchorH = it.height.toFloat() }
-            .pointerInput(top, picker) {
+            .onSizeChanged { picker.anchorH = it.height.toFloat() }
+            .pointerInput(picker) {
                 val slop = viewConfiguration.touchSlop
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -450,28 +436,7 @@ fun TabCountButton(count: Int, top: Boolean, onNewTab: () -> Unit, picker: TabPi
                         return@awaitEachGesture
                     }
                     if (moved) return@awaitEachGesture
-                    // On the start page holding it lists your tabs instead (like holding the address).
-                    if (picker != null) {
-                        pickTab(picker, haptics)
-                        return@awaitEachGesture
-                    }
-                    holding = true
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    while (true) {
-                        val e = awaitPointerEvent()
-                        val c = e.changes.first()
-                        val dy = c.position.y - down.position.y
-                        val over = if (top) dy > reach * 0.6f else dy < -reach * 0.6f
-                        if (over != armed) {
-                            armed = over
-                            if (over) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        }
-                        c.consume()
-                        if (!c.pressed) break
-                    }
-                    if (armed) newTab()
-                    armed = false
-                    holding = false
+                    pickTab(picker, haptics)
                 }
             },
         contentAlignment = Alignment.Center,
@@ -491,31 +456,72 @@ fun TabCountButton(count: Int, top: Boolean, onNewTab: () -> Unit, picker: TabPi
                 style = TextStyle(lineHeight = 11.sp, lineHeightStyle = Centered),
             )
         }
-        if (pop > 0.01f) {
-            // The "+" pops out above the button (below it when the bar is on top).
-            val offset = with(density) { (if (top) 60.dp else (-60).dp).roundToPx() }
-            Popup(
-                alignment = Alignment.Center,
-                offset = IntOffset(0, offset),
-                properties = PopupProperties(focusable = false, clippingEnabled = false),
-            ) {
-                Box(
-                    Modifier
-                        .graphicsLayer {
-                            val k = (0.4f + 0.6f * pop) * (1f + 0.15f * lit)
-                            scaleX = k
-                            scaleY = k
-                            alpha = pop.coerceIn(0f, 1f)
-                        }
-                        .size(48.dp)
-                        .shadow(10.dp, CircleShape)
-                        .clip(CircleShape)
-                        .background(lerp(p.field, p.accent, lit)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Outlined.Add, "New tab", tint = lerp(p.text, p.onAccent, lit), modifier = Modifier.size(24.dp))
+        TabPickerPopup(picker, end = true)
+    }
+}
+
+/** Holding the address: a "+" pops out; slide onto it and let go for a new tab. */
+class NewTabPop {
+    var holding by mutableStateOf(false)
+    var armed by mutableStateOf(false)
+}
+
+/** The held part of the gesture: slide up (down when the bar is on top) onto the "+"; elsewhere cancels. */
+private suspend fun AwaitPointerEventScope.slideToNewTab(
+    pop: NewTabPop,
+    top: Boolean,
+    reach: Float,
+    startY: Float,
+    haptics: HapticFeedback,
+    onNewTab: () -> Unit,
+) {
+    pop.holding = true
+    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    while (true) {
+        val c = awaitPointerEvent().changes.first()
+        val dy = c.position.y - startY
+        val over = if (top) dy > reach * 0.6f else dy < -reach * 0.6f
+        if (over != pop.armed) {
+            pop.armed = over
+            if (over) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+        c.consume()
+        if (!c.pressed) break
+    }
+    if (pop.armed) onNewTab()
+    pop.armed = false
+    pop.holding = false
+}
+
+/** The "+" that pops out above the address (below it when the bar is on top). */
+@Composable
+fun NewTabBubble(pop: NewTabPop, top: Boolean) {
+    val p = LocalPalette.current
+    val density = LocalDensity.current
+    val shown by animateFloatAsState(if (pop.holding) 1f else 0f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "pop")
+    val lit by animateFloatAsState(if (pop.armed) 1f else 0f, spring(dampingRatio = 0.7f, stiffness = 700f), label = "lit")
+    if (shown < 0.01f) return
+    val offset = with(density) { (if (top) 60.dp else (-60).dp).roundToPx() }
+    Popup(
+        alignment = Alignment.Center,
+        offset = IntOffset(0, offset),
+        properties = PopupProperties(focusable = false, clippingEnabled = false),
+    ) {
+        Box(
+            Modifier
+                .graphicsLayer {
+                    val k = (0.4f + 0.6f * shown) * (1f + 0.15f * lit)
+                    scaleX = k
+                    scaleY = k
+                    alpha = shown.coerceIn(0f, 1f)
                 }
-            }
+                .size(48.dp)
+                .shadow(10.dp, CircleShape)
+                .clip(CircleShape)
+                .background(lerp(p.field, p.accent, lit)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Outlined.Add, "New tab", tint = lerp(p.text, p.onAccent, lit), modifier = Modifier.size(24.dp))
         }
     }
 }
@@ -667,12 +673,13 @@ fun rememberTabPicker(tab: Tab?, top: Boolean): TabPicker {
     return remember(top, d) { with(d) { TabPicker(top, 52.dp.toPx(), 10.dp.toPx(), 6.dp.toPx()) } }
 }
 
-private fun Modifier.tabPicker(picker: TabPicker, onTap: () -> Unit): Modifier = composed {
+/** The address: tap to type; hold, slide onto the "+" that pops out and let go for a new tab. */
+private fun Modifier.holdForNewTab(pop: NewTabPop, top: Boolean, isPrivate: Boolean, onTap: () -> Unit): Modifier = composed {
     val haptics = LocalHapticFeedback.current
     val tap by rememberUpdatedState(onTap)
+    val reach = with(LocalDensity.current) { 44.dp.toPx() }
     this
-        .onSizeChanged { picker.anchorH = it.height.toFloat() }
-        .pointerInput(picker) {
+        .pointerInput(pop, top, isPrivate) {
             val slop = viewConfiguration.touchSlop
             awaitEachGesture {
                 val down = awaitFirstDown()
@@ -696,7 +703,7 @@ private fun Modifier.tabPicker(picker: TabPicker, onTap: () -> Unit): Modifier =
                     return@awaitEachGesture
                 }
                 if (moved) return@awaitEachGesture
-                pickTab(picker, haptics)
+                slideToNewTab(pop, top, reach, down.position.y, haptics) { Browser.newTab(null, isPrivate = isPrivate) }
             }
         }
 }
