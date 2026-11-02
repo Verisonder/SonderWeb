@@ -142,6 +142,21 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("status_bar", false)
         set(v) = sp.edit().putBoolean("status_bar", v).apply()
 
+    /** Start page background colour (ARGB); 0 = the theme's own. */
+    var startBgColor: Int
+        get() = sp.getInt("start_bg_color", 0)
+        set(v) = sp.edit().putInt("start_bg_color", v).apply()
+
+    /** A wallpaper you chose is shown on the start page. */
+    var startWallpaper: Boolean
+        get() = sp.getBoolean("start_wallpaper", false)
+        set(v) = sp.edit().putBoolean("start_wallpaper", v).apply()
+
+    /** How much the wallpaper is darkened (percent), so the text on it stays readable. */
+    var startDim: Int
+        get() = sp.getInt("start_dim", 30)
+        set(v) = sp.edit().putInt("start_dim", v).apply()
+
     /** How far above its usual place the time and date sit on the start page (dp; negative = lower). */
     var clockLift: Int
         get() = sp.getInt("clock_lift", 28)

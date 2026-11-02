@@ -55,6 +55,7 @@ import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.draw.shadow
 import kotlin.math.roundToInt
 import androidx.compose.material3.SliderDefaults
@@ -75,6 +76,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -143,6 +145,8 @@ private val index: List<Pair<String, Page>> = listOf(
     "Status bar" to Page.Look,
     "Reopen tabs" to Page.Tabs,
     "Clock position" to Page.Start,
+    "Start page background" to Page.Start,
+    "Wallpaper" to Page.Start,
     "Open last site" to Page.Tabs,
     "Start page when opening the app" to Page.Tabs,
     "Version" to Page.About,
@@ -698,6 +702,117 @@ private fun TabsPage() {
     OpenOnLaunch()
 }
 
+/** Colours to pick from for the start page (dark ones first, then light ones). */
+private val startColors = listOf(
+    0xFF000000, 0xFF0F172A, 0xFF1E293B, 0xFF14281D, 0xFF0B2545, 0xFF2A1736, 0xFF3B0D1A,
+    0xFFF3EBDD, 0xFFE8EEF4, 0xFFE3F2EA, 0xFFF8E5E8, 0xFFFFFFFF,
+).map { it.toInt() }
+
+/** Start page › Background: the theme's colour, a colour of your choice, or a wallpaper. */
+@Composable
+private fun StartBackgroundSettings(ui: UiState) {
+    val p = LocalPalette.current
+    val ctx = LocalContext.current
+    val prefs = Browser.prefs
+    var color by remember { mutableStateOf(prefs.startBgColor) }
+    var wallpaper by remember { mutableStateOf(prefs.startWallpaper) }
+    var dim by remember { mutableStateOf(prefs.startDim.toFloat()) }
+    var busy by remember { mutableStateOf(false) }
+
+    fun pickColor(c: Int) {
+        color = c
+        prefs.startBgColor = c
+        wallpaper = false
+        prefs.startWallpaper = false
+        ui.themeVersion++
+    }
+
+    GroupTitle("Background")
+    Group {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(p.field)
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // The theme's own colour first.
+            Swatch(p.bg, selected = color == 0 && !wallpaper, label = "Theme") { pickColor(0) }
+            startColors.forEach { c ->
+                Swatch(Color(c), selected = color == c && !wallpaper, label = null) { pickColor(c) }
+            }
+        }
+        Action(
+            if (wallpaper) "Change wallpaper" else "Choose a wallpaper",
+            if (busy) "Adding the picture…" else "A picture from your phone",
+        ) {
+            Browser.host?.pickFiles(arrayOf("image/*"), multiple = false) { uris ->
+                val uri = uris.firstOrNull() ?: return@pickFiles
+                busy = true
+                com.verisonder.sonderweb.data.StartBackground.set(ctx, uri) { ok ->
+                    busy = false
+                    if (ok) {
+                        wallpaper = true
+                        prefs.startWallpaper = true
+                        ui.themeVersion++
+                    } else {
+                        Browser.host?.toast("Couldn't use that picture")
+                    }
+                }
+            }
+        }
+        if (wallpaper) {
+            Column(Modifier.fillMaxWidth().background(p.field).padding(horizontal = 18.dp, vertical = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Darken", color = p.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                    Text("${dim.roundToInt()}%", color = p.faint, fontSize = 14.sp)
+                }
+                Slider(
+                    value = dim,
+                    onValueChange = { dim = it },
+                    valueRange = 0f..80f,
+                    steps = 15,
+                    onValueChangeFinished = {
+                        prefs.startDim = dim.roundToInt()
+                        ui.themeVersion++
+                    },
+                    colors = SliderDefaults.colors(thumbColor = p.accent, activeTrackColor = p.accent, inactiveTrackColor = p.line),
+                )
+            }
+            Action("Remove wallpaper", "Back to a plain colour") {
+                com.verisonder.sonderweb.data.StartBackground.clear(ctx)
+                wallpaper = false
+                prefs.startWallpaper = false
+                ui.themeVersion++
+            }
+        }
+    }
+}
+
+/** A round colour to tap; the chosen one has a ring. */
+@Composable
+private fun Swatch(c: Color, selected: Boolean, label: String?, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .border(if (selected) 2.5.dp else 1.dp, if (selected) p.accent else p.line, CircleShape)
+                .padding(if (selected) 4.dp else 0.dp)
+                .clip(CircleShape)
+                .background(c)
+                .clickable(onClick = onClick),
+        )
+        if (label != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(label, color = p.faint, fontSize = 11.sp)
+        }
+    }
+}
+
 /** Minutes the timer can be set to, from a minute to a day. */
 private val awaySteps = listOf(1, 5, 15, 30, 60, 120, 240, 480, 720, 1440)
 
@@ -887,6 +1002,8 @@ private fun StartSettings(ui: UiState) {
             ui.themeVersion++
         }
     }
+
+    StartBackgroundSettings(ui)
 
     if (clock) {
         GroupTitle("Time and date")

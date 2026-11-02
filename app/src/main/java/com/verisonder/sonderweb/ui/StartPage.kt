@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
@@ -178,9 +179,68 @@ private fun PrivateStart(ui: UiState, tab: com.verisonder.sonderweb.browser.Tab)
     }
 }
 
-/** What a new tab shows: the time, a greeting, the weather, a search box and your shortcuts. */
+/** The start page's own look: its colours, and the wallpaper if you chose one. */
+private class StartLook(val palette: Palette, val color: Color, val wallpaper: androidx.compose.ui.graphics.ImageBitmap?, val dim: Float)
+
+@Composable
+private fun startLook(ui: UiState): StartLook {
+    val base = LocalPalette.current
+    val ctx = LocalContext.current
+    val prefs = Browser.prefs
+    val version = ui.themeVersion
+    val wallOn = prefs.startWallpaper
+    LaunchedEffect(version, wallOn) { if (wallOn) com.verisonder.sonderweb.data.StartBackground.load(ctx) }
+    val wall = if (wallOn) com.verisonder.sonderweb.data.StartBackground.image else null
+    val custom = prefs.startBgColor
+    val dim = prefs.startDim
+    return remember(version, base, wall, custom, dim) {
+        when {
+            // On a picture: light text, see-through search box and tiles.
+            wall != null -> StartLook(
+                DarkPalette.copy(accent = base.accent, field = Color.White.copy(alpha = 0.16f)),
+                Color(0xFF101114),
+                wall,
+                dim.coerceIn(0, 80) / 100f,
+            )
+            custom != 0 -> {
+                val c = Color(custom)
+                val light = c.luminance() > 0.5f
+                val b = if (light) LightPalette else DarkPalette
+                StartLook(
+                    b.copy(bg = c, accent = base.accent, field = if (light) Color.Black.copy(alpha = 0.07f) else Color.White.copy(alpha = 0.1f)),
+                    c,
+                    null,
+                    0f,
+                )
+            }
+            else -> StartLook(base, base.bg, null, 0f)
+        }
+    }
+}
+
+/** What a new tab shows: the time, a greeting, the weather, a search box and your shortcuts,
+ *  on the theme's colour, a colour you pick, or your wallpaper (Settings › Start page). */
 @Composable
 fun StartPage(ui: UiState, preview: com.verisonder.sonderweb.browser.Tab? = null) {
+    val tab = preview ?: Browser.current ?: return
+    if (tab.isPrivate) {
+        StartPageBody(ui, preview)
+        return
+    }
+    val look = startLook(ui)
+    androidx.compose.runtime.CompositionLocalProvider(LocalPalette provides look.palette) {
+        Box(Modifier.fillMaxSize().background(look.color)) {
+            look.wallpaper?.let { w ->
+                Image(w, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                if (look.dim > 0f) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = look.dim)))
+            }
+            StartPageBody(ui, preview, ownBackground = false)
+        }
+    }
+}
+
+@Composable
+private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser.Tab?, ownBackground: Boolean = true) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
     // [preview]: drawn small on a card in the tab switcher.
@@ -214,7 +274,7 @@ fun StartPage(ui: UiState, preview: com.verisonder.sonderweb.browser.Tab? = null
     var editing by remember { mutableStateOf<Int?>(null) } // index, or -1 for a new one
 
     // Everything sits in the middle of the screen, a little below centre; it scrolls if it doesn't fit.
-    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(p.bg)) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(if (ownBackground) p.bg else Color.Transparent)) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -384,34 +444,48 @@ private fun ShortcutGrid(
     }
 }
 
-/** A site's icon: big app icons fill the tile, small favicons sit in the middle of it. */
+/**
+ * A site's icon, like an app on a home screen: the icon itself with no grey tile behind it
+ * (square ones get rounded corners, shaped ones keep their shape). Sites with only a tiny favicon
+ * get a soft tile; sites with none get their first letter on a tile in a colour of their own.
+ */
 @Composable
 private fun SiteTile(host: String, title: String) {
     val p = LocalPalette.current
     val bmp = SiteIcons.icons[host]
-    val shape = RoundedCornerShape(15.dp)
-    Box(
-        Modifier.size(52.dp).clip(shape).background(p.field),
-        contentAlignment = Alignment.Center,
-    ) {
-        when {
-            bmp != null && bmp.width >= 96 -> Image(
+    val shape = RoundedCornerShape(14.dp)
+    when {
+        bmp != null && bmp.width >= 64 -> Image(
+            remember(bmp) { bmp.asImageBitmap() },
+            title,
+            contentScale = ContentScale.Fit,
+            filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+            modifier = Modifier.size(52.dp).clip(shape),
+        )
+        bmp != null -> Box(
+            Modifier.size(52.dp).clip(shape).background(p.field),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
                 remember(bmp) { bmp.asImageBitmap() },
                 title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+                modifier = Modifier.size(30.dp),
             )
-            bmp != null -> Image(
-                remember(bmp) { bmp.asImageBitmap() },
-                title,
-                modifier = Modifier.size(28.dp),
-            )
-            else -> Text(
-                (title.ifBlank { host }).firstOrNull()?.uppercase() ?: "•",
-                color = p.text,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
+        }
+        else -> {
+            val hue = remember(host) { ((host.hashCode() % 360) + 360) % 360 }.toFloat()
+            Box(
+                Modifier.size(52.dp).clip(shape).background(Color.hsl(hue, 0.42f, 0.42f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    (title.ifBlank { host }).firstOrNull()?.uppercase() ?: "•",
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
     }
 }
