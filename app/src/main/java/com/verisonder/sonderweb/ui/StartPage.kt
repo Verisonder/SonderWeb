@@ -52,6 +52,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -367,6 +373,10 @@ private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser
                     onOpen = { Browser.load(tab, it.url) },
                     onEdit = { editing = it },
                     onAdd = { editing = -1 },
+                    onReorder = { list ->
+                        prefs.shortcuts = list
+                        version++
+                    },
                 )
                 Spacer(Modifier.height(32.dp))
             }
@@ -405,41 +415,132 @@ private fun ShortcutGrid(
     onOpen: (Shortcut) -> Unit,
     onEdit: (Int) -> Unit,
     onAdd: () -> Unit,
+    onReorder: (List<Shortcut>) -> Unit,
 ) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    // Hold an icon and drag it to move it; let go where you want it. Hold without moving: edit it.
+    val order = remember(shortcuts) { androidx.compose.runtime.mutableStateListOf<Shortcut>().apply { addAll(shortcuts) } }
+    var dragged by remember { mutableStateOf<Shortcut?>(null) }
+    var dragX by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    var dragY by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    var rowPx by remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
+    val lift by androidx.compose.animation.core.animateFloatAsState(
+        if (dragged != null) 1f else 0f,
+        androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 600f),
+        label = "lift",
+    )
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val columns = if (maxWidth > 560.dp) 6 else 4
         val cell = maxWidth / columns
+        val cellPx = with(androidx.compose.ui.platform.LocalDensity.current) { cell.toPx() }
         val names = Browser.prefs.showShortcutNames
         FlowRow(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
             maxItemsInEachRow = columns,
         ) {
-            shortcuts.forEachIndexed { i, s ->
-                val host = UrlText.host(s.url)
-                LaunchedEffect(host) { SiteIcons.load(ctx, host) }
-                Column(
-                    Modifier
-                        .width(cell)
-                        .clip(RoundedCornerShape(14.dp))
-                        .combinedClickable(onClick = { onOpen(s) }, onLongClick = { onEdit(i) })
-                        .padding(vertical = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    SiteTile(host, s.title)
-                    if (names) {
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            s.title.ifBlank { host },
-                            color = p.mute,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 4.dp),
-                        )
+            order.forEach { s ->
+                androidx.compose.runtime.key(s) {
+                    val host = UrlText.host(s.url)
+                    LaunchedEffect(host) { SiteIcons.load(ctx, host) }
+                    val isDragged = dragged == s
+                    val open by androidx.compose.runtime.rememberUpdatedState(onOpen)
+                    val edit by androidx.compose.runtime.rememberUpdatedState(onEdit)
+                    val save by androidx.compose.runtime.rememberUpdatedState(onReorder)
+                    Column(
+                        Modifier
+                            .width(cell)
+                            .onSizeChanged { rowPx = it.height.toFloat().coerceAtLeast(1f) }
+                            .zIndex(if (isDragged) 1f else 0f)
+                            .pointerInput(s) {
+                                val slop = viewConfiguration.touchSlop
+                                awaitEachGesture {
+                                    val down = awaitFirstDown()
+                                    var moved = false
+                                    var released = false
+                                    withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                                        while (true) {
+                                            val c = awaitPointerEvent().changes.first()
+                                            if ((c.position - down.position).getDistance() > slop) moved = true
+                                            if (!c.pressed) {
+                                                released = true
+                                                break
+                                            }
+                                        }
+                                    }
+                                    if (released) {
+                                        if (!moved) open(s)
+                                        return@awaitEachGesture
+                                    }
+                                    if (moved) return@awaitEachGesture
+                                    // Picked up.
+                                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    dragged = s
+                                    dragX = 0f
+                                    dragY = 0f
+                                    var travelled = 0f
+                                    while (true) {
+                                        val c = awaitPointerEvent().changes.first()
+                                        val d = c.positionChange()
+                                        c.consume()
+                                        travelled += d.getDistance()
+                                        dragX += d.x
+                                        dragY += d.y
+                                        // Over another spot: move there; the icon stays under the finger.
+                                        val from = order.indexOf(s)
+                                        val dc = kotlin.math.round(dragX / cellPx).toInt()
+                                        val dr = kotlin.math.round(dragY / rowPx).toInt()
+                                        val to = (from + dr * columns + dc).coerceIn(0, order.size - 1)
+                                        if (to != from) {
+                                            val shift = to - from
+                                            order.removeAt(from)
+                                            order.add(to, s)
+                                            val oldCol = from % columns
+                                            val newCol = to % columns
+                                            dragX -= (newCol - oldCol) * cellPx
+                                            dragY -= (to / columns - from / columns) * rowPx
+                                            if (shift != 0) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                        }
+                                        if (!c.pressed) break
+                                    }
+                                    dragged = null
+                                    dragX = 0f
+                                    dragY = 0f
+                                    if (order.toList() != shortcuts) {
+                                        save(order.toList())
+                                    } else if (travelled < slop * 2) {
+                                        edit(shortcuts.indexOf(s))
+                                    }
+                                }
+                            }
+                            .graphicsLayer {
+                                if (isDragged) {
+                                    translationX = dragX
+                                    translationY = dragY
+                                    val k = 1f + 0.12f * lift
+                                    scaleX = k
+                                    scaleY = k
+                                }
+                            }
+                            .clip(RoundedCornerShape(14.dp))
+                            .padding(vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        SiteTile(host, s.title)
+                        if (names) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                s.title.ifBlank { host },
+                                color = p.mute,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                        }
                     }
                 }
             }

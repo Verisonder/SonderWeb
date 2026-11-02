@@ -26,7 +26,7 @@ object SiteIcons {
 
     fun load(context: Context, host: String) {
         if (host.isEmpty() || icons.containsKey(host) || !loading.add(host)) return
-        val dir = File(context.filesDir, "icons3").apply { mkdirs() }
+        val dir = File(context.filesDir, "icons4").apply { mkdirs() }
         val file = File(dir, host.replace(Regex("[^a-zA-Z0-9.-]"), "_") + ".png")
         scope.launch {
             val bmp = withContext(Dispatchers.IO) {
@@ -56,14 +56,46 @@ object SiteIcons {
         candidates += "https://$host/apple-touch-icon-precomposed.png"
         var best: Bitmap? = null
         for (url in candidates) {
-            val bmp = decode(url) ?: continue
-            // Big enough to look sharp on the start page: take it.
-            if (bmp.width >= 120) return bmp
-            if (best == null || bmp.width > best.width) best = bmp
+            val bmp = decode(url)?.let(::trim) ?: continue
+            if (best == null || bmp.width * bmp.height > best.width * best.height) best = bmp
+            // Sharp on any screen (the tile is about 140 px on a phone): stop looking.
+            if (minOf(best.width, best.height) >= 180) return best
         }
-        if (best != null && best.width >= 48) return best
-        val small = decode("https://icons.duckduckgo.com/ip3/$host.ico")
-        return listOfNotNull(best, small).maxByOrNull { it.width }
+        if (best != null && maxOf(best.width, best.height) >= 48) return best
+        val small = decode("https://icons.duckduckgo.com/ip3/$host.ico")?.let(::trim)
+        return listOfNotNull(best, small).maxByOrNull { it.width * it.height }
+    }
+
+    /**
+     * Cuts away a see-through border, so a logo drawn small in the middle of its picture
+     * (YouTube's play button) fills its tile instead of looking tiny and soft.
+     */
+    private fun trim(bmp: Bitmap): Bitmap {
+        if (!bmp.hasAlpha()) return bmp
+        val w = bmp.width
+        val h = bmp.height
+        val px = IntArray(w * h)
+        bmp.getPixels(px, 0, w, 0, 0, w, h)
+        var top = h
+        var left = w
+        var right = -1
+        var bottom = -1
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                if ((px[y * w + x] ushr 24) > 24) {
+                    if (x < left) left = x
+                    if (x > right) right = x
+                    if (y < top) top = y
+                    if (y > bottom) bottom = y
+                }
+            }
+        }
+        if (right < 0) return bmp
+        val cw = right - left + 1
+        val ch = bottom - top + 1
+        // Nothing much to cut: keep it as it is.
+        if (cw * ch > w * h * 0.85f) return bmp
+        return Bitmap.createBitmap(bmp, left, top, cw, ch)
     }
 
     private fun decode(url: String): Bitmap? {
