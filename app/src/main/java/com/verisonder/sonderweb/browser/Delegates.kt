@@ -295,23 +295,36 @@ object Delegates {
      * Back in the app: if a page that had something on it now shows one flat colour, the engine
      * lost its drawing while you were away (it stays empty until a refresh), so it's reloaded.
      */
-    fun checkPainted(tab: Tab, firstTry: Boolean = true) {
+    fun checkPainted(tab: Tab, attempt: Int = 0) {
         // A page that really is one plain colour is left alone.
         if (tab.covered || tab.lastFlat == true || !UrlText.isWeb(tab.url)) return
         val view = Browser.host?.geckoViewFor(tab) ?: return
-        // Still empty (or the engine can't even take a picture of it): first hand the page to the
-        // view again, which makes the engine draw it; if that doesn't help, reload it.
+        // Still empty (or the engine can't even take a picture of it). The page itself is usually
+        // fine (a refresh doesn't help): it's the screen surface it draws into that went blank.
+        // 1: hand the page to the view again; 2: give the view a fresh surface and wake the page;
+        // 3: as a last resort, reload.
         val empty = {
             Browser.main.post {
                 if (Browser.current === tab && tab.session.isOpen && view.session === tab.session) {
-                    if (firstTry) {
-                        view.releaseSession()
-                        view.setSession(tab.session)
-                        view.postDelayed({ if (Browser.current === tab) checkPainted(tab, firstTry = false) }, 900)
-                    } else {
-                        tab.lastFlat = null
-                        tab.session.reload()
+                    when (attempt) {
+                        0 -> {
+                            view.releaseSession()
+                            view.setSession(tab.session)
+                        }
+                        1 -> {
+                            tab.session.setActive(false)
+                            view.visibility = android.view.View.INVISIBLE
+                            view.post {
+                                view.visibility = android.view.View.VISIBLE
+                                tab.session.setActive(true)
+                            }
+                        }
+                        else -> {
+                            tab.lastFlat = null
+                            tab.session.reload()
+                        }
                     }
+                    if (attempt < 2) view.postDelayed({ if (Browser.current === tab) checkPainted(tab, attempt + 1) }, 900)
                 }
             }
         }
