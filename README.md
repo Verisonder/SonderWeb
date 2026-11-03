@@ -31,18 +31,22 @@ Nothing is sent to any SonderWeb server, because there isn't one.
 
 | | |
 |---|---|
-| **uBlock Origin, built in** | Ads, trackers and malware blocked from the first page. Tap the shield in the bar for the count, the element picker or to switch it off for a site. |
+| **uBlock Origin, built in** | Ads, trackers and malware blocked from the first page. Tap the shield in the bar for the count, the element picker or to switch it off for a site — in a panel restyled to match the browser. |
 | **Other extensions** | Add more from addons.mozilla.org: ⋮ › Extensions › Get more extensions. |
-| **Hardened engine** | Strict tracking protection, fingerprinting protection, cookies kept apart per site and trackers' cookies purged, bounce-tracking protection, tracking parameters stripped from links, HTTPS only, sites kept from probing your home network, Global Privacy Control. |
+| **Hardened engine** | Strict tracking protection, fingerprinting protection, cookies kept apart per site and trackers' cookies purged, bounce-tracking protection, tracking parameters stripped from links, tracking redirects (Google, Facebook, YouTube, Reddit…) skipped straight to the real page, AMP pages swapped for the real site, WebRTC kept from revealing your local IP, HTTPS only, sites kept from probing your home network, Global Privacy Control. |
+| **Shred site data** | ⋮ › Shred site data: confirm, watch the page get clawed apart, and the site's tabs, cookies and stored data are gone. Your history and bookmarks stay. |
 | **Really private tabs** | Pure black and kept apart from your history, bookmarks and shortcuts. Locked behind your fingerprint every time you go in, no screenshots, no tab previews, incognito keyboard, encrypted DNS (Quad9), nothing kept once closed. |
 | **The page gets the screen** | The bar floats, then shrinks into a small round button as you scroll, or slides away. Swipe the bar sideways to put it away, long-press the button to tuck it out of sight. The status bar is hidden unless you want it. |
-| **Quick gestures** | Hold the tabs button and slide up for a new tab. Hold the address and slide onto any open tab to switch. Pull down at the top of a page to reload. |
-| **A start page** | The time, a greeting, the weather (Open-Meteo; only the place you pick is sent) and the shortcuts you add. Star a site in the menu to pin it there. |
+| **Quick gestures** | Hold the address and slide onto the + for a new tab. Hold the tabs button and slide onto any open tab to switch. Swipe the bar up, down or sideways to put it away. Pull down at the top of a page to reload. |
+| **Works with your password manager** | Sign-in fields bring up Proton Pass, Bitwarden or whichever manager you use, and passkeys work too. |
+| **A start page** | The time, a greeting, the weather (Open-Meteo; only the place you pick is sent) and the shortcuts you add, with the sites' own icons. Star a site in the menu to pin it there; hold and drag a shortcut to move it. |
 | **!bangs and your search engine** | `!w Tangier`, `!yt lofi`, `!gh sonder` search a site directly. DuckDuckGo by default, restyled to match the browser; Brave, Startpage, Qwant, Ecosia, Kagi, Google, Bing or your own. |
 | **Asks before opening apps** | A link an app could open asks first: open the app, or stay in the browser. |
 | **Encrypted DNS** | Off by default so a VPN or DNS blocker keeps working; Quad9, Mullvad or Cloudflare when you want it. |
-| **Yours to shape** | Light, dark or system theme; bar on top or bottom, floating or docked, at the size you like; the small button in any corner or anywhere you set. |
-| **On your phone only** | History, bookmarks and downloads stay on the device. |
+| **Yours to shape** | Light, dark or system theme; bar on top or bottom, floating or docked, at the size you like; the small button in any corner or anywhere you set; a round or squircle app icon. |
+| **Tabs that remember** | The tab list shows a picture of each page and keeps it when the app restarts. A page that comes back blank after you've been away is redrawn by itself. |
+| **Updates inside the app** | A blue dot when a new version is out; one tap downloads and installs it. A cut-off download carries on where it stopped, and the file is deleted once installed. |
+| **On your phone only** | History, bookmarks and downloads stay on the device. Downloads keep going when you leave the app. |
 
 ## Install
 
@@ -56,11 +60,13 @@ Android 8.0 or newer, 64-bit phones.
 
 ```
 app/src/main/java/com/verisonder/sonderweb/
-  browser/   the engine, tabs, extensions, downloads, private-tab locking
+  browser/   the engine, tabs, extensions, downloads, private-tab locking, shredding
   core/      address bar logic, !bangs, search engines (plain Kotlin, tested)
   data/      settings, history and bookmarks (SQLite), weather
-  ui/        Jetpack Compose: bar, start page, tabs, menu, settings
-app/src/main/assets/extensions/style/   the built-in DuckDuckGo look
+  ui/        Jetpack Compose: bar, start page, tabs, menu, settings, shred animation
+app/src/main/assets/extensions/style/     the built-in DuckDuckGo look
+app/src/main/assets/extensions/shields/   WebRTC protection, de-AMP, tracking-redirect skipping
+app/ublock-look/                          the look added to uBlock Origin's panel
 ```
 
 Kotlin and Jetpack Compose on GeckoView. The build downloads GeckoView from Mozilla's Maven repository and the signed uBlock Origin release named in `gradle/libs.versions.toml`, and ships it as a built-in extension.
@@ -75,7 +81,7 @@ gradle assembleDebug
 
 ## Privacy
 
-No account, no analytics, no crash reports, no SonderWeb servers. The only requests SonderWeb makes on its own are the weather for the place you choose (Open-Meteo) and site icons for your shortcuts (from the site itself, or DuckDuckGo's icon service). Everything else is the pages you open.
+No account, no analytics, no crash reports, no SonderWeb servers. The only requests SonderWeb makes on its own are the weather for the place you choose (Open-Meteo), site icons for your shortcuts and tabs (from the site itself, or DuckDuckGo's icon service), and a look at this repository's latest release to tell you about updates (GitHub). Everything else is the pages you open.
 
 ## Using SonderWeb
 
@@ -91,6 +97,6 @@ Want to do something beyond that? Just ask first. 🌐
 
 Apache License 2.0 — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
 
-GeckoView is under the Mozilla Public License 2.0 and uBlock Origin under the GPL-3.0; both are used unmodified. Font: Inter, SIL Open Font License.
+GeckoView is under the Mozilla Public License 2.0 and is used unmodified. uBlock Origin is under the GPL-3.0; it is used unmodified apart from a stylesheet and a small script added to its panel at build time (`app/ublock-look/`, under the same GPL-3.0). Font: Inter, SIL Open Font License.
 
 <p align="center"><sub>By <a href="https://github.com/Verisonder">Verisonder</a></sub></p>
