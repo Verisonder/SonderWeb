@@ -228,7 +228,6 @@ fun BrowserScreen(activity: MainActivity) {
         }.collect { activity.geckoView.setVerticalClipping(it) }
     }
     // While typing the bar is always fully shown, so suggestions sit right under (or over) it.
-    val barDp = with(density) { barPx.toDp() }
     val edgeTop by animateColorAsState(tab?.edgeTop?.let { Color(it) } ?: palette.bg, tween(220), label = "edgeTop")
 
     BackHandler(enabled = true) {
@@ -274,7 +273,6 @@ fun BrowserScreen(activity: MainActivity) {
                 // you scroll down. The engine is told how much of the page the bar covers.
                 // Top bar: the page sits just under the visible part of the bar (its bottom
                 // runs off-screen by the same amount, which the engine accounts for).
-                val barSpace = if (barTop) PaddingValues(top = barDp) else PaddingValues(bottom = barDp)
                 // Behind the page: its own background colour, so the space around the floating bar
                 // (where the engine leaves room for it) looks like part of the page.
                 val pageBg by animateColorAsState(
@@ -326,13 +324,13 @@ fun BrowserScreen(activity: MainActivity) {
                         enter = fadeIn(tween(160)),
                         exit = fadeOut(tween(120)),
                     ) {
-                        // Typing: an opaque sheet over the whole page (also behind and around the bar), so no
-                        // part of the page peeks through above the keyboard.
-                        tab?.let {
-                            Box(Modifier.fillMaxSize().background(palette.bg)) {
-                                Box(Modifier.fillMaxSize().padding(barSpace)) { Suggestions(ui, it, barTop) }
-                            }
-                        }
+                        // Typing: the page stays in view, dimmed, behind the search sheet; tapping it cancels.
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.35f))
+                                .clickable(interactionSource = null, indication = null) { ui.editing = false },
+                        )
                     }
                 }
                 // The (+) in the middle: search or type an address.
@@ -365,7 +363,7 @@ fun BrowserScreen(activity: MainActivity) {
                     exit = fadeOut(tween(120)),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    Box(Modifier.fillMaxSize()) { BarArea(ui, tab, barTop, hideMode, { morphState.value }, { barOffsetState.value }) { barPx = it } }
+                    Box(Modifier.fillMaxSize()) { BarArea(ui, tab, barTop, hideMode, { morphState.value }, { barOffsetState.value }) { if (!ui.editing) barPx = it } }
                 }
             }
 

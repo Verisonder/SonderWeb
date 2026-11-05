@@ -119,6 +119,11 @@ fun submit(ui: UiState, text: String) {
 
 @Composable
 fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
+    // Typing: the bar becomes the search sheet.
+    if (ui.editing) {
+        SearchSheet(ui, tab, top)
+        return
+    }
     val p = LocalPalette.current
     val floating = remember(ui.themeVersion) { Browser.prefs.barFloating }
     val insets = if (top) {
@@ -539,112 +544,6 @@ fun IconButtonSmall(icon: ImageVector, label: String, size: Int = 36, tint: andr
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, label, tint = tint ?: p.text, modifier = Modifier.size(20.dp))
-    }
-}
-
-/** What typing in the bar offers: the search itself, !bangs, bookmarks and history. */
-@Composable
-fun Suggestions(ui: UiState, tab: Tab, top: Boolean) {
-    val p = LocalPalette.current
-    val text = ui.query.text
-    val resolved = remember(text) { AddressInput.resolve(text, Browser.prefs.engine()) }
-    val rows = remember(text, tab.isPrivate) {
-        // Private tabs are kept apart from your normal history and bookmarks.
-        if (text.isBlank() || tab.isPrivate) emptyList() else Browser.db.suggest(text)
-    }
-    val bangHints = remember(text) {
-        val first = text.trimStart()
-        if (first.startsWith("!") && !first.contains(' ')) {
-            val t = first.drop(1).lowercase()
-            Bangs.all.filter { it.trigger.startsWith(t) }.distinctBy { it.trigger }.take(6)
-        } else {
-            emptyList()
-        }
-    }
-
-    LazyColumn(
-            Modifier
-                .fillMaxSize()
-                .background(p.bg)
-                .clickable(interactionSource = null, indication = null) { },
-            reverseLayout = !top,
-            // Bar at the bottom: the list grows up from just above the bar, not from the top of the screen.
-            verticalArrangement = if (top) Arrangement.Top else Arrangement.Bottom,
-        ) {
-            if (resolved != null) {
-                item {
-                    val (title, sub, icon) = when (resolved) {
-                        is Resolved.Address -> Triple(UrlText.editable(resolved.url), "Go to address", Icons.Outlined.Language)
-                        is Resolved.BangSearch -> Triple(
-                            resolved.query.ifEmpty { Bangs.find(resolved.bang)?.name ?: "!" + resolved.bang },
-                            "!" + resolved.bang + " · " + (Bangs.find(resolved.bang)?.name ?: "via DuckDuckGo"),
-                            Icons.Outlined.Search,
-                        )
-                        is Resolved.Search -> Triple(resolved.query, "Search with " + Browser.prefs.engine().name, Icons.Outlined.Search)
-                    }
-                    SuggestionRow(icon, title, sub, accent = true) { submit(ui, text) }
-                }
-            }
-            items(bangHints, key = { "b" + it.trigger }) { b ->
-                SuggestionRow(Icons.Outlined.Search, "!" + b.trigger, b.name, fill = true) {
-                    val t = "!" + b.trigger + " "
-                    ui.query = TextFieldValue(t, TextRange(t.length))
-                }
-            }
-            items(rows, key = { "r" + it.first }) { (url, title) ->
-                val bookmarked = remember(url) { Browser.db.isBookmarked(url) }
-                SuggestionRow(
-                    if (bookmarked) Icons.Outlined.Bookmark else Icons.Outlined.History,
-                    title.ifBlank { UrlText.host(url) },
-                    UrlText.editable(url),
-                    fill = true,
-                    onFill = {
-                        val t = UrlText.editable(url)
-                        ui.query = TextFieldValue(t, TextRange(t.length))
-                    },
-                ) {
-                    ui.editing = false
-                    Browser.load(tab, url)
-                }
-            }
-    }
-}
-
-@Composable
-private fun SuggestionRow(
-    icon: ImageVector,
-    title: String,
-    sub: String,
-    accent: Boolean = false,
-    fill: Boolean = false,
-    onFill: (() -> Unit)? = null,
-    onClick: () -> Unit,
-) {
-    val p = LocalPalette.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(if (accent) p.accent else p.field),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, null, tint = if (accent) p.onAccent else p.mute, modifier = Modifier.size(16.dp))
-        }
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, color = p.text, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(sub, color = p.faint, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        if (fill && onFill != null) {
-            IconButtonSmall(Icons.Outlined.NorthWest, "Edit", tint = p.faint) { onFill() }
-        }
     }
 }
 
