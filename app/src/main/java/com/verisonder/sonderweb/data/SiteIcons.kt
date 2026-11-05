@@ -23,6 +23,13 @@ private val YOUTUBE = listOf(
     "https://www.gstatic.com/images/branding/product/2x/youtube_48dp.png",
 )
 
+private val DRIVE = listOf(
+    "https://www.gstatic.com/images/branding/product/1x/drive_2020q4_512dp.png",
+    "https://www.gstatic.com/images/branding/product/2x/drive_2020q4_96dp.png",
+    "https://ssl.gstatic.com/images/branding/product/2x/drive_2020q4_48dp.png",
+    "https://www.gstatic.com/images/branding/product/2x/drive_2020q4_48dp.png",
+)
+
 private val GMAIL = listOf(
     "https://www.gstatic.com/images/branding/product/1x/gmail_2020q4_512dp.png",
     "https://www.gstatic.com/images/branding/product/2x/gmail_2020q4_48dp.png",
@@ -38,7 +45,7 @@ object SiteIcons {
 
     fun load(context: Context, host: String) {
         if (host.isEmpty() || icons.containsKey(host) || !loading.add(host)) return
-        val dir = File(context.filesDir, "icons5").apply { mkdirs() }
+        val dir = File(context.filesDir, "icons6").apply { mkdirs() }
         val file = File(dir, host.replace(Regex("[^a-zA-Z0-9.-]"), "_") + ".png")
         scope.launch {
             val bmp = withContext(Dispatchers.IO) {
@@ -64,6 +71,7 @@ object SiteIcons {
         "mail.google.com" to GMAIL,
         "gmail.com" to GMAIL,
         "www.gmail.com" to GMAIL,
+        "drive.google.com" to DRIVE,
         "youtube.com" to YOUTUBE,
         "www.youtube.com" to YOUTUBE,
         "m.youtube.com" to YOUTUBE,
