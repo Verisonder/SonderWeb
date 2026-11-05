@@ -7,6 +7,7 @@ import android.speech.RecognizerIntent
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -109,6 +110,9 @@ fun SearchSheet(ui: UiState, tab: Tab?, top: Boolean) {
         gone.animateTo(1f, tween(140))
         ui.editing = false
     }
+    // Opening: the sheet rises out of the bar and settles, then its rows follow one after another.
+    val enter = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { enter.animateTo(1f, spring(dampingRatio = 0.82f, stiffness = 300f)) }
     val radius = 32.dp
     Column(
         Modifier
@@ -116,12 +120,14 @@ fun SearchSheet(ui: UiState, tab: Tab?, top: Boolean) {
             // Animated values are only read here, frame by frame, never in composition.
             .graphicsLayer {
                 val g = back.value
-                val s = 1f - 0.1f * g
+                val e = enter.value
+                val s = (1f - 0.1f * g) * (0.9f + 0.1f * e)
                 scaleX = s
                 scaleY = s
                 transformOrigin = TransformOrigin(0.5f, if (top) 0f else 1f)
                 translationX = (if (fromLeft) 1f else -1f) * size.width * 0.04f * g
-                alpha = 1f - gone.value
+                translationY = (1f - e) * 48.dp.toPx() * (if (top) -1f else 1f)
+                alpha = e.coerceIn(0f, 1f) * (1f - gone.value)
                 // The edge on the keyboard side rounds off as the sheet lifts away from it.
                 val full = radius.toPx()
                 val far = CornerSize(full * g)
@@ -151,10 +157,12 @@ fun SearchSheet(ui: UiState, tab: Tab?, top: Boolean) {
         Spacer(Modifier.height(8.dp))
         Column(
             Modifier
+                // Rows coming and going while you type: the sheet grows and shrinks smoothly.
+                .animateContentSize(spring(dampingRatio = 0.9f, stiffness = 500f))
                 .heightIn(max = 360.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            if (tab != null) SheetSuggestions(ui, tab)
+            if (tab != null) SheetSuggestions(ui, tab) { enter.value }
         }
     }
 }
@@ -218,7 +226,8 @@ private fun SearchField(ui: UiState, tab: Tab?) {
 }
 
 @Composable
-private fun SheetSuggestions(ui: UiState, tab: Tab) {
+private fun SheetSuggestions(ui: UiState, tab: Tab, enter: () -> Float) {
+    var row = 0
     val p = LocalPalette.current
     val text = ui.query.text
     val resolved = remember(text) { AddressInput.resolve(text, Browser.prefs.engine()) }
@@ -249,10 +258,10 @@ private fun SheetSuggestions(ui: UiState, tab: Tab) {
             }
             is Resolved.Search -> resolved.query to Icons.Outlined.Search
         }
-        SheetRow(title, { Glyph(icon, tint = p.accent) }) { submit(ui, text) }
+        SheetRow(title, row++, enter, { Glyph(icon, tint = p.accent) }) { submit(ui, text) }
     }
     bangHints.forEach { b ->
-        SheetRow("!" + b.trigger + " · " + b.name, { Glyph(Icons.Outlined.Search) }) {
+        SheetRow("!" + b.trigger + " · " + b.name, row++, enter, { Glyph(Icons.Outlined.Search) }) {
             val t = "!" + b.trigger + " "
             ui.query = TextFieldValue(t, TextRange(t.length))
         }
@@ -261,6 +270,8 @@ private fun SheetSuggestions(ui: UiState, tab: Tab) {
         val bookmarked = remember(url) { Browser.db.isBookmarked(url) }
         SheetRow(
             title.ifBlank { UrlText.host(url) },
+            row++,
+            enter,
             { SiteGlyph(url, if (bookmarked) Icons.Outlined.Bookmark else Icons.Outlined.History) },
         ) {
             ui.editing = false
@@ -270,11 +281,17 @@ private fun SheetSuggestions(ui: UiState, tab: Tab) {
 }
 
 @Composable
-private fun SheetRow(title: String, icon: @Composable () -> Unit, onClick: () -> Unit) {
+private fun SheetRow(title: String, index: Int, enter: () -> Float, icon: @Composable () -> Unit, onClick: () -> Unit) {
     val p = LocalPalette.current
     Row(
         Modifier
             .fillMaxWidth()
+            // Each row comes in a beat after the one before it.
+            .graphicsLayer {
+                val t = ((enter() - 0.2f - 0.07f * index) / 0.5f).coerceIn(0f, 1f)
+                alpha = t
+                translationY = (1f - t) * 14.dp.toPx()
+            }
             .clickable(onClick = onClick)
             .padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
