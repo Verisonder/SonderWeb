@@ -731,7 +731,7 @@ private fun PickerIcon(t: Tab, host: String) {
                 remember(bmp) { bmp.asImageBitmap() },
                 null,
                 filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
-                modifier = Modifier.size(26.dp).clip(RoundedCornerShape(7.dp)),
+                modifier = Modifier.size(26.dp).iconCorners(bmp, 7.dp),
             )
         } else {
             Box(
@@ -747,4 +747,13 @@ private fun PickerIcon(t: Tab, host: String) {
             }
         }
     }
+}
+
+/**
+ * Rounds a site icon's corners only when the picture is square: a wide logo (Gmail's M) fills
+ * the width of its spot, so rounded corners would cut off its ends.
+ */
+fun Modifier.iconCorners(bmp: android.graphics.Bitmap, radius: androidx.compose.ui.unit.Dp): Modifier {
+    val ratio = bmp.width.toFloat() / bmp.height.coerceAtLeast(1)
+    return if (ratio in 0.9f..1.1f) clip(RoundedCornerShape(radius)) else this
 }

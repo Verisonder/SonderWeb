@@ -243,7 +243,7 @@ private fun TabIcon(tab: Tab) {
             remember(bmp) { bmp.asImageBitmap() },
             null,
             filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
-            modifier = Modifier.size(16.dp).clip(RoundedCornerShape(4.dp)),
+            modifier = Modifier.size(16.dp).iconCorners(bmp, 4.dp),
         )
     } else {
         Icon(
