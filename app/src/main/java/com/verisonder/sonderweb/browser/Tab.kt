@@ -75,6 +75,9 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     var videoPlaying = false
     var videoRatio = 16f / 9f
 
+    /** The site's address before desktop mode was turned on (to go back to its mobile address). */
+    var hostBeforeDesktop: String? = null
+
     /** The address back would go to (null: back leads to the start page). */
     var backUrl: String? = null
 

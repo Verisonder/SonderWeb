@@ -389,6 +389,7 @@ object Browser {
 
     fun setDesktop(tab: Tab, on: Boolean) {
         tab.desktop = on
+        if (on) tab.hostBeforeDesktop = UrlText.host(tab.url)
         val s = tab.session.settings
         s.setUserAgentMode(
             if (on) org.mozilla.geckoview.GeckoSessionSettings.USER_AGENT_MODE_DESKTOP
@@ -398,7 +399,25 @@ object Browser {
             if (on) org.mozilla.geckoview.GeckoSessionSettings.VIEWPORT_MODE_DESKTOP
             else org.mozilla.geckoview.GeckoSessionSettings.VIEWPORT_MODE_MOBILE,
         )
-        tab.session.reload()
+        // Back to mobile: sites that moved you to their desktop address (m.youtube.com →
+        // youtube.com) remember it and keep sending the desktop page, which then shows zoomed
+        // in and cut off. So the mobile address you were on is opened again, fresh.
+        val before = tab.hostBeforeDesktop
+        val now = UrlText.host(tab.url)
+        if (!on && before != null && now.isNotEmpty() && now != before && sameSite(before, now)) {
+            val back = android.net.Uri.parse(tab.url).buildUpon().authority(before).build().toString()
+            tab.session.loadUri(back)
+        } else {
+            // Fresh from the site, not the copy kept for the other mode.
+            tab.session.reload(org.mozilla.geckoview.GeckoSession.LOAD_FLAGS_BYPASS_CACHE)
+        }
+        if (!on) tab.hostBeforeDesktop = null
+    }
+
+    /** The same site, give or take www. or m. (m.youtube.com and youtube.com). */
+    private fun sameSite(a: String, b: String): Boolean {
+        fun bare(h: String) = h.lowercase().removePrefix("www.").removePrefix("m.")
+        return bare(a) == bare(b)
     }
 
     /**
