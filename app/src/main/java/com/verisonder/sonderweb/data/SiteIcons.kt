@@ -64,8 +64,8 @@ object SiteIcons {
     }
 
     /**
-     * Sites whose home page, opened signed out, only shows a sign-in page with another
-     * service's icon (Gmail shows Google's "G"): their own app icon, biggest first.
+     * Sign-in pages are already skipped for every site (see fetch). These few only get a
+     * sharper picture than the small icon such a site leaves: their app icon, biggest first.
      */
     private val known = mapOf(
         "mail.google.com" to GMAIL,
@@ -85,12 +85,17 @@ object SiteIcons {
         val home = "https://$host/"
         val candidates = LinkedHashSet<String>()
         // Big pages (YouTube's is over 1 MB): the icons are in the head, near the start.
-        Net.get(home, 400_000, Net.BROWSER_AGENT, partial = true)?.toString(Charsets.UTF_8)?.let { html ->
+        var landed = host
+        val html = Net.get(home, 400_000, Net.BROWSER_AGENT, partial = true, landed = { landed = it })?.toString(Charsets.UTF_8)
+        // Signed out, many services (Drive, Docs, Calendar…) send you to another site's sign-in
+        // page: its icons are that site's, not the service's, so they're skipped.
+        if (html != null && sameSite(host, landed)) {
             candidates += manifestIcons(html, home)
             candidates += headIcons(html, home)
         }
         candidates += "https://$host/apple-touch-icon.png"
         candidates += "https://$host/apple-touch-icon-precomposed.png"
+        candidates += "https://$host/favicon.ico"
         var best: Bitmap? = null
         for (url in candidates) {
             val bmp = decode(url)?.let(::trim) ?: continue
@@ -101,6 +106,14 @@ object SiteIcons {
         if (best != null && maxOf(best.width, best.height) >= 48) return best
         val small = decode("https://icons.duckduckgo.com/ip3/$host.ico")?.let(::trim)
         return listOfNotNull(best, small).maxByOrNull { it.width * it.height }
+    }
+
+    /** The same site, give or take www. or m. (x.com → www.x.com, youtube.com → m.youtube.com). */
+    private fun sameSite(a: String, b: String): Boolean {
+        fun bare(h: String) = h.lowercase().removePrefix("www.").removePrefix("m.")
+        val x = bare(a)
+        val y = bare(b)
+        return x == y || x.endsWith(".$y") || y.endsWith(".$x")
     }
 
     /**

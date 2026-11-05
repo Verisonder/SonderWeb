@@ -8,8 +8,17 @@ object Net {
     /** A phone browser's name, for pages that only send their full head (with icons) to browsers. */
     const val BROWSER_AGENT = "Mozilla/5.0 (Android 14; Mobile; rv:159.0) Gecko/159.0 Firefox/159.0"
 
-    /** [partial]: past [maxBytes], keep what came so far instead of giving up (enough for a page's head). */
-    fun get(url: String, maxBytes: Int = 2_000_000, agent: String = "SonderWeb", partial: Boolean = false): ByteArray? = runCatching {
+    /**
+     * [partial]: past [maxBytes], keep what came so far instead of giving up (enough for a page's head).
+     * [landed]: told the host the request ended up on, after redirects.
+     */
+    fun get(
+        url: String,
+        maxBytes: Int = 2_000_000,
+        agent: String = "SonderWeb",
+        partial: Boolean = false,
+        landed: ((String) -> Unit)? = null,
+    ): ByteArray? = runCatching {
         val c = URL(url).openConnection() as HttpURLConnection
         c.connectTimeout = 8000
         c.readTimeout = 8000
@@ -18,6 +27,7 @@ object Net {
         c.setRequestProperty("User-Agent", agent)
         try {
             if (c.responseCode !in 200..299) return@runCatching null
+            landed?.invoke(c.url.host.orEmpty())
             c.inputStream.use { input ->
                 val out = java.io.ByteArrayOutputStream()
                 val buf = ByteArray(16 * 1024)
