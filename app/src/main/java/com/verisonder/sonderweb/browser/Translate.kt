@@ -79,7 +79,7 @@ object Translate {
     private fun name(code: String) =
         Locale.forLanguageTag(code).getDisplayLanguage(Locale.getDefault()).ifBlank { code }
 
-    private fun message(e: Throwable): String = when ((e as? TranslationsException)?.code) {
+    private fun message(e: Throwable?): String = when ((e as? TranslationsException)?.code) {
         TranslationsException.ERROR_MODEL_COULD_NOT_DOWNLOAD,
         TranslationsException.ERROR_MODEL_DOWNLOAD_REQUIRED,
         -> "Couldn't download the language pack. Check your connection"
