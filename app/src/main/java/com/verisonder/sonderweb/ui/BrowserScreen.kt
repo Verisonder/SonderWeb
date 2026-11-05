@@ -75,6 +75,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -90,6 +91,9 @@ enum class Panel { None, Tabs, History, Bookmarks, Downloads, Settings, Extensio
 /** Screen state that isn't the browser's own. */
 class UiState {
     var panel by mutableStateOf(Panel.None)
+
+    /** The search sheet is on screen (opening, open or closing): the bar's size isn't the bar's then. */
+    var sheetShown by mutableStateOf(false)
     var menu by mutableStateOf(false)
 
     /** "Shred site data" asked for this site, waiting for you to confirm. */
@@ -373,7 +377,7 @@ fun BrowserScreen(activity: MainActivity) {
                     exit = fadeOut(tween(120)),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    Box(Modifier.fillMaxSize()) { BarArea(ui, tab, barTop, hideMode, { morphState.value }, { barOffsetState.value }) { if (!ui.editing) barPx = it } }
+                    Box(Modifier.fillMaxSize()) { BarArea(ui, tab, barTop, hideMode, { morphState.value }, { barOffsetState.value }) { if (!ui.editing && !ui.sheetShown) barPx = it } }
                 }
             }
 
@@ -958,12 +962,20 @@ fun BarButton(
 /** A thin progress line at the top of the bar while a page loads. */
 @Composable
 fun LoadLine(progress: Int, color: androidx.compose.ui.graphics.Color) {
-    Box(Modifier.fillMaxWidth().height(2.dp)) {
-        Box(
-            Modifier
-                .fillMaxWidth((progress.coerceIn(5, 100)) / 100f)
-                .height(2.dp)
-                .background(color),
-        )
+    // Glides to each new value instead of jumping; a fresh load starts again from the left.
+    val w = remember { androidx.compose.animation.core.Animatable(0.05f) }
+    LaunchedEffect(progress) {
+        val t = progress.coerceIn(5, 100) / 100f
+        if (t < w.value) {
+            w.snapTo(t)
+        } else {
+            w.animateTo(t, androidx.compose.animation.core.tween(320, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        }
     }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(2.dp)
+            .drawBehind { drawRect(color, size = androidx.compose.ui.geometry.Size(size.width * w.value, size.height)) },
+    )
 }

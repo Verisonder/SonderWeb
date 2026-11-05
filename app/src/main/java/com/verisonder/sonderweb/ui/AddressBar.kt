@@ -1,9 +1,22 @@
 package com.verisonder.sonderweb.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,8 +27,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -61,14 +72,9 @@ import org.mozilla.geckoview.GeckoSession
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.NorthWest
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Shield
@@ -89,7 +95,6 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -99,9 +104,6 @@ import com.verisonder.sonderweb.browser.Browser
 import com.verisonder.sonderweb.browser.Delegates
 import com.verisonder.sonderweb.browser.Tab
 import com.verisonder.sonderweb.browser.Ublock
-import com.verisonder.sonderweb.core.AddressInput
-import com.verisonder.sonderweb.core.Bangs
-import com.verisonder.sonderweb.core.Resolved
 import com.verisonder.sonderweb.core.UrlText
 
 fun startEditing(ui: UiState, tab: Tab?) {
@@ -119,11 +121,30 @@ fun submit(ui: UiState, text: String) {
 
 @Composable
 fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
-    // Typing: the bar becomes the search sheet.
-    if (ui.editing) {
-        SearchSheet(ui, tab, top)
-        return
+    // Typing: the bar becomes the search sheet. The sheet rises out of the bar (its own opening
+    // motion) and sinks back into it when it closes, while the bar fades back in underneath.
+    val sheet = remember { MutableTransitionState(false) }
+    sheet.targetState = ui.editing
+    val sheetShown = sheet.currentState || sheet.targetState
+    LaunchedEffect(sheetShown) { ui.sheetShown = sheetShown }
+    Box(contentAlignment = if (top) Alignment.TopCenter else Alignment.BottomCenter) {
+        AnimatedVisibility(
+            visible = !ui.editing,
+            enter = fadeIn(tween(200, delayMillis = 70)),
+            exit = ExitTransition.None,
+        ) { BarBody(ui, tab, top) }
+        AnimatedVisibility(
+            visibleState = sheet,
+            enter = EnterTransition.None,
+            exit = fadeOut(tween(150)) +
+                scaleOut(tween(190, easing = FastOutSlowInEasing), 0.94f, TransformOrigin(0.5f, if (top) 0f else 1f)) +
+                slideOutVertically(tween(190, easing = FastOutSlowInEasing)) { if (top) -it / 10 else it / 10 },
+        ) { SearchSheet(ui, tab, top) }
     }
+}
+
+@Composable
+private fun BarBody(ui: UiState, tab: Tab?, top: Boolean) {
     val p = LocalPalette.current
     val floating = remember(ui.themeVersion) { Browser.prefs.barFloating }
     val insets = if (top) {
@@ -156,6 +177,16 @@ fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
         if (!top) {
             if (showLoad) Box(lineInset) { LoadLine(tab!!.progress, p.accent) } else Spacer(Modifier.height(2.dp))
         }
+        // Find in page slides in over the bar's usual buttons, and back out.
+        AnimatedContent(
+            targetState = ui.finding && tab != null,
+            transitionSpec = {
+                (fadeIn(tween(200, delayMillis = 40)) + slideInVertically(spring(dampingRatio = 0.85f, stiffness = 500f)) { it / 3 })
+                    .togetherWith(fadeOut(tween(110)))
+                    .using(SizeTransform(clip = false))
+            },
+            label = "find",
+        ) { finding ->
         Row(
             Modifier
                 .fillMaxWidth()
@@ -163,26 +194,8 @@ fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (ui.finding && tab != null && !ui.editing) {
-                FindBar(ui, tab)
-            } else if (ui.editing) {
-                IconButtonSmall(Icons.AutoMirrored.Outlined.ArrowBack, "Cancel", size = 44) { ui.editing = false }
-                Row(
-                    Modifier
-                        .weight(1f)
-                        .height(40.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(p.field)
-                        .padding(start = 16.dp, end = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    EditField(ui, Modifier.weight(1f))
-                    if (ui.query.text.isNotEmpty()) {
-                        IconButtonSmall(Icons.Outlined.Close, "Clear", size = 32, tint = p.faint) { ui.query = TextFieldValue("") }
-                    }
-                }
-                Spacer(Modifier.width(8.dp))
-            } else {
+            if (finding && tab != null) {
+                FindBar(ui, tab)            } else {
                 if (tab == null || tab.isBlank) {
                     // The start page has its own search box: here only tabs and the menu.
                     Spacer(Modifier.weight(1f))
@@ -207,6 +220,7 @@ fun AddressBar(ui: UiState, tab: Tab?, top: Boolean) {
                     if (tab != null) BrowserMenu(ui, tab, top)
                 }
             }
+        }
         }
         if (top) {
             if (showLoad) Box(lineInset) { LoadLine(tab!!.progress, p.accent) } else Spacer(Modifier.height(2.dp))
@@ -352,32 +366,6 @@ private fun Omnibox(ui: UiState, tab: Tab?, modifier: Modifier, pop: NewTabPop? 
     }
 }
 
-@Composable
-private fun EditField(ui: UiState, modifier: Modifier) {
-    val p = LocalPalette.current
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
-    Box(modifier, contentAlignment = Alignment.CenterStart) {
-        if (ui.query.text.isEmpty()) Text("Search or type address", color = p.faint, fontSize = 15.sp, maxLines = 1)
-        IncognitoKeyboard(Browser.current?.isPrivate == true) {
-            BasicTextField(
-                value = ui.query,
-                onValueChange = { ui.query = it },
-                singleLine = true,
-                textStyle = TextStyle(fontFamily = Inter, color = p.text, fontSize = 15.sp),
-                cursorBrush = SolidColor(p.accent),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Uri,
-                    imeAction = ImeAction.Go,
-                    autoCorrectEnabled = false,
-                ),
-                keyboardActions = KeyboardActions(onGo = { submit(ui, ui.query.text) }),
-                modifier = Modifier.fillMaxWidth().focusRequester(focus),
-            )
-        }
-    }
-}
-
 /** uBlock Origin's button: a small shield and the number it blocked on this page. */
 @Composable
 private fun ShieldButton(tab: Tab) {
@@ -454,14 +442,25 @@ fun TabCountButton(count: Int, top: Boolean, onClick: () -> Unit) {
                 .border(1.8.dp, p.mute, RoundedCornerShape(5.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                if (count > 99) ":D" else count.toString(),
-                color = p.mute,
-                fontSize = if (count > 9) 9.sp else 11.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                style = TextStyle(lineHeight = 11.sp, lineHeightStyle = Centered),
-            )
+            // The number rolls: up when a tab opens, down when one closes.
+            AnimatedContent(
+                targetState = count,
+                transitionSpec = {
+                    val up = targetState > initialState
+                    (slideInVertically(spring(dampingRatio = 0.8f, stiffness = 700f)) { if (up) it else -it } + fadeIn(tween(140)))
+                        .togetherWith(slideOutVertically(tween(160)) { if (up) -it else it } + fadeOut(tween(100)))
+                },
+                label = "tabCount",
+            ) { n ->
+                Text(
+                    if (n > 99) ":D" else n.toString(),
+                    color = p.mute,
+                    fontSize = if (n > 9) 9.sp else 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    style = TextStyle(lineHeight = 11.sp, lineHeightStyle = Centered),
+                )
+            }
         }
         TabPickerPopup(picker, end = true)
     }

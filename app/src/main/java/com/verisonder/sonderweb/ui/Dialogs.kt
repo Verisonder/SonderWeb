@@ -41,6 +41,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import kotlinx.coroutines.launch
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
@@ -284,7 +285,11 @@ fun ContextSheet(req: ContextMenu.Request) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val close = { ContextMenu.dismiss() }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    // Picking an item: the sheet slides away first instead of vanishing.
+    val close: () -> Unit = {
+        scope.launch { state.hide() }.invokeOnCompletion { ContextMenu.dismiss() }
+    }
     fun copy(text: String) {
         val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText("link", text))
