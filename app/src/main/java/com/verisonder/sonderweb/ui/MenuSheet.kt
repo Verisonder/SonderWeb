@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Star
@@ -59,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verisonder.sonderweb.browser.Browser
 import com.verisonder.sonderweb.browser.Tab
+import com.verisonder.sonderweb.browser.Translate
 import com.verisonder.sonderweb.browser.Ublock
 import com.verisonder.sonderweb.core.UrlText
 import com.verisonder.sonderweb.data.Shortcut
@@ -156,6 +158,10 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                     ui.findQuery = ""
                     ui.findResult = ""
                     ui.finding = true
+                    close()
+                }
+                Item(if (tab.translatedTo != null) "Show original" else "Translate page", Icons.Outlined.Translate) {
+                    Translate.toggle(tab)
                     close()
                 }
                 if (!tab.isPrivate) {

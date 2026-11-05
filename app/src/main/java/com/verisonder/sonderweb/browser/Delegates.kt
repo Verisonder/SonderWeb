@@ -36,6 +36,7 @@ object Delegates {
                 Browser.main.postDelayed(resampleLate, 900)
             }
         })
+        Translate.attach(tab)
         Extensions.attach(tab)
     }
 

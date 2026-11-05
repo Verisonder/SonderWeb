@@ -65,6 +65,12 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     /** Address to load the first time this tab is shown (restored tabs load lazily). */
     var pendingUrl: String? = null
 
+    /** Translation: the page's language, the phone's, and what the page is translated to (null = original). */
+    var pageLang: String? = null
+    var userLang: String? = null
+    var translatedTo by mutableStateOf<String?>(null)
+    var translating by mutableStateOf(false)
+
     /** The tab that opened this one; closing returns to it. */
     var openerId: Long? = null
 
