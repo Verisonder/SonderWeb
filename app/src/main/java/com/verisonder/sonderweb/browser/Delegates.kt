@@ -37,6 +37,7 @@ object Delegates {
             }
         })
         Translate.attach(tab)
+        BackPeek.attach(tab)
         Extensions.attach(tab)
     }
 
@@ -269,6 +270,8 @@ object Delegates {
                 val bottom = runCatching { edgeColor(bmp, bottomY) }.getOrNull()
                 val topKnown = top != null
                 val flat = runCatching { isFlat(bmp) }.getOrDefault(false)
+                // Kept for the back gesture's peek, when you come back here from the next page.
+                BackPeek.remember(tab, tab.url, bmp)
                 // No pictures of private pages, not even in memory: only the two colours.
                 val small = if (thumbnail && !tab.isPrivate) {
                     val w = 360

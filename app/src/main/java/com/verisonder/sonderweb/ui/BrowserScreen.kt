@@ -38,7 +38,6 @@ import androidx.compose.animation.core.VectorConverter
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.only
@@ -230,7 +229,14 @@ fun BrowserScreen(activity: MainActivity) {
     // While typing the bar is always fully shown, so suggestions sit right under (or over) it.
     val edgeTop by animateColorAsState(tab?.edgeTop?.let { Color(it) } ?: palette.bg, tween(220), label = "edgeTop")
 
-    BackHandler(enabled = true) {
+    // Something open over the page (menu, panel, typing…): back closes that first.
+    val overlay = (Browser.privateLocked && tab?.isPrivate == true) || activity.inFullscreen ||
+        Ublock.popup != null || ContextMenu.request != null || ui.menu || ui.panel != Panel.None ||
+        ui.editing || ui.finding
+    val onSite = tab != null && !tab.isBlank
+    // On the start page the phone itself handles back, with its own "back to home" peek
+    // (the app goes to the background, as before). Older Android versions keep the old way.
+    BackHandler(enabled = overlay || onSite || android.os.Build.VERSION.SDK_INT < 33) {
         when {
             Browser.privateLocked && tab?.isPrivate == true -> leavePrivate(ui)
             activity.inFullscreen -> tab?.session?.exitFullScreen()
@@ -250,6 +256,9 @@ fun BrowserScreen(activity: MainActivity) {
             else -> Browser.home(tab)
         }
     }
+    // On a site: back with a peek at the page behind (registered last, so it comes first).
+    val backSwipe = remember { BackSwipe() }
+    PageBackGesture(backSwipe, tab, enabled = !overlay && onSite)
 
     // Top padding: the status bar when it's shown, else only the camera cut-out.
     val screenInsets = WindowInsets.statusBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)
@@ -319,6 +328,7 @@ fun BrowserScreen(activity: MainActivity) {
                     ) {
                         Box(Modifier.fillMaxSize()) { StartPage(ui) }
                     }
+                    BackSwipeLayer(backSwipe, ui) { (pageTop() + if (barTop) overPage - overOffset() else 0f).roundToInt() }
                     AnimatedVisibility(
                         visible = ui.editing && tab != null,
                         enter = fadeIn(tween(160)),

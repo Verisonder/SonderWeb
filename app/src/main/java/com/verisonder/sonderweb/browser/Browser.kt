@@ -276,6 +276,7 @@ object Browser {
         tabs.removeAt(i)
         Prompts.queue.removeAll { it.tab === tab }
         Bar.forget(tab)
+        BackPeek.forget(tab)
         if (current === tab) {
             current = null
             val next = tabs.firstOrNull { it.id == tab.openerId && it.isPrivate == tab.isPrivate }

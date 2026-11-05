@@ -71,6 +71,9 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     var translatedTo by mutableStateOf<String?>(null)
     var translating by mutableStateOf(false)
 
+    /** The address back would go to (null: back leads to the start page). */
+    var backUrl: String? = null
+
     /** The tab that opened this one; closing returns to it. */
     var openerId: Long? = null
 
