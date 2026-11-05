@@ -235,8 +235,9 @@ private fun SheetSuggestions(ui: UiState, tab: Tab, enter: () -> Float) {
     val rows = remember(text, tab.isPrivate) {
         when {
             tab.isPrivate -> emptyList()
-            text.isBlank() -> Browser.db.history("", 40).distinctBy { it.url }.take(5).map { it.url to it.title }
-            else -> Browser.db.suggest(text)
+            // Each site once: its latest (or best-matching) page, not every page of it.
+            text.isBlank() -> Browser.db.history("", 200).distinctBy { UrlText.host(it.url) }.take(5).map { it.url to it.title }
+            else -> Browser.db.suggest(text, 30).distinctBy { UrlText.host(it.first) }.take(6)
         }
     }
     val bangHints = remember(text) {
