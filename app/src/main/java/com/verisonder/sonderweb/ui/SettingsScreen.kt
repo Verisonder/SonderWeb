@@ -127,6 +127,8 @@ private val index: List<Pair<String, Page>> = listOf(
     "Greeting" to Page.Start,
     "Shortcuts" to Page.Start,
     "Shortcut names" to Page.Start,
+    "Picture-in-picture" to Page.Tabs,
+    "Videos" to Page.Tabs,
     "Search engine" to Page.Search,
     "!bangs" to Page.Search,
     "Theme" to Page.Look,
@@ -705,6 +707,15 @@ private fun TabsPage() {
         Toggle("Reopen tabs", "Bring back your normal tabs when the app starts. Private tabs never come back.", restore) {
             restore = it
             prefs.restoreTabs = it
+        }
+    }
+    Spacer(Modifier.height(16.dp))
+    var pip by remember { mutableStateOf(prefs.pip) }
+    Group {
+        Toggle("Picture-in-picture", "Leave the app while a video plays and it keeps playing in a small window.", pip) {
+            pip = it
+            prefs.pip = it
+            Browser.host?.updatePip()
         }
     }
     OpenOnLaunch()

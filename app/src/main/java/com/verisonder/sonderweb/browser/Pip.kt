@@ -1,0 +1,92 @@
+package com.verisonder.sonderweb.browser
+
+import org.json.JSONObject
+import org.mozilla.geckoview.GeckoRuntime
+import org.mozilla.geckoview.WebExtension
+
+/**
+ * Picture-in-picture: leave the app while a video plays and it keeps playing in a small window.
+ * A small built-in extension tells us when a video plays (and its shape), and fills the small
+ * window with that video while it's open.
+ */
+object Pip {
+    const val ID = "pip@sonderweb"
+    private const val LOCATION = "resource://android/assets/extensions/pip/"
+    private const val APP = "pip"
+    private var extension: WebExtension? = null
+
+    /** The video's page in each tab (one port per frame that played a video). */
+    private val ports = HashMap<Tab, WebExtension.Port>()
+
+    fun install(runtime: GeckoRuntime) {
+        runtime.webExtensionController.ensureBuiltIn(LOCATION, ID).accept({ ext ->
+            Browser.main.post {
+                extension = ext ?: return@post
+                runtime.webExtensionController.setAllowedInPrivateBrowsing(ext, true)
+                Browser.tabs.forEach { attach(it) }
+            }
+        }, { _ -> })
+    }
+
+    fun attach(tab: Tab) {
+        val ext = extension ?: return
+        tab.session.webExtensionController.setMessageDelegate(
+            ext,
+            object : WebExtension.MessageDelegate {
+                override fun onConnect(port: WebExtension.Port) {
+                    port.setDelegate(
+                        object : WebExtension.PortDelegate {
+                            override fun onPortMessage(message: Any, port: WebExtension.Port) {
+                                val m = message as? JSONObject ?: return
+                                val playing = m.optBoolean("playing")
+                                // The frame that's playing is the one to talk to; others only when they're the last one.
+                                if (playing || ports[tab] === port) {
+                                    ports[tab] = port
+                                    tab.videoPlaying = playing
+                                    val w = m.optInt("w", 16).coerceAtLeast(1)
+                                    val h = m.optInt("h", 9).coerceAtLeast(1)
+                                    tab.videoRatio = w.toFloat() / h
+                                    changed()
+                                }
+                            }
+
+                            override fun onDisconnect(port: WebExtension.Port) {
+                                if (ports[tab] === port) {
+                                    ports.remove(tab)
+                                    tab.videoPlaying = false
+                                    changed()
+                                }
+                            }
+                        },
+                    )
+                }
+            },
+            APP,
+        )
+    }
+
+    fun forget(tab: Tab) {
+        ports.remove(tab)
+    }
+
+    /** A video is playing in the tab on screen, and picture-in-picture is on. */
+    val ready: Boolean
+        get() = Browser.prefs.pip && Browser.current?.videoPlaying == true
+
+    private fun changed() {
+        Browser.host?.updatePip()
+    }
+
+    /** The small window opened or closed: the video fills it, or goes back into its page. */
+    fun shown(on: Boolean) {
+        val port = Browser.current?.let { ports[it] } ?: return
+        runCatching { port.postMessage(JSONObject().put("pip", on)) }
+    }
+
+    /** The play/pause button in the small window. */
+    fun togglePlay() {
+        val tab = Browser.current ?: return
+        val port = ports[tab] ?: return
+        runCatching { port.postMessage(JSONObject().put("toggle", true)) }
+    }
+}

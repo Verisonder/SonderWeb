@@ -40,6 +40,7 @@ import java.util.Locale
 class MainActivity : ComponentActivity(), Browser.Host {
 
     private companion object {
+        const val PIP_TOGGLE = "com.verisonder.sonderweb.PIP_TOGGLE"
         val NO_BIOMETRICS = setOf(
             android.hardware.biometrics.BiometricPrompt.BIOMETRIC_ERROR_HW_UNAVAILABLE,
             android.hardware.biometrics.BiometricPrompt.BIOMETRIC_ERROR_NO_BIOMETRICS,
@@ -53,6 +54,21 @@ class MainActivity : ComponentActivity(), Browser.Host {
 
     /** True while a page shows a video (or anything) in fullscreen. */
     var inFullscreen by mutableStateOf(false)
+
+    /** In the small picture-in-picture window: only the page (its video) shows. */
+    var inPip by mutableStateOf(false)
+
+    /** The page takes the whole window: a fullscreen video, or picture-in-picture. */
+    val fullView: Boolean get() = inFullscreen || inPip
+
+    private val pipSupported by lazy { packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE) }
+
+    /** The play/pause button in the picture-in-picture window. */
+    private val pipButton = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: Intent?) {
+            com.verisonder.sonderweb.browser.Pip.togglePlay()
+        }
+    }
         private set
 
     private var filesResult: ((List<Uri>) -> Unit)? = null
@@ -162,6 +178,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
         // No grey scrim behind the gesture bar: the page shows through.
         if (android.os.Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
         if (savedInstanceState == null) handleIntent(intent)
+        ContextCompat.registerReceiver(this, pipButton, android.content.IntentFilter(PIP_TOGGLE), ContextCompat.RECEIVER_NOT_EXPORTED)
         lifecycleScope.launch { com.verisonder.sonderweb.data.AppUpdate.autoCheck(this@MainActivity) }
     }
 
@@ -212,6 +229,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
     }
 
     override fun onDestroy() {
+        runCatching { unregisterReceiver(pipButton) }
         if (Browser.host === this) Browser.host = null
         super.onDestroy()
     }
@@ -302,7 +320,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun applySystemBars() {
         val c = WindowCompat.getInsetsController(window, window.decorView)
         c.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        if (inFullscreen) {
+        if (inFullscreen || inPip) {
             c.hide(WindowInsetsCompat.Type.systemBars())
             return
         }
@@ -316,6 +334,55 @@ class MainActivity : ComponentActivity(), Browser.Host {
         } else {
             c.hide(WindowInsetsCompat.Type.statusBars())
         }
+    }
+
+    // ---- Picture-in-picture ----
+
+    /** The small window: the video's shape and a play/pause button. Opens by itself when you leave (Android 12+). */
+    private fun pipParams(): android.app.PictureInPictureParams {
+        val ready = com.verisonder.sonderweb.browser.Pip.ready
+        // Android only allows shapes between 1:2.39 and 2.39:1.
+        val ratio = (Browser.current?.videoRatio ?: (16f / 9f)).coerceIn(0.42f, 2.38f)
+        val icon = android.graphics.drawable.Icon.createWithResource(
+            this,
+            if (ready) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
+        )
+        val tap = android.app.PendingIntent.getBroadcast(
+            this,
+            0,
+            Intent(PIP_TOGGLE).setPackage(packageName),
+            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val label = if (ready) "Pause" else "Play"
+        val b = android.app.PictureInPictureParams.Builder()
+            .setAspectRatio(android.util.Rational((ratio * 1000).toInt(), 1000))
+            .setActions(listOf(android.app.RemoteAction(icon, label, label, tap)))
+        if (Build.VERSION.SDK_INT >= 31) {
+            // Swiping home while a video plays glides it into the small window.
+            b.setAutoEnterEnabled(ready)
+            b.setSeamlessResizeEnabled(false)
+        }
+        return b.build()
+    }
+
+    override fun updatePip() {
+        if (!pipSupported) return
+        runCatching { setPictureInPictureParams(pipParams()) }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // Before Android 12 the small window is opened here, when you leave with a video playing.
+        if (Build.VERSION.SDK_INT < 31 && pipSupported && com.verisonder.sonderweb.browser.Pip.ready) {
+            runCatching { enterPictureInPictureMode(pipParams()) }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        inPip = isInPictureInPictureMode
+        com.verisonder.sonderweb.browser.Pip.shown(isInPictureInPictureMode)
+        applySystemBars()
     }
 
     /** No screenshots, screen recording or recent-apps preview while private tabs are on screen. */

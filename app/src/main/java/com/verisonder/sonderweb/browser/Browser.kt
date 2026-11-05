@@ -108,6 +108,7 @@ object Browser {
         Look.install(runtime)
         AddonsSite.install(runtime)
         Shields.install(runtime)
+        Pip.install(runtime)
         restoreTabs()
     }
 
@@ -277,6 +278,7 @@ object Browser {
         Prompts.queue.removeAll { it.tab === tab }
         Bar.forget(tab)
         BackPeek.forget(tab)
+        Pip.forget(tab)
         if (current === tab) {
             current = null
             val next = tabs.firstOrNull { it.id == tab.openerId && it.isPrivate == tab.isPrivate }
@@ -492,6 +494,9 @@ object Browser {
         fun share(text: String, title: String?)
         fun setFullscreen(on: Boolean)
         fun applySystemBars()
+
+        /** A video started or stopped: the picture-in-picture window's shape and buttons follow it. */
+        fun updatePip()
 
         /** Asks for the fingerprint or screen lock, then unlocks the private tabs. */
         fun unlockPrivate()

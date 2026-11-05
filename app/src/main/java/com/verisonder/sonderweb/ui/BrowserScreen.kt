@@ -173,7 +173,7 @@ fun BrowserScreen(activity: MainActivity) {
     var barPx by remember { mutableIntStateOf(0) }
     // The start page shows no bar: only the tabs button and the menu (the bar comes back to type).
     val startPage = tab?.isBlank == true && !ui.editing && !ui.finding
-    val pinned = ui.editing || ui.menu || ui.finding || tab == null || activity.inFullscreen ||
+    val pinned = ui.editing || ui.menu || ui.finding || tab == null || activity.fullView ||
         hideMode == Bar.ALWAYS || (hideMode == Bar.SLIDE && tab.isBlank)
     val collapsed = Bar.hidden && !pinned
     // Bar swiped down: the phone's gesture bar hides with it (not over the start page or a panel).
@@ -199,8 +199,8 @@ fun BrowserScreen(activity: MainActivity) {
     // engine is told that strip is covered, so buttons pinned to the bottom of a page sit above it.
     val showStatus = remember(ui.themeVersion) { Browser.prefs.showStatusBar }
     val density = LocalDensity.current
-    val safeTop = if (activity.inFullscreen || showStatus) 0 else WindowInsets.displayCutout.getTop(density)
-    val safeBottom = if (activity.inFullscreen) 0 else WindowInsets.navigationBars.getBottom(density)
+    val safeTop = if (activity.fullView || showStatus) 0 else WindowInsets.displayCutout.getTop(density)
+    val safeBottom = if (activity.fullView) 0 else WindowInsets.navigationBars.getBottom(density)
     // The bar already covers the strip on its side: only the rest of it lies over the page.
     val overPage = (barPx - if (barTop) safeTop else safeBottom).coerceAtLeast(0)
     val overOffset = { barOffsetState.value.coerceIn(0f, overPage.toFloat()) }
@@ -220,26 +220,34 @@ fun BrowserScreen(activity: MainActivity) {
             stripState.value
         }
     }
-    LaunchedEffect(overPage, safeBottom, safeTop, activity.inFullscreen) {
+    LaunchedEffect(overPage, safeBottom, safeTop, activity.fullView) {
         // The page is as tall as the screen; whatever it is pushed down by runs off the bottom,
         // so the engine counts that as covered too (fixed bottom elements stay in sight).
-        activity.geckoView.setDynamicToolbarMaxHeight(if (activity.inFullscreen) 0 else overPage + safeBottom + safeTop)
-        com.verisonder.sonderweb.browser.Delegates.coveredBottom = if (activity.inFullscreen) 0 else overPage + safeBottom + safeTop
+        activity.geckoView.setDynamicToolbarMaxHeight(if (activity.fullView) 0 else overPage + safeBottom + safeTop)
+        com.verisonder.sonderweb.browser.Delegates.coveredBottom = if (activity.fullView) 0 else overPage + safeBottom + safeTop
         // Follows the bar and the strip frame by frame without recomposing anything.
         androidx.compose.runtime.snapshotFlow {
-            if (activity.inFullscreen) 0 else -(overOffset() + safeTop - pageTop()).roundToInt()
+            if (activity.fullView) 0 else -(overOffset() + safeTop - pageTop()).roundToInt()
         }.collect { activity.geckoView.setVerticalClipping(it) }
     }
     // While typing the bar is always fully shown, so suggestions sit right under (or over) it.
     val edgeTop by animateColorAsState(tab?.edgeTop?.let { Color(it) } ?: palette.bg, tween(220), label = "edgeTop")
 
     // Something open over the page (menu, panel, typing…): back closes that first.
-    val overlay = (Browser.privateLocked && tab?.isPrivate == true) || activity.inFullscreen ||
+    val overlay = (Browser.privateLocked && tab?.isPrivate == true) || activity.fullView ||
         Ublock.popup != null || ContextMenu.request != null || ui.menu || ui.panel != Panel.None ||
         ui.editing || ui.finding
     val onSite = tab != null && !tab.isBlank
     // On the start page the phone itself handles back, with its own "back to home" peek
     // (the app goes to the background, as before). Older Android versions keep the old way.
+    // Into the small picture-in-picture window: nothing but the video, so menus and panels close.
+    LaunchedEffect(activity.inPip) {
+        if (activity.inPip) {
+            ui.menu = false
+            ui.editing = false
+            ui.panel = Panel.None
+        }
+    }
     BackHandler(enabled = overlay || onSite || android.os.Build.VERSION.SDK_INT < 33) {
         when {
             Browser.privateLocked && tab?.isPrivate == true -> leavePrivate(ui)
@@ -278,7 +286,7 @@ fun BrowserScreen(activity: MainActivity) {
                     .fillMaxSize()
                     // Pages run edge to edge: under the camera hole and the gesture bar. Only the
                     // status bar, when you choose to show it, takes space at the top.
-                    .then(if (activity.inFullscreen || !showStatus) Modifier else Modifier.statusBarsPadding())
+                    .then(if (activity.fullView || !showStatus) Modifier else Modifier.statusBarsPadding())
                     .imePadding()
                     .clipToBounds(),
             ) {
@@ -304,7 +312,7 @@ fun BrowserScreen(activity: MainActivity) {
                         modifier = Modifier
                             .fillMaxSize()
                             .then(
-                                if (activity.inFullscreen) {
+                                if (activity.fullView) {
                                     Modifier
                                 } else {
                                     Modifier.offset {
@@ -313,7 +321,7 @@ fun BrowserScreen(activity: MainActivity) {
                                 },
                             ),
                     )
-                    if (tab != null && !tab.isBlank && !activity.inFullscreen) {
+                    if (tab != null && !tab.isBlank && !activity.fullView) {
                         PullIndicator(tab) { (pageTop() + if (barTop) overPage - overOffset() else 0f).roundToInt() }
                     }
                     // Opening the start page covers the engine view at once, so the previous page
@@ -322,7 +330,7 @@ fun BrowserScreen(activity: MainActivity) {
                     // Until the page has drawn: its own colours and a small loading mark (no white flash).
                     LoadingCover(
                         tab = tab,
-                        visible = tab != null && tab.covered && !tab.isBlank && !activity.inFullscreen,
+                        visible = tab != null && tab.covered && !tab.isBlank && !activity.fullView,
                         safeTop = safeTop,
                     )
                     AnimatedVisibility(
@@ -349,7 +357,7 @@ fun BrowserScreen(activity: MainActivity) {
                 }
                 // The (+) in the middle: search or type an address.
                 AnimatedVisibility(
-                    visible = startPage && !activity.inFullscreen,
+                    visible = startPage && !activity.fullView,
                     enter = fadeIn(tween(180)) + scaleIn(spring(dampingRatio = 0.75f, stiffness = 500f), initialScale = 0.85f),
                     exit = fadeOut(tween(120)) + scaleOut(tween(140), targetScale = 0.9f),
                     modifier = Modifier
@@ -360,7 +368,7 @@ fun BrowserScreen(activity: MainActivity) {
                     tab?.let { Scaled(remember(ui.themeVersion) { Browser.prefs.barSize / 100f }) { StartSearchButton(ui, it, Modifier.padding(12.dp)) } }
                 }
                 AnimatedVisibility(
-                    visible = startPage && !activity.inFullscreen,
+                    visible = startPage && !activity.fullView,
                     enter = fadeIn(tween(180)) + scaleIn(spring(dampingRatio = 0.75f, stiffness = 500f), initialScale = 0.85f),
                     exit = fadeOut(tween(120)) + scaleOut(tween(140), targetScale = 0.9f),
                     modifier = Modifier
@@ -372,7 +380,7 @@ fun BrowserScreen(activity: MainActivity) {
                     tab?.let { Scaled(remember(ui.themeVersion) { Browser.prefs.barSize / 100f }) { StartControls(ui, it, Modifier.padding(12.dp)) } }
                 }
                 AnimatedVisibility(
-                    visible = !startPage && !activity.inFullscreen,
+                    visible = !startPage && !activity.fullView,
                     enter = fadeIn(tween(180)),
                     exit = fadeOut(tween(120)),
                     modifier = Modifier.fillMaxSize(),

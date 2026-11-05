@@ -169,7 +169,7 @@ object Extensions {
      * page you're on reloads so it runs there too.
      */
     private fun started(ext: WebExtension, reload: Boolean = true) {
-        if (ext.id == Ublock.ID || ext.id == Look.ID || ext.id == AddonsSite.ID) return
+        if (ext.id == Ublock.ID || ext.id == Look.ID || ext.id == AddonsSite.ID || ext.id == Shields.ID || ext.id == Pip.ID) return
         if (ext.id in Browser.prefs.extensionsSetUp && !reload) return
         Browser.prefs.extensionsSetUp = Browser.prefs.extensionsSetUp + ext.id
         val m = ext.metaData
@@ -197,7 +197,7 @@ object Extensions {
         controller.list().accept({ all ->
             Browser.main.post {
                 // The browser's own little extensions aren't yours: they stay out of the list.
-                val exts = (all ?: emptyList()).filter { !it.metaData.temporary && it.id != Look.ID && it.id != AddonsSite.ID }
+                val exts = (all ?: emptyList()).filter { !it.metaData.temporary && it.id != Look.ID && it.id != AddonsSite.ID && it.id != Shields.ID && it.id != Pip.ID }
                 list.clear()
                 // uBlock Origin first, then by name.
                 list.addAll(exts.sortedWith(compareBy({ it.id != Ublock.ID }, { it.metaData.name ?: it.id })))

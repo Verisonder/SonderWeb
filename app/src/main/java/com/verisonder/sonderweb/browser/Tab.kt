@@ -71,6 +71,10 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     var translatedTo by mutableStateOf<String?>(null)
     var translating by mutableStateOf(false)
 
+    /** A video is playing in this tab, and its width / height (for picture-in-picture). */
+    var videoPlaying = false
+    var videoRatio = 16f / 9f
+
     /** The address back would go to (null: back leads to the start page). */
     var backUrl: String? = null
 

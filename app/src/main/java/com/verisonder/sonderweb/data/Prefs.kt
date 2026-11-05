@@ -67,6 +67,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("history", true)
         set(v) = sp.edit().putBoolean("history", v).apply()
 
+    /** Leave the app while a video plays: it keeps playing in a small window. */
+    var pip: Boolean
+        get() = sp.getBoolean("pip", true)
+        set(v) = sp.edit().putBoolean("pip", v).apply()
+
     var restoreTabs: Boolean
         get() = sp.getBoolean("restore_tabs", true)
         set(v) = sp.edit().putBoolean("restore_tabs", v).apply()
