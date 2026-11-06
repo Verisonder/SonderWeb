@@ -56,6 +56,12 @@
   // phone's bars go away a moment later). Players like YouTube's only place the video for the
   // size they saw first, which left it stuck at the top. Telling the page the size changed again
   // once things settle puts the video back in the middle.
+  // Safety net: back at full size, the video goes back into its page even if the browser's
+  // "small window closed" message never came.
+  window.addEventListener("resize", () => {
+    if (filled && (window.innerWidth > 480 || window.innerHeight > 480)) unfill();
+  });
+
   document.addEventListener("fullscreenchange", () => {
     for (const ms of [120, 350, 800]) {
       setTimeout(() => {

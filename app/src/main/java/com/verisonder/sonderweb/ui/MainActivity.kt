@@ -189,6 +189,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
 
     override fun onResume() {
         super.onResume()
+        checkPipEnded()
         Browser.host = this
         if (launchCheck) {
             launchCheck = false
@@ -388,10 +389,29 @@ class MainActivity : ComponentActivity(), Browser.Host {
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-        inPip = isInPictureInPictureMode
-        com.verisonder.sonderweb.browser.Pip.shown(isInPictureInPictureMode)
+        pipChanged(isInPictureInPictureMode)
+    }
+
+    /**
+     * Some phones (HyperOS) don't always say the small window has closed when you come back to
+     * the app. Without this the app stayed in "small window" mode: no bar, no back, and the page
+     * still laid out for the small window. So it's checked again whenever the app is in front.
+     */
+    private fun checkPipEnded() {
+        if (inPip && !isInPictureInPictureMode) pipChanged(false)
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        checkPipEnded()
+    }
+
+    private fun pipChanged(on: Boolean) {
+        if (inPip == on) return
+        inPip = on
+        com.verisonder.sonderweb.browser.Pip.shown(on)
         applySystemBars()
-        if (!isInPictureInPictureMode) {
+        if (!on) {
             // The small window closed. Tapped to open the app: it comes back to the front. Closed
             // with its ✕: the app isn't on screen any more, so the video stops and you've left.
             window.decorView.postDelayed({
