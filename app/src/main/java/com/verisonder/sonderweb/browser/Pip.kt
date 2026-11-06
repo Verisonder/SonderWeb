@@ -33,24 +33,53 @@ object Pip {
         // extension, for videos with sound). Fullscreen videos also tell their shape here.
         tab.session.setMediaSessionDelegate(
             object : org.mozilla.geckoview.MediaSession.Delegate {
+                override fun onActivated(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
+                    tab.media = media
+                    MediaPlayback.activated(tab, media)
+                }
+
+                override fun onMetadata(
+                    session: org.mozilla.geckoview.GeckoSession,
+                    media: org.mozilla.geckoview.MediaSession,
+                    meta: org.mozilla.geckoview.MediaSession.Metadata,
+                ) {
+                    MediaPlayback.metadata(tab, meta)
+                }
+
+                override fun onFeatures(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession, features: Long) {
+                    MediaPlayback.features(tab, features)
+                }
+
+                override fun onPositionState(
+                    session: org.mozilla.geckoview.GeckoSession,
+                    media: org.mozilla.geckoview.MediaSession,
+                    state: org.mozilla.geckoview.MediaSession.PositionState,
+                ) {
+                    MediaPlayback.position(tab, state)
+                }
+
                 override fun onPlay(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
                     tab.media = media
                     tab.mediaPlaying = true
+                    MediaPlayback.played(tab, media)
                     changed()
                 }
 
                 override fun onPause(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
                     tab.mediaPlaying = false
+                    MediaPlayback.paused(tab)
                     changed()
                 }
 
                 override fun onStop(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
                     tab.mediaPlaying = false
+                    MediaPlayback.paused(tab)
                     changed()
                 }
 
                 override fun onDeactivated(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
                     tab.mediaPlaying = false
+                    MediaPlayback.ended(tab)
                     changed()
                 }
 
@@ -105,6 +134,7 @@ object Pip {
 
     fun forget(tab: Tab) {
         ports.remove(tab)
+        MediaPlayback.ended(tab)
     }
 
     /** A video is playing in the tab on screen, and picture-in-picture is on. */

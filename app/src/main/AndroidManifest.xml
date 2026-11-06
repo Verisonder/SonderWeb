@@ -16,6 +16,7 @@
     <!-- Downloads keep going after you leave the app (only while something downloads). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- Only asked when a site requests it, and only after you allow that site. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -111,6 +112,17 @@
             android:name=".browser.DownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Sound and video keep playing when you leave the app or turn the screen off. -->
+        <service
+            android:name=".browser.MediaService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <!-- Play/pause, next and previous on the media notification. -->
+        <receiver
+            android:name=".browser.MediaActions"
+            android:exported="false" />
 
         <!-- The Cancel button on a download's notification. -->
         <receiver

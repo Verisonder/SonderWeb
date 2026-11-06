@@ -1,6 +1,25 @@
 // Picture-in-picture: tells the browser while a video is playing (and its shape), and while
 // the page is in the small window, makes that video fill it on black.
 (() => {
+  // Leaving the app, turning the screen off or the picture-in-picture window: the page isn't
+  // told it's hidden, so sites that pause then (YouTube) keep playing. The browser itself
+  // still pauses pages that aren't playing anything, to save battery.
+  try {
+    const page = window.wrappedJSObject;
+    const proto = page.Document.prototype;
+    const visible = (name, value) => Object.defineProperty(proto, name, {
+      get: exportFunction(() => value, window),
+      configurable: true,
+    });
+    visible("hidden", false);
+    visible("webkitHidden", false);
+    visible("visibilityState", "visible");
+    visible("webkitVisibilityState", "visible");
+  } catch (e) {}
+  for (const t of ["visibilitychange", "webkitvisibilitychange"]) {
+    window.addEventListener(t, (e) => e.stopImmediatePropagation(), true);
+  }
+
   let port = null;
   let video = null;
   let filled = null;

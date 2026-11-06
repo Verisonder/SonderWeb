@@ -248,6 +248,15 @@ class MainActivity : ComponentActivity(), Browser.Host {
         // Still on screen in the small picture-in-picture window: the page keeps playing, and
         // private tabs don't lock under it. That happens when the window is closed.
         if (isInPictureInPictureMode) return
+        // Something is playing (music, a video): it keeps playing while you're away or the screen
+        // is off, with the media notification. Otherwise the page is paused to save battery.
+        if (com.verisonder.sonderweb.browser.MediaPlayback.keepAwake) {
+            if (!ownScreen && !isChangingConfigurations) {
+                Browser.leftApp()
+                launchCheck = true
+            }
+            return
+        }
         // Paused while you're away (saves battery); woken again in onStart.
         Browser.current?.let { t -> if (t.ready && t.session.isOpen && !isChangingConfigurations) t.session.setActive(false) }
         if (!ownScreen && !isChangingConfigurations) {
