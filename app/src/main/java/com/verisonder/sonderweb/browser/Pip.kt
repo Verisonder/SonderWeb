@@ -34,6 +34,7 @@ object Pip {
         tab.session.setMediaSessionDelegate(
             object : org.mozilla.geckoview.MediaSession.Delegate {
                 override fun onPlay(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
+                    tab.media = media
                     tab.mediaPlaying = true
                     changed()
                 }
@@ -118,6 +119,13 @@ object Pip {
     fun shown(on: Boolean) {
         val port = Browser.current?.let { ports[it] } ?: return
         runCatching { port.postMessage(JSONObject().put("pip", on)) }
+    }
+
+    /** The small window was closed: the video stops. */
+    fun pause() {
+        val tab = Browser.current ?: return
+        runCatching { tab.media?.pause() }
+        runCatching { ports[tab]?.postMessage(JSONObject().put("pause", true)) }
     }
 
     /** The play/pause button in the small window. */

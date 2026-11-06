@@ -74,6 +74,9 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     /** A video is playing in this tab, and its width / height (for picture-in-picture). */
     var videoPlaying = false
 
+    /** The page's media controls, from the engine (to pause when picture-in-picture closes). */
+    var media: org.mozilla.geckoview.MediaSession? = null
+
     /** The engine says media is playing here (sound or video). */
     var mediaPlaying = false
     var videoRatio = 16f / 9f

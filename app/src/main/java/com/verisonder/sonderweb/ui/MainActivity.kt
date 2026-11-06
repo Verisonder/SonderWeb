@@ -244,6 +244,9 @@ class MainActivity : ComponentActivity(), Browser.Host {
         super.onStop()
         Browser.current?.let { it.flatWhenLeft = it.lastFlat }
         Browser.saveTabs()
+        // Still on screen in the small picture-in-picture window: the page keeps playing, and
+        // private tabs don't lock under it. That happens when the window is closed.
+        if (isInPictureInPictureMode) return
         // Paused while you're away (saves battery); woken again in onStart.
         Browser.current?.let { t -> if (t.ready && t.session.isOpen && !isChangingConfigurations) t.session.setActive(false) }
         if (!ownScreen && !isChangingConfigurations) {
@@ -388,6 +391,20 @@ class MainActivity : ComponentActivity(), Browser.Host {
         inPip = isInPictureInPictureMode
         com.verisonder.sonderweb.browser.Pip.shown(isInPictureInPictureMode)
         applySystemBars()
+        if (!isInPictureInPictureMode) {
+            // The small window closed. Tapped to open the app: it comes back to the front. Closed
+            // with its ✕: the app isn't on screen any more, so the video stops and you've left.
+            window.decorView.postDelayed({
+                if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+                    com.verisonder.sonderweb.browser.Pip.pause()
+                    Browser.current?.let { t -> if (t.ready && t.session.isOpen) t.session.setActive(false) }
+                    if (!ownScreen) {
+                        Browser.leftApp()
+                        launchCheck = true
+                    }
+                }
+            }, 400)
+        }
     }
 
     /** No screenshots, screen recording or recent-apps preview while private tabs are on screen. */

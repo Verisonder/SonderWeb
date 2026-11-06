@@ -4,6 +4,7 @@
   let port = null;
   let video = null;
   let filled = null;
+  let scrolled = null;
 
   function connect() {
     if (port) return port;
@@ -82,6 +83,10 @@
     // Already filling the screen on its own (the site's fullscreen): nothing to do.
     if (document.fullscreenElement && document.fullscreenElement.contains(v)) return;
     const saved = [];
+    // Players pause a video whose own box has scrolled out of sight (YouTube does): its box is
+    // brought into view first, and the page goes back to where it was afterwards.
+    scrolled = [window.scrollX, window.scrollY];
+    try { v.scrollIntoView({ block: "center", inline: "center" }); } catch (e) {}
     const set = (el, rules) => {
       saved.push([el, el.getAttribute("style")]);
       for (const [k, val] of rules) el.style.setProperty(k, val, "important");
@@ -98,11 +103,16 @@
       if (style === null) el.removeAttribute("style"); else el.setAttribute("style", style);
     }
     filled = null;
+    if (scrolled) {
+      try { window.scrollTo(scrolled[0], scrolled[1]); } catch (e) {}
+      scrolled = null;
+    }
   }
 
   function onMessage(m) {
     if (m.pip === true) fill();
     if (m.pip === false) unfill();
+    if (m.pause && video) video.pause();
     if (m.toggle && video) {
       if (video.paused) video.play().catch(() => {}); else video.pause();
     }
