@@ -439,7 +439,7 @@ fun BrowserScreen(activity: MainActivity) {
             Prompts.queue.firstOrNull { it.tab === tab }?.let { PromptDialog(it) }
             com.verisonder.sonderweb.browser.Extensions.pending?.let { InstallDialog(it) }
             com.verisonder.sonderweb.browser.AppLinks.ask?.let { OpenAppDialog(it) }
-            com.verisonder.sonderweb.browser.Translate.choices?.let { TranslateFromDialog(it) }
+            com.verisonder.sonderweb.browser.Translate.ask?.let { TranslateDialog(it) }
             ui.shred?.let { site ->
                 ConfirmDialog(
                     "Shred $site?",

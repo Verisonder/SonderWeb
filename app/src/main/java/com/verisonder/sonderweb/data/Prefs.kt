@@ -80,6 +80,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("shield_debounce", true)
         set(v) = sp.edit().putBoolean("shield_debounce", v).apply()
 
+    /** The language pages were last translated into (empty: the phone's). */
+    var translateTo: String
+        get() = sp.getString("translate_to", "") ?: ""
+        set(v) = sp.edit().putString("translate_to", v).apply()
+
     /** Leave the app while a video plays: it keeps playing in a small window. */
     var pip: Boolean
         get() = sp.getBoolean("pip", true)

@@ -48,6 +48,9 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Icon
+import androidx.compose.animation.animateContentSize
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -454,35 +457,98 @@ fun OpenAppDialog(ask: com.verisonder.sonderweb.browser.AppLinks.Ask) {
     )
 }
 
-/** The page says it's already in your language: which language are its words really in? */
+/** Translate page: From (what the page is in) and To, each opening its list of languages. */
 @Composable
-fun TranslateFromDialog(choices: List<org.mozilla.geckoview.TranslationsController.Language>) {
+fun TranslateDialog(ask: com.verisonder.sonderweb.browser.Translate.Ask) {
     val p = LocalPalette.current
     val t = com.verisonder.sonderweb.browser.Translate
+    var from by remember(ask) { mutableStateOf(ask.from) }
+    var to by remember(ask) { mutableStateOf(ask.to) }
+    // Which list is open: 0 none, 1 From, 2 To.
+    var open by remember(ask) { mutableStateOf(if (ask.from == null) 1 else 0) }
     AlertDialog(
-        onDismissRequest = { t.picked(null) },
+        onDismissRequest = { t.answer(null, null) },
         containerColor = p.card,
-        title = { Text("Translate from", color = p.text, fontSize = 18.sp) },
+        title = { Text("Translate page", color = p.text, fontSize = 18.sp) },
         text = {
-            androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                items(choices.size) { i ->
-                    val l = choices[i]
-                    Text(
-                        t.label(l),
-                        color = p.text,
-                        fontSize = 16.sp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable { t.picked(l.code) }
-                            .padding(horizontal = 8.dp, vertical = 13.dp),
-                    )
+            Column(Modifier.animateContentSize(androidx.compose.animation.core.spring(dampingRatio = 0.9f, stiffness = 600f))) {
+                LanguageRow("From", from?.let { t.label(it) } ?: "Choose", open == 1) { open = if (open == 1) 0 else 1 }
+                if (open == 1) {
+                    LanguageList(ask.froms, from) {
+                        from = it
+                        open = 0
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                LanguageRow("To", t.label(to), open == 2) { open = if (open == 2) 0 else 2 }
+                if (open == 2) {
+                    LanguageList(ask.tos, to) {
+                        to = it
+                        open = 0
+                    }
                 }
             }
         },
-        confirmButton = {},
+        confirmButton = {
+            TextButton({ t.answer(from, to) }, enabled = from != null && from != to) {
+                Text("Translate", color = if (from != null && from != to) p.accent else p.faint, fontWeight = FontWeight.SemiBold)
+            }
+        },
         dismissButton = {
-            TextButton({ t.picked(null) }) { Text("Cancel", color = p.text) }
+            TextButton({ t.answer(null, null) }) { Text("Cancel", color = p.text) }
         },
     )
+}
+
+@Composable
+private fun LanguageRow(label: String, value: String, open: Boolean, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    val turn by androidx.compose.animation.core.animateFloatAsState(if (open) 180f else 0f, label = "arrow")
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(p.field)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, color = p.faint, fontSize = 12.sp)
+            Text(value, color = p.text, fontSize = 16.sp)
+        }
+        Icon(
+            androidx.compose.material.icons.Icons.Outlined.KeyboardArrowDown,
+            null,
+            tint = p.mute,
+            modifier = Modifier.graphicsLayer { rotationZ = turn },
+        )
+    }
+}
+
+@Composable
+private fun LanguageList(
+    langs: List<org.mozilla.geckoview.TranslationsController.Language>,
+    picked: String?,
+    onPick: (String) -> Unit,
+) {
+    val p = LocalPalette.current
+    val t = com.verisonder.sonderweb.browser.Translate
+    androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 260.dp).padding(top = 4.dp)) {
+        items(langs.size) { i ->
+            val l = langs[i]
+            val on = l.code == picked
+            Text(
+                t.label(l),
+                color = if (on) p.accent else p.text,
+                fontSize = 16.sp,
+                fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onPick(l.code) }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            )
+        }
+    }
 }

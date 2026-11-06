@@ -53,52 +53,47 @@ object Translate {
             return
         }
         if (tab.translating) return
-        val to = short(tab.userLang ?: Locale.getDefault().toLanguageTag())
-        val from = tab.pageLang?.let(::short)
-        // The page says it's in your language (x.com always says English, even with Portuguese
-        // posts), or doesn't say: you pick the language to translate from.
-        if (from == null || from == to) {
-            pickFrom(tab, to)
-            return
-        }
-        start(tab, from, to)
-    }
-
-    /** The "Translate from" list: shown while not null. */
-    var choices by mutableStateOf<List<TranslationsController.Language>?>(null)
-        private set
-    private var choosingFor: Tab? = null
-    private var choosingTo = ""
-
-    private fun pickFrom(tab: Tab, to: String) {
+        // The phone's language, or the one you picked last time.
+        val to = Browser.prefs.translateTo.ifEmpty { short(tab.userLang ?: Locale.getDefault().toLanguageTag()) }
+        // What the page says it's in. Not trusted when it says your language: x.com always says
+        // English, even with Portuguese posts, so then you pick.
+        val from = tab.pageLang?.let(::short)?.takeIf { it != to }
         TranslationsController.RuntimeTranslation.listSupportedLanguages().accept(
             { support ->
                 Browser.main.post {
-                    val list = support?.fromLanguages.orEmpty()
-                        .filter { short(it.code) != to }
-                        .sortedBy { (it.localizedDisplayName ?: name(it.code)).lowercase() }
-                    if (list.isEmpty()) {
-                        Browser.host?.toast("This page is already in ${name(to)}")
-                    } else {
-                        choosingFor = tab
-                        choosingTo = to
-                        choices = list
-                    }
+                    val sort = { l: List<TranslationsController.Language> -> l.sortedBy { label(it).lowercase() } }
+                    ask = Ask(tab, sort(support?.fromLanguages.orEmpty()), sort(support?.toLanguages.orEmpty()), from, to)
                 }
             },
             { e -> Browser.main.post { Browser.host?.toast(message(e)) } },
         )
     }
 
-    /** Picked from the list (null: closed without picking). */
-    fun picked(code: String?) {
-        val tab = choosingFor
-        choices = null
-        choosingFor = null
-        if (code != null && tab != null) start(tab, code, choosingTo)
+    /** The From / To dialog: which languages, with the page's own and your usual one picked. */
+    class Ask(
+        val tab: Tab,
+        val froms: List<TranslationsController.Language>,
+        val tos: List<TranslationsController.Language>,
+        val from: String?,
+        val to: String,
+    )
+
+    /** Shown while not null. */
+    var ask by mutableStateOf<Ask?>(null)
+        private set
+
+    /** Translate was tapped in the dialog (null: closed). The "To" is kept for next time. */
+    fun answer(from: String?, to: String?) {
+        val a = ask
+        ask = null
+        if (a == null || from == null || to == null) return
+        Browser.prefs.translateTo = to
+        start(a.tab, from, to)
     }
 
     fun label(l: TranslationsController.Language) = l.localizedDisplayName ?: name(l.code)
+
+    fun label(code: String) = name(code)
 
     private fun start(tab: Tab, from: String?, to: String) {
         val st = tab.session.sessionTranslation ?: return
