@@ -453,3 +453,36 @@ fun OpenAppDialog(ask: com.verisonder.sonderweb.browser.AppLinks.Ask) {
         },
     )
 }
+
+/** The page says it's already in your language: which language are its words really in? */
+@Composable
+fun TranslateFromDialog(choices: List<org.mozilla.geckoview.TranslationsController.Language>) {
+    val p = LocalPalette.current
+    val t = com.verisonder.sonderweb.browser.Translate
+    AlertDialog(
+        onDismissRequest = { t.picked(null) },
+        containerColor = p.card,
+        title = { Text("Translate from", color = p.text, fontSize = 18.sp) },
+        text = {
+            androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                items(choices.size) { i ->
+                    val l = choices[i]
+                    Text(
+                        t.label(l),
+                        color = p.text,
+                        fontSize = 16.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { t.picked(l.code) }
+                            .padding(horizontal = 8.dp, vertical = 13.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton({ t.picked(null) }) { Text("Cancel", color = p.text) }
+        },
+    )
+}

@@ -2,6 +2,10 @@ package com.verisonder.sonderweb.browser
 
 import java.util.Locale
 import org.mozilla.geckoview.GeckoSession
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import org.mozilla.geckoview.TranslationsController
 import org.mozilla.geckoview.TranslationsController.SessionTranslation
 import org.mozilla.geckoview.TranslationsController.TranslationsException
 
@@ -51,10 +55,53 @@ object Translate {
         if (tab.translating) return
         val to = short(tab.userLang ?: Locale.getDefault().toLanguageTag())
         val from = tab.pageLang?.let(::short)
-        if (from == to) {
-            Browser.host?.toast("This page is already in ${name(to)}")
+        // The page says it's in your language (x.com always says English, even with Portuguese
+        // posts), or doesn't say: you pick the language to translate from.
+        if (from == null || from == to) {
+            pickFrom(tab, to)
             return
         }
+        start(tab, from, to)
+    }
+
+    /** The "Translate from" list: shown while not null. */
+    var choices by mutableStateOf<List<TranslationsController.Language>?>(null)
+        private set
+    private var choosingFor: Tab? = null
+    private var choosingTo = ""
+
+    private fun pickFrom(tab: Tab, to: String) {
+        TranslationsController.RuntimeTranslation.listSupportedLanguages().accept(
+            { support ->
+                Browser.main.post {
+                    val list = support?.fromLanguages.orEmpty()
+                        .filter { short(it.code) != to }
+                        .sortedBy { (it.localizedDisplayName ?: name(it.code)).lowercase() }
+                    if (list.isEmpty()) {
+                        Browser.host?.toast("This page is already in ${name(to)}")
+                    } else {
+                        choosingFor = tab
+                        choosingTo = to
+                        choices = list
+                    }
+                }
+            },
+            { e -> Browser.main.post { Browser.host?.toast(message(e)) } },
+        )
+    }
+
+    /** Picked from the list (null: closed without picking). */
+    fun picked(code: String?) {
+        val tab = choosingFor
+        choices = null
+        choosingFor = null
+        if (code != null && tab != null) start(tab, code, choosingTo)
+    }
+
+    fun label(l: TranslationsController.Language) = l.localizedDisplayName ?: name(l.code)
+
+    private fun start(tab: Tab, from: String?, to: String) {
+        val st = tab.session.sessionTranslation ?: return
         tab.translating = true
         Browser.host?.toast("Translating to ${name(to)}…")
         val options = SessionTranslation.TranslationOptions.Builder().downloadModel(true).build()
