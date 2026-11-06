@@ -15,9 +15,17 @@
     } catch (e) {}
     location.replace(target.href);
   };
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", go, { once: true });
-  } else {
-    go();
+  const start = () => {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", go, { once: true });
+    } else {
+      go();
+    }
+  };
+  // Off in the browser's settings: leave AMP pages alone.
+  try {
+    browser.storage.local.get("amp").then((r) => { if (r.amp !== false) start(); }, start);
+  } catch (e) {
+    start();
   }
 })();

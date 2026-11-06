@@ -1,10 +1,10 @@
 {
   "manifest_version": 2,
   "name": "SonderWeb shields",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Keeps your IP address out of WebRTC, opens real pages instead of AMP copies, and skips tracking redirect links.",
   "browser_specific_settings": { "gecko": { "id": "shields@sonderweb" } },
-  "permissions": ["privacy", "webRequest", "webRequestBlocking", "<all_urls>"],
+  "permissions": ["privacy", "webRequest", "webRequestBlocking", "storage", "nativeMessaging", "geckoViewAddons", "<all_urls>"],
   "background": { "scripts": ["shields.js"] },
   "content_scripts": [
     {

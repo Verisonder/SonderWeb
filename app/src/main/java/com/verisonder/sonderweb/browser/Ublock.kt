@@ -463,12 +463,42 @@ object AddonsSite {
 object Shields {
     const val ID = "shields@sonderweb"
     private const val LOCATION = "resource://android/assets/extensions/shields/"
+    private var port: WebExtension.Port? = null
 
     fun install(runtime: GeckoRuntime) {
         runtime.webExtensionController.ensureBuiltIn(LOCATION, ID).accept({ ext ->
             if (ext != null) {
-                Browser.main.post { runtime.webExtensionController.setAllowedInPrivateBrowsing(ext, true) }
+                Browser.main.post {
+                    runtime.webExtensionController.setAllowedInPrivateBrowsing(ext, true)
+                    // Its switches (Settings › Privacy & security › Shields) are sent when it connects.
+                    ext.setMessageDelegate(
+                        object : WebExtension.MessageDelegate {
+                            override fun onConnect(p: WebExtension.Port) {
+                                port = p
+                                p.setDelegate(
+                                    object : WebExtension.PortDelegate {
+                                        override fun onDisconnect(p: WebExtension.Port) {
+                                            if (port === p) port = null
+                                        }
+                                    },
+                                )
+                                apply()
+                            }
+                        },
+                        "shields",
+                    )
+                }
             }
         }, { _ -> })
+    }
+
+    /** Sends the switches as they are now. */
+    fun apply() {
+        val prefs = Browser.prefs
+        val m = org.json.JSONObject()
+            .put("webrtc", prefs.shieldWebrtc)
+            .put("amp", prefs.shieldAmp)
+            .put("debounce", prefs.shieldDebounce)
+        runCatching { port?.postMessage(m) }
     }
 }

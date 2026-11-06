@@ -67,6 +67,19 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("history", true)
         set(v) = sp.edit().putBoolean("history", v).apply()
 
+    /** Shields: local IP addresses kept out of WebRTC, real pages instead of AMP copies, tracking redirects skipped. */
+    var shieldWebrtc: Boolean
+        get() = sp.getBoolean("shield_webrtc", true)
+        set(v) = sp.edit().putBoolean("shield_webrtc", v).apply()
+
+    var shieldAmp: Boolean
+        get() = sp.getBoolean("shield_amp", true)
+        set(v) = sp.edit().putBoolean("shield_amp", v).apply()
+
+    var shieldDebounce: Boolean
+        get() = sp.getBoolean("shield_debounce", true)
+        set(v) = sp.edit().putBoolean("shield_debounce", v).apply()
+
     /** Leave the app while a video plays: it keeps playing in a small window. */
     var pip: Boolean
         get() = sp.getBoolean("pip", true)

@@ -107,6 +107,10 @@ private val index: List<Pair<String, Page>> = listOf(
     "Strict tracking protection" to Page.Privacy,
     "HTTPS only" to Page.Privacy,
     "Fingerprinting" to Page.Privacy,
+    "Shields" to Page.Privacy,
+    "WebRTC IP protection" to Page.Privacy,
+    "AMP pages" to Page.Privacy,
+    "Tracking redirects" to Page.Privacy,
     "DuckDuckGo look" to Page.Search,
     "Secure DNS" to Page.Privacy,
     "DNS over HTTPS" to Page.Privacy,
@@ -366,6 +370,27 @@ private fun PrivacyPage(onClear: () -> Unit) {
         Toggle("Keep history", "Off: pages you visit aren't remembered. Private tabs never are.", history) {
             history = it
             prefs.saveHistory = it
+        }
+    }
+    GroupTitle("Shields")
+    var webrtc by remember { mutableStateOf(prefs.shieldWebrtc) }
+    var amp by remember { mutableStateOf(prefs.shieldAmp) }
+    var debounce by remember { mutableStateOf(prefs.shieldDebounce) }
+    Group {
+        Toggle("WebRTC IP protection", "Calls and video chats only see the address your traffic already uses (your VPN's), never your local network.", webrtc) {
+            webrtc = it
+            prefs.shieldWebrtc = it
+            com.verisonder.sonderweb.browser.Shields.apply()
+        }
+        Toggle("Skip AMP pages", "Opens the real page instead of Google's AMP copy of it.", amp) {
+            amp = it
+            prefs.shieldAmp = it
+            com.verisonder.sonderweb.browser.Shields.apply()
+        }
+        Toggle("Skip tracking redirects", "Links that only pass through a tracker (Google, Facebook, YouTube…) go straight to the real page.", debounce) {
+            debounce = it
+            prefs.shieldDebounce = it
+            com.verisonder.sonderweb.browser.Shields.apply()
         }
     }
     GroupTitle("Secure DNS")
