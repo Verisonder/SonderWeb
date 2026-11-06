@@ -372,10 +372,15 @@ class MainActivity : ComponentActivity(), Browser.Host {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        // Before Android 12 the small window is opened here, when you leave with a video playing.
-        if (Build.VERSION.SDK_INT < 31 && pipSupported && com.verisonder.sonderweb.browser.Pip.ready) {
-            runCatching { enterPictureInPictureMode(pipParams()) }
-        }
+        // Leaving with a video playing: into the small window. Android 12+ may already be doing
+        // it by itself; asking again is harmless, and some phones (HyperOS) only do it this way.
+        if (com.verisonder.sonderweb.browser.Pip.ready) enterPip()
+    }
+
+    /** Opens the small window now (also from the ⋮ menu). False when the phone won't. */
+    override fun enterPip(): Boolean {
+        if (!pipSupported || isInPictureInPictureMode) return false
+        return runCatching { enterPictureInPictureMode(pipParams()) }.getOrDefault(false)
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {

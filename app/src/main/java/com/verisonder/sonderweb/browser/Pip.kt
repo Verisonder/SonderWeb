@@ -29,6 +29,43 @@ object Pip {
     }
 
     fun attach(tab: Tab) {
+        // Second way to know a video plays: the engine's own media session (works without the
+        // extension, for videos with sound). Fullscreen videos also tell their shape here.
+        tab.session.setMediaSessionDelegate(
+            object : org.mozilla.geckoview.MediaSession.Delegate {
+                override fun onPlay(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
+                    tab.mediaPlaying = true
+                    changed()
+                }
+
+                override fun onPause(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
+                    tab.mediaPlaying = false
+                    changed()
+                }
+
+                override fun onStop(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
+                    tab.mediaPlaying = false
+                    changed()
+                }
+
+                override fun onDeactivated(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
+                    tab.mediaPlaying = false
+                    changed()
+                }
+
+                override fun onFullscreen(
+                    session: org.mozilla.geckoview.GeckoSession,
+                    media: org.mozilla.geckoview.MediaSession,
+                    enabled: Boolean,
+                    meta: org.mozilla.geckoview.MediaSession.ElementMetadata?,
+                ) {
+                    if (enabled && meta != null && meta.width > 0 && meta.height > 0) {
+                        tab.videoRatio = meta.width.toFloat() / meta.height
+                        changed()
+                    }
+                }
+            },
+        )
         val ext = extension ?: return
         tab.session.webExtensionController.setMessageDelegate(
             ext,
@@ -71,7 +108,7 @@ object Pip {
 
     /** A video is playing in the tab on screen, and picture-in-picture is on. */
     val ready: Boolean
-        get() = Browser.prefs.pip && Browser.current?.videoPlaying == true
+        get() = Browser.prefs.pip && Browser.current.let { it != null && (it.videoPlaying || it.mediaPlaying) }
 
     private fun changed() {
         Browser.host?.updatePip()

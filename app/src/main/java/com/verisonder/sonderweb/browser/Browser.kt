@@ -517,6 +517,9 @@ object Browser {
         /** A video started or stopped: the picture-in-picture window's shape and buttons follow it. */
         fun updatePip()
 
+        /** Opens the picture-in-picture window now; false when it can't. */
+        fun enterPip(): Boolean
+
         /** Asks for the fingerprint or screen lock, then unlocks the private tabs. */
         fun unlockPrivate()
         fun requestAndroidPermissions(perms: Array<String>, result: (Boolean) -> Unit)

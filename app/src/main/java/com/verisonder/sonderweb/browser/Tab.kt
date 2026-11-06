@@ -73,6 +73,9 @@ class Tab(val id: Long, val isPrivate: Boolean) {
 
     /** A video is playing in this tab, and its width / height (for picture-in-picture). */
     var videoPlaying = false
+
+    /** The engine says media is playing here (sound or video). */
+    var mediaPlaying = false
     var videoRatio = 16f / 9f
 
     /** The site's address before desktop mode was turned on (to go back to its mobile address). */

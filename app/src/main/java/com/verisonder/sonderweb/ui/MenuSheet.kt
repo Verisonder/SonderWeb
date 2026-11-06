@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material.icons.outlined.PictureInPictureAlt
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Star
@@ -159,6 +160,15 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                     ui.findResult = ""
                     ui.finding = true
                     close()
+                }
+                // A video is playing: put it in the small window right away.
+                if (tab.videoPlaying || tab.mediaPlaying) {
+                    Item("Picture-in-picture", Icons.Outlined.PictureInPictureAlt) {
+                        close()
+                        if (Browser.host?.enterPip() != true) {
+                            Browser.host?.toast("Picture-in-picture is off for SonderWeb in the phone's settings")
+                        }
+                    }
                 }
                 Item(if (tab.translatedTo != null) "Show original" else "Translate page", Icons.Outlined.Translate) {
                     Translate.toggle(tab)
