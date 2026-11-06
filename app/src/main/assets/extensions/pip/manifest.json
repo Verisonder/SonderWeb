@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
-  "name": "SonderWeb picture-in-picture",
-  "version": "1.0",
-  "description": "Tells the browser when a video plays, and fills the small window with it in picture-in-picture.",
+  "name": "SonderWeb video helper",
+  "version": "1.1",
+  "description": "Tells the browser when a video plays, fills the picture-in-picture window with it, and keeps fullscreen videos in place.",
   "browser_specific_settings": { "gecko": { "id": "pip@sonderweb" } },
   "permissions": ["nativeMessaging", "nativeMessagingFromContent", "geckoViewAddons"],
   "content_scripts": [

@@ -51,6 +51,18 @@
     document.addEventListener(t, report, true);
   }
 
+  // Going in or out of fullscreen, the screen changes size in steps (the browser's bar and the
+  // phone's bars go away a moment later). Players like YouTube's only place the video for the
+  // size they saw first, which left it stuck at the top. Telling the page the size changed again
+  // once things settle puts the video back in the middle.
+  document.addEventListener("fullscreenchange", () => {
+    for (const ms of [120, 350, 800]) {
+      setTimeout(() => {
+        try { window.dispatchEvent(new Event("resize")); } catch (e) {}
+      }, ms);
+    }
+  }, true);
+
   const FILL = [
     ["position", "fixed"], ["inset", "0"], ["top", "0"], ["left", "0"],
     ["width", "100vw"], ["height", "100vh"], ["max-width", "none"], ["max-height", "none"],
