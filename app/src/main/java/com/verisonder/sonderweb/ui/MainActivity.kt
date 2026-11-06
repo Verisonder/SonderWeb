@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
 
     /** True while a page shows a video (or anything) in fullscreen. */
     var inFullscreen by mutableStateOf(false)
+        private set
 
     /** In the small picture-in-picture window: only the page (its video) shows. */
     var inPip by mutableStateOf(false)
@@ -69,7 +70,6 @@ class MainActivity : ComponentActivity(), Browser.Host {
             com.verisonder.sonderweb.browser.Pip.togglePlay()
         }
     }
-        private set
 
     private var filesResult: ((List<Uri>) -> Unit)? = null
     private var permsResult: ((Boolean) -> Unit)? = null
