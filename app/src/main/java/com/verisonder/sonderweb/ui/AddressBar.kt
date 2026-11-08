@@ -341,7 +341,7 @@ private fun Omnibox(ui: UiState, tab: Tab?, modifier: Modifier, pop: NewTabPop? 
             .height(40.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(p.field)
-            .then(if (pop != null) Modifier.holdForNewTab(pop, top, tab?.isPrivate ?: false) { startEditing(ui, tab) } else Modifier.clickable { startEditing(ui, tab) })
+            .then(if (pop != null) Modifier.holdForNewTab(pop, top, tab?.isPrivate ?: false, onNewTab = { startEditing(ui, it) }) { startEditing(ui, tab) } else Modifier.clickable { startEditing(ui, tab) })
             .padding(start = 14.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -574,9 +574,16 @@ fun rememberTabPicker(tab: Tab?, top: Boolean): TabPicker {
 }
 
 /** The address: tap to type; hold, slide onto the "+" that pops out and let go for a new tab. */
-private fun Modifier.holdForNewTab(pop: NewTabPop, top: Boolean, isPrivate: Boolean, onTap: () -> Unit): Modifier = composed {
+private fun Modifier.holdForNewTab(
+    pop: NewTabPop,
+    top: Boolean,
+    isPrivate: Boolean,
+    onNewTab: (Tab) -> Unit,
+    onTap: () -> Unit,
+): Modifier = composed {
     val haptics = LocalHapticFeedback.current
     val tap by rememberUpdatedState(onTap)
+    val opened by rememberUpdatedState(onNewTab)
     val reach = with(LocalDensity.current) { 44.dp.toPx() }
     this
         .pointerInput(pop, top, isPrivate) {
@@ -603,7 +610,10 @@ private fun Modifier.holdForNewTab(pop: NewTabPop, top: Boolean, isPrivate: Bool
                     return@awaitEachGesture
                 }
                 if (moved) return@awaitEachGesture
-                slideToNewTab(pop, top, reach, down.position.y, haptics) { Browser.newTab(null, isPrivate = isPrivate) }
+                slideToNewTab(pop, top, reach, down.position.y, haptics) {
+                    // Straight into typing: the home button already gives a plain start page.
+                    opened(Browser.newTab(null, isPrivate = isPrivate))
+                }
             }
         }
 }
