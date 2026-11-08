@@ -65,7 +65,8 @@ fun TabsScreen(ui: UiState) {
     BackHandler(enabled = showInactive) { showInactive = false }
     // Inactive tabs (Brave's idea) sit behind one row at the top instead of in the grid.
     val inactive = if (privateMode) emptyList() else Browser.inactiveTabs()
-    val list = Browser.tabs.filter { it.isPrivate == privateMode && it !in inactive }
+    // Empty new tabs are just the start page: not listed here.
+    val list = Browser.tabs.filter { it.isPrivate == privateMode && !it.isBlank && it !in inactive }
     val accent = if (privateMode) PrivatePalette.accent else p.accent
 
     // Opens at the bottom, where the newest tabs are (and again on switching normal / private).
@@ -91,7 +92,10 @@ fun TabsScreen(ui: UiState) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Segmented(
-                listOf("Tabs · " + Browser.tabs.count { !it.isPrivate }, "Private · " + Browser.tabs.count { it.isPrivate }),
+                listOf(
+                    "Tabs · " + Browser.tabs.count { !it.isPrivate && !it.isBlank },
+                    "Private · " + Browser.tabs.count { it.isPrivate && !it.isBlank },
+                ),
                 if (privateMode) 1 else 0,
                 accent,
             ) { privateMode = it == 1 }
