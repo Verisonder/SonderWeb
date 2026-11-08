@@ -66,6 +66,7 @@ object Pip {
                 }
 
                 override fun onPause(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
+                    debug("engine: media paused")
                     tab.mediaPlaying = false
                     MediaPlayback.paused(tab)
                     changed()
@@ -105,6 +106,10 @@ object Pip {
                         object : WebExtension.PortDelegate {
                             override fun onPortMessage(message: Any, port: WebExtension.Port) {
                                 val m = message as? JSONObject ?: return
+                                m.optString("debug").takeIf { it.isNotEmpty() }?.let {
+                                    debug("video: $it")
+                                    return
+                                }
                                 val playing = m.optBoolean("playing")
                                 // The frame that's playing is the one to talk to; others only when they're the last one.
                                 if (playing || ports[tab] === port) {
@@ -151,8 +156,18 @@ object Pip {
         runCatching { port.postMessage(JSONObject().put("pip", on)) }
     }
 
+    /** TEMPORARY: what paused the video, on screen (works over other apps and in the small window). */
+    fun debug(text: String) {
+        Browser.main.post {
+            runCatching {
+                android.widget.Toast.makeText(Browser.app, text, android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     /** The small window was closed: the video stops. */
     fun pause() {
+        debug("app: small window closed, pausing")
         val tab = Browser.current ?: return
         runCatching { tab.media?.pause() }
         runCatching { ports[tab]?.postMessage(JSONObject().put("pause", true)) }

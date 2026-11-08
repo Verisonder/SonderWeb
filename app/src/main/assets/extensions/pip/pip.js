@@ -19,6 +19,42 @@
   for (const t of ["visibilitychange", "webkitvisibilitychange"]) {
     window.addEventListener(t, (e) => e.stopImmediatePropagation(), true);
   }
+  // Losing focus (the small window never has it) and the page being frozen or hidden are
+  // also kept from the page. Only the window's own events: a text field's blur still goes through.
+  for (const t of ["blur", "pagehide", "freeze"]) {
+    window.addEventListener(t, (e) => {
+      if (e.target === window || e.target === document) e.stopImmediatePropagation();
+    }, true);
+  }
+  try {
+    exportFunction(() => true, window.wrappedJSObject.Document.prototype, { defineAs: "hasFocus" });
+  } catch (e) {}
+
+  // TEMPORARY: what stops the video. A pause() call from the page is recorded with where it
+  // came from; a pause with no call before it was the browser. Shown on the phone as a message.
+  let pauseCall = null;
+  try {
+    const mproto = window.wrappedJSObject.HTMLMediaElement.prototype;
+    const realPause = mproto.pause;
+    exportFunction(function () {
+      let where = "";
+      try {
+        const lines = String(new Error().stack).split("\n").filter((l) => l && !l.includes("pip.js"));
+        where = lines.slice(0, 2).map((l) => l.replace(/https?:\/\/[^ ]*\//, "").slice(0, 60)).join(" < ");
+      } catch (e) {}
+      pauseCall = { at: Date.now(), where };
+      return realPause.call(this);
+    }, mproto, { defineAs: "pause" });
+  } catch (e) {}
+  document.addEventListener("pause", (e) => {
+    if (!(e.target instanceof HTMLVideoElement)) return;
+    const byPage = pauseCall && Date.now() - pauseCall.at < 300;
+    const why = byPage ? "page called pause(): " + (pauseCall.where || "?") : "browser paused it";
+    const state = "vis " + document.visibilityState + ", focus " + document.hasFocus();
+    const p = connect();
+    if (p) try { p.postMessage({ debug: why + " · " + state }); } catch (err) {}
+    pauseCall = null;
+  }, true);
 
   let port = null;
   let video = null;
