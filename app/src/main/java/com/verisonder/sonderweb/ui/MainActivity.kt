@@ -202,6 +202,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun onStart() {
         super.onStart()
         ownScreen = false
+        Browser.current?.let { com.verisonder.sonderweb.browser.Pip.hold(it, false) }
         com.verisonder.sonderweb.browser.Extensions.wake()
         wake()
     }
@@ -251,6 +252,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
         // Something is playing (music, a video): it keeps playing while you're away or the screen
         // is off, with the media notification. Otherwise the page is paused to save battery.
         if (com.verisonder.sonderweb.browser.MediaPlayback.keepAwake) {
+            Browser.current?.let { com.verisonder.sonderweb.browser.Pip.hold(it, true) }
             if (!ownScreen && !isChangingConfigurations) {
                 Browser.leftApp()
                 launchCheck = true

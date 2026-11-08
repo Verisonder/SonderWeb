@@ -171,6 +171,12 @@ object Pip {
         runCatching { port.postMessage(JSONObject().put("pip", on)) }
     }
 
+    /** The app went to the background with the video playing (or came back): the page may not pause it meanwhile. */
+    fun hold(tab: Tab, on: Boolean) {
+        val port = ports[tab] ?: return
+        runCatching { port.postMessage(JSONObject().put("hold", on)) }
+    }
+
     /** Stop the video in a tab that isn't the one on screen. */
     fun pauseTab(tab: Tab) {
         runCatching { tab.media?.pause() }

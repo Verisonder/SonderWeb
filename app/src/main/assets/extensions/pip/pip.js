@@ -33,6 +33,10 @@
   // TEMPORARY: what stops the video. A pause() call from the page is recorded with where it
   // came from; a pause with no call before it was the browser. Shown on the phone as a message.
   let pauseCall = null;
+  // While the video is in a small window or playing with the app in the background, the page
+  // may not stop it: YouTube calls pause() itself when it notices. The play/pause button, the
+  // media controls and the × still work - they don't go through the page.
+  let hold = false;
   try {
     const mproto = window.wrappedJSObject.HTMLMediaElement.prototype;
     const realPause = mproto.pause;
@@ -42,6 +46,11 @@
         const lines = String(new Error().stack).split("\n").filter((l) => l && !l.includes("pip.js"));
         where = lines.slice(0, 2).map((l) => l.replace(/https?:\/\/[^ ]*\//, "").slice(0, 60)).join(" < ");
       } catch (e) {}
+      if (hold) {
+        const p = connect();
+        if (p) try { p.postMessage({ debug: "kept playing (page tried to pause)" }); } catch (err) {}
+        return undefined;
+      }
       pauseCall = { at: Date.now(), where };
       return realPause.call(this);
     }, mproto, { defineAs: "pause" });
@@ -156,9 +165,11 @@
     for (let el = v.parentElement; el && el !== document.documentElement; el = el.parentElement) set(el, FREE);
     set(document.documentElement, [["overflow", "hidden"], ["background", "#000"]]);
     filled = saved;
+    hold = true;
   }
 
   function unfill() {
+    hold = false;
     if (!filled) return;
     for (const [el, style] of filled.reverse()) {
       if (style === null) el.removeAttribute("style"); else el.setAttribute("style", style);
@@ -173,6 +184,8 @@
   function onMessage(m) {
     if (m.pip === true) fill();
     if (m.pip === false) unfill();
+    if (m.hold === true) hold = true;
+    if (m.hold === false && !filled) hold = false;
     if (m.pause && video) video.pause();
     if (m.toggle && video) {
       if (video.paused) video.play().catch(() => {}); else video.pause();
