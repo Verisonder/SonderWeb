@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.verisonder.sonderweb.browser.Browser
 import com.verisonder.sonderweb.browser.Tab
 import com.verisonder.sonderweb.core.UrlText
+import kotlinx.coroutines.flow.first
 
 /**
  * The tab switcher, laid out like Brave's: the normal / private switch on top, "Search your
@@ -88,6 +89,16 @@ fun TabsScreen(ui: UiState) {
     }
     val accent = if (privateMode) PrivatePalette.accent else p.accent
     val locked = privateMode && Browser.privateLocked
+
+    // Opens at the bottom, where the newest tabs are (and again when switching normal / private).
+    val grid = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    androidx.compose.runtime.LaunchedEffect(privateMode, showInactive) {
+        if (showInactive) return@LaunchedEffect
+        // The grid's own count is 0 until it has laid out once: wait for it.
+        val count = androidx.compose.runtime.snapshotFlow { grid.layoutInfo.totalItemsCount }
+            .first { it > 0 }
+        grid.scrollToItem(count - 1)
+    }
 
     if (showInactive) {
         InactiveTabs(ui, inactive) { showInactive = false }
@@ -120,6 +131,7 @@ fun TabsScreen(ui: UiState) {
 
         Box(Modifier.weight(1f)) {
             LazyVerticalGrid(
+                state = grid,
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
