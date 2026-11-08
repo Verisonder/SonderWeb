@@ -37,18 +37,15 @@
   // may not stop it: YouTube calls pause() itself when it notices. The play/pause button, the
   // media controls and the × still work - they don't go through the page.
   let hold = false;
-  // The last time you touched the page or pressed a key: a pause right after that is yours.
-  let lastInput = 0;
-  for (const t of ["pointerdown", "touchstart", "mousedown", "keydown"]) {
-    window.addEventListener(t, (e) => { if (e.isTrusted) lastInput = Date.now(); }, true);
-  }
   // The page's last pause that nobody asked for. YouTube often gets one in just before the
   // browser has said the video went small; it is undone as soon as the browser does.
   let strayPause = null;
   function resumeStray() {
     const s = strayPause;
     strayPause = null;
-    if (!s || Date.now() - s.at > 4000 || lastInput > s.at) return;
+    // The swipe home is itself a touch on the page, so it can't count as "you paused it":
+    // the browser only holds a video that was playing when you left.
+    if (!s || Date.now() - s.at > 4000) return;
     try {
       if (s.el.paused && !s.el.ended) {
         s.el.play().catch(() => {});
@@ -66,14 +63,15 @@
         const lines = String(new Error().stack).split("\n").filter((l) => l && !l.includes("pip.js"));
         where = lines.slice(0, 2).map((l) => l.replace(/https?:\/\/[^ ]*\//, "").slice(0, 60)).join(" < ");
       } catch (e) {}
-      const yours = Date.now() - lastInput < 1500;
-      if (hold && !yours) {
+      // Held: nothing on the page can pause it. In the small windows the page can't be touched;
+      // the window's own buttons and the media controls don't come through here.
+      if (hold) {
         const p = connect();
         if (p) try { p.postMessage({ debug: "kept playing (page tried to pause)" }); } catch (err) {}
         return undefined;
       }
       pauseCall = { at: Date.now(), where };
-      if (!yours) strayPause = { at: Date.now(), el: this };
+      strayPause = { at: Date.now(), el: this };
       return realPause.call(this);
     }, mproto, { defineAs: "pause" });
   } catch (e) {}
@@ -91,6 +89,16 @@
   let video = null;
   let filled = null;
   let scrolled = null;
+
+  // TEMPORARY: every change shows as a message, to see when holding starts and stops.
+  function setHold(on, why) {
+    if (hold !== on) {
+      const p = connect();
+      if (p) try { p.postMessage({ debug: (on ? "hold on: " : "hold off: ") + why }); } catch (err) {}
+    }
+    hold = on;
+    if (on) resumeStray();
+  }
 
   function connect() {
     if (port) return port;
@@ -187,12 +195,11 @@
     for (let el = v.parentElement; el && el !== document.documentElement; el = el.parentElement) set(el, FREE);
     set(document.documentElement, [["overflow", "hidden"], ["background", "#000"]]);
     filled = saved;
-    hold = true;
-    resumeStray();
+    setHold(true, "small window");
   }
 
   function unfill() {
-    hold = false;
+    setHold(false, "window back to full size");
     if (!filled) return;
     for (const [el, style] of filled.reverse()) {
       if (style === null) el.removeAttribute("style"); else el.setAttribute("style", style);
@@ -207,8 +214,8 @@
   function onMessage(m) {
     if (m.pip === true) fill();
     if (m.pip === false) unfill();
-    if (m.hold === true) { hold = true; resumeStray(); }
-    if (m.hold === false && !filled) hold = false;
+    if (m.hold === true) setHold(true, "app left");
+    if (m.hold === false && !filled) setHold(false, "app back in front");
     if (m.pause && video) video.pause();
     if (m.toggle && video) {
       if (video.paused) video.play().catch(() => {}); else video.pause();
