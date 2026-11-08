@@ -16,6 +16,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.OpenInFull
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -44,15 +53,14 @@ import org.mozilla.geckoview.GeckoView
 import kotlin.math.roundToInt
 
 /**
- * The floating video window inside the app: a tab you left while its video played keeps playing
- * here. Drag it anywhere; tap it to go back to that tab; × stops the video.
+ * The floating video window inside the app. Drag it anywhere; tap it for its buttons: open the
+ * video full size, play/pause, or stop it.
  *
  * It is a second engine view showing that tab's page (drawn as a texture, so it can float, be
- * rounded and be dragged over the main page), with the page's video filling it.
+ * rounded and be dragged over everything else), with the page's video filling it.
  */
 @Composable
-fun MiniPlayer(main: GeckoView, bottomGap: androidx.compose.ui.unit.Dp) {
-    val tab = Browser.mini ?: return
+fun MiniPlayer(tab: Tab, main: GeckoView, bottomGap: androidx.compose.ui.unit.Dp, onOpen: () -> Unit) {
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
@@ -67,6 +75,15 @@ fun MiniPlayer(main: GeckoView, bottomGap: androidx.compose.ui.unit.Dp) {
         // Starts in the bottom-right corner, above the bar.
         var x by remember { mutableFloatStateOf(maxX) }
         var y by remember { mutableFloatStateOf(maxY) }
+        var controls by remember { mutableStateOf(false) }
+        var paused by remember(tab) { mutableStateOf(false) }
+        // The buttons fade away again on their own.
+        LaunchedEffect(controls, paused) {
+            if (controls) {
+                delay(3000)
+                controls = false
+            }
+        }
         Box(
             Modifier
                 .offset { IntOffset(x.coerceIn(0f, maxX).roundToInt(), y.coerceIn(0f, maxY).roundToInt()) }
@@ -83,21 +100,39 @@ fun MiniPlayer(main: GeckoView, bottomGap: androidx.compose.ui.unit.Dp) {
                 },
         ) {
             MiniView(tab, main)
-            // Taps go to the window, not to the page inside it.
-            Box(Modifier.fillMaxSize().clickable { Browser.select(tab) })
-            Box(
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .clickable { Browser.closeMini(tab) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Outlined.Close, "Stop video", tint = Color.White, modifier = Modifier.size(16.dp))
+            // Taps go to the window (its buttons), never to the page inside it.
+            Box(Modifier.fillMaxSize().clickable { controls = !controls })
+            AnimatedVisibility(controls, enter = fadeIn(), exit = fadeOut()) {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f))) {
+                    Row(
+                        Modifier.align(Alignment.Center),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        MiniButton(Icons.Outlined.OpenInFull, "Open") { onOpen() }
+                        MiniButton(if (paused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause, if (paused) "Play" else "Pause") {
+                            Pip.togglePlay(tab)
+                            paused = !paused
+                        }
+                        MiniButton(Icons.Outlined.Close, "Stop video") { Browser.closeMini(tab) }
+                    }
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun MiniButton(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, label, tint = Color.White, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -109,10 +144,11 @@ private fun MiniView(tab: Tab, main: GeckoView) {
     }
     var attached by remember(tab) { mutableStateOf(false) }
     LaunchedEffect(tab) {
-        // The main view lets go of this tab's page when it switches to the new tab; a page can
-        // only be shown in one view at a time.
+        // A page can only be shown in one view at a time. A tab you left: the main view lets go
+        // of it as it switches. The tab on screen (a panel over it): it is taken from the main view.
         var waited = 0
-        while (main.session === tab.session && waited++ < 60) delay(16)
+        while (main.session === tab.session && Browser.current !== tab && waited++ < 60) delay(16)
+        if (main.session === tab.session) runCatching { main.releaseSession() }
         if (main.session === tab.session || !tab.session.isOpen) return@LaunchedEffect
         runCatching {
             view.setSession(tab.session)
@@ -127,6 +163,10 @@ private fun MiniView(tab: Tab, main: GeckoView) {
         onDispose {
             Pip.fill(tab, false)
             if (attached) runCatching { view.releaseSession() }
+            // Back on the main view when it is the tab on screen again.
+            if (Browser.current === tab && main.session == null && tab.session.isOpen) {
+                runCatching { main.setSession(tab.session) }
+            }
         }
     }
     AndroidView({ view }, Modifier.fillMaxSize())

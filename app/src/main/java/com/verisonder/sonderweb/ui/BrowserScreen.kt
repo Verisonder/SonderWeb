@@ -405,11 +405,6 @@ fun BrowserScreen(activity: MainActivity) {
                 }
             }
 
-            // A video from a tab you left keeps playing in a small floating window.
-            if (!activity.inPip && !activity.fullView) {
-                MiniPlayer(activity.geckoView, bottomGap = if (barTop) 16.dp else 84.dp)
-            }
-
             SnackbarHost(
                 activity.snackbar,
                 modifier = Modifier
@@ -508,6 +503,24 @@ fun BrowserScreen(activity: MainActivity) {
                 exit = fadeOut(tween(220)),
             ) {
                 PrivateLock(onLeave = { leavePrivate(ui) })
+            }
+
+            // A video keeps playing in a small floating window: from a tab you left, or from
+            // this tab while Settings, the tab list or another page covers it. Over everything.
+            val miniTab = Browser.mini ?: tab?.takeIf {
+                ui.panel != Panel.None && Browser.keepsPlaying(it) && Browser.miniStopped !== it
+            }
+            LaunchedEffect(ui.panel) { if (ui.panel == Panel.None) Browser.miniStopped = null }
+            if (miniTab != null && !activity.inPip && !activity.fullView) {
+                MiniPlayer(
+                    miniTab,
+                    activity.geckoView,
+                    bottomGap = if (barTop && ui.panel == Panel.None) 16.dp else 84.dp,
+                ) {
+                    // Open: back to the video's own tab, full size.
+                    ui.panel = Panel.None
+                    if (Browser.current !== miniTab) Browser.select(miniTab)
+                }
             }
         }
     }

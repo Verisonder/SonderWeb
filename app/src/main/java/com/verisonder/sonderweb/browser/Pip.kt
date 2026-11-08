@@ -191,6 +191,12 @@ object Pip {
         runCatching { ports[tab]?.postMessage(JSONObject().put("pause", true)) }
     }
 
+    /** Play/pause for a tab's video, from the floating window. */
+    fun togglePlay(tab: Tab) {
+        val port = ports[tab] ?: return
+        runCatching { port.postMessage(JSONObject().put("toggle", true)) }
+    }
+
     /** The play/pause button in the small window. */
     fun togglePlay() {
         val tab = Browser.current ?: return

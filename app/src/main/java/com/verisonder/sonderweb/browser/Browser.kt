@@ -50,6 +50,9 @@ object Browser {
      */
     var mini by mutableStateOf<Tab?>(null)
 
+    /** The tab on screen whose floating window you closed while a panel covers it. */
+    var miniStopped by mutableStateOf<Tab?>(null)
+
     /** A video is playing here and picture-in-picture is on: another page shouldn't replace it. */
     fun keepsPlaying(tab: Tab?): Boolean = tab != null && prefs.pip && tab.playing && !tab.isBlank
 
@@ -443,6 +446,7 @@ object Browser {
     fun closeMini(tab: Tab? = mini) {
         val t = tab ?: return
         if (mini === t) mini = null
+        if (current === t) miniStopped = t
         Pip.pauseTab(t)
         if (current !== t && t.session.isOpen) {
             t.session.setActive(false)
