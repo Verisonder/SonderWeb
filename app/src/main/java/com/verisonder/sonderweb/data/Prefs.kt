@@ -252,6 +252,17 @@ class Prefs(context: Context) {
             sp.edit().putString("tab_colors", a.toString()).apply()
         }
 
+    /** When each saved tab was last used (ms), in the order of [savedTabs]. */
+    var savedTabUsed: List<Long>
+        get() {
+            val raw = sp.getString("tab_used", null) ?: return emptyList()
+            return runCatching {
+                val a = JSONArray(raw)
+                List(a.length()) { a.optLong(it) }
+            }.getOrDefault(emptyList())
+        }
+        set(v) = sp.edit().putString("tab_used", JSONArray(v).toString()).apply()
+
     var savedTabIndex: Int
         get() = sp.getInt("tab_index", 0)
         set(v) = sp.edit().putInt("tab_index", v).apply()

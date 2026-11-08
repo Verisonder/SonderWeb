@@ -90,6 +90,9 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     /** The tab that opened this one; closing returns to it. */
     var openerId: Long? = null
 
+    /** When this tab was last the current one. Tabs left alone long enough go under "inactive". */
+    var lastUsed: Long = System.currentTimeMillis()
+
     /** True while nothing has been loaded yet: the start page is shown instead of the engine. */
     val isBlank: Boolean get() = url.isEmpty() && pendingUrl == null && !loading
 

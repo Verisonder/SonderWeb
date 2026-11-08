@@ -240,6 +240,7 @@ object Browser {
         // Leaving the private tabs locks them again: coming back needs your fingerprint.
         if (old?.isPrivate == true && !tab.isPrivate && prefs.privateLock) privateLocked = true
         current = tab
+        tab.lastUsed = System.currentTimeMillis()
         if (old?.isPrivate != tab.isPrivate) applyDns()
         Bar.show()
         if (tab.ready) activate(tab)
@@ -323,6 +324,28 @@ object Browser {
     fun closeAll(isPrivate: Boolean) {
         tabs.filter { it.isPrivate == isPrivate }.forEach { close(it) }
     }
+
+    /**
+     * Inactive, like Brave's: normal tabs not used for [INACTIVE_DAYS] days, and older copies of
+     * a page that is open in another tab. Never the current tab.
+     */
+    fun inactiveTabs(): List<Tab> {
+        val cutoff = System.currentTimeMillis() - INACTIVE_DAYS * 24L * 60 * 60 * 1000
+        val normal = tabs.filter { !it.isPrivate && it !== current }
+        val newest = HashMap<String, Tab>()
+        tabs.filter { !it.isPrivate && !it.isBlank }.forEach { t ->
+            val key = t.pendingUrl ?: t.url
+            val n = newest[key]
+            if (n == null || t === current || (n !== current && t.lastUsed > n.lastUsed)) newest[key] = t
+        }
+        return normal.filter { t ->
+            if (t.isBlank) return@filter false
+            val key = t.pendingUrl ?: t.url
+            t.lastUsed < cutoff || newest[key] !== t
+        }
+    }
+
+    const val INACTIVE_DAYS = 14
 
     fun privateTabsOpen(): Boolean = tabs.any { it.isPrivate }
 
@@ -442,6 +465,7 @@ object Browser {
         val kept = tabs.filter { !it.isPrivate && UrlText.isWeb(it.pendingUrl ?: it.url) }
         prefs.savedTabs = kept.map { it.pendingUrl ?: it.url }
         prefs.savedTabTitles = kept.map { it.title }
+        prefs.savedTabUsed = kept.map { it.lastUsed }
         // Their page colours too, so a reopened tab is covered in its own colours until it draws.
         prefs.savedTabColors = kept.map { it.edgeTop to it.edgeBottom }
         prefs.savedTabIndex = kept.indexOf(current).coerceAtLeast(0)
@@ -467,6 +491,7 @@ object Browser {
         val startPage = startPageDue(fresh = true)
         val colors = prefs.savedTabColors
         val titles = prefs.savedTabTitles
+        val used = prefs.savedTabUsed
         urls.forEachIndexed { i, url ->
             val tab = newTab(url, isPrivate = false, select = false, lazy = true)
             colors.getOrNull(i)?.let { (top, bottom) ->
@@ -475,6 +500,7 @@ object Browser {
             }
             // Its title and picture from last time, so the tab switcher shows the real thing.
             titles.getOrNull(i)?.let { tab.title = it }
+            used.getOrNull(i)?.takeIf { it > 0 }?.let { tab.lastUsed = it }
             com.verisonder.sonderweb.data.Thumbs.load(app, url) { bmp ->
                 if (tab.thumbnail == null) {
                     tab.thumbnail = bmp.asImageBitmap()
