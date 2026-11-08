@@ -94,6 +94,9 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     var lastUsed: Long = System.currentTimeMillis()
 
     /** True while nothing has been loaded yet: the start page is shown instead of the engine. */
+    /** A video or sound is playing in this tab. */
+    val playing: Boolean get() = videoPlaying || mediaPlaying
+
     val isBlank: Boolean get() = url.isEmpty() && pendingUrl == null && !loading
 
     val displayTitle: String get() = title.ifBlank { url.ifBlank { "New tab" } }

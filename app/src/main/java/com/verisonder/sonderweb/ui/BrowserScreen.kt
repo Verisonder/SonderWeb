@@ -405,6 +405,11 @@ fun BrowserScreen(activity: MainActivity) {
                 }
             }
 
+            // A video from a tab you left keeps playing in a small floating window.
+            if (!activity.inPip && !activity.fullView) {
+                MiniPlayer(activity.geckoView, bottomGap = if (barTop) 16.dp else 84.dp)
+            }
+
             SnackbarHost(
                 activity.snackbar,
                 modifier = Modifier

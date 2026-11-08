@@ -200,7 +200,7 @@ private fun BarBody(ui: UiState, tab: Tab?, top: Boolean) {
                     // The start page has its own search box: here only tabs and the menu.
                     Spacer(Modifier.weight(1f))
                 } else {
-                    IconButtonSmall(Icons.Outlined.Home, "Home", size = 44, tint = p.mute) { Browser.home(tab) }
+                    IconButtonSmall(Icons.Outlined.Home, "Home", size = 44, tint = p.mute) { Browser.goHome(tab) }
                     val pop = remember { NewTabPop() }
                     Box(Modifier.weight(1f)) {
                         Omnibox(ui, tab, Modifier.fillMaxWidth(), pop, top)

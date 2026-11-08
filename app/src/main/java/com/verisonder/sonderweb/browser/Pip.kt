@@ -165,6 +165,18 @@ object Pip {
         }
     }
 
+    /** The floating window in the app: the tab's video fills it, or goes back into its page. */
+    fun fill(tab: Tab, on: Boolean) {
+        val port = ports[tab] ?: return
+        runCatching { port.postMessage(JSONObject().put("pip", on)) }
+    }
+
+    /** Stop the video in a tab that isn't the one on screen. */
+    fun pauseTab(tab: Tab) {
+        runCatching { tab.media?.pause() }
+        runCatching { ports[tab]?.postMessage(JSONObject().put("pause", true)) }
+    }
+
     /** The small window was closed: the video stops. */
     fun pause() {
         debug("app: small window closed, pausing")

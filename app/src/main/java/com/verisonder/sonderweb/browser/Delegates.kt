@@ -76,6 +76,15 @@ object Delegates {
         ): GeckoResult<AllowOrDeny>? {
             val uri = request.uri
             if (UrlText.isInternal(uri)) {
+                // A link to another site tapped while this tab plays a video: it opens in a new tab
+                // and the video keeps going in the floating window.
+                if (UrlText.isWeb(uri) && request.hasUserGesture && !request.isDirectNavigation &&
+                    !request.isRedirect && request.target == NavigationDelegate.TARGET_WINDOW_CURRENT &&
+                    Browser.keepsPlaying(tab) && Browser.siteOf(uri) != Browser.siteOf(tab.url)
+                ) {
+                    Browser.main.post { Browser.newTab(uri, isPrivate = tab.isPrivate, opener = tab) }
+                    return GeckoResult.deny()
+                }
                 // A link you tapped that an installed app can also open: you're asked first,
                 // and the page waits for your answer.
                 if (UrlText.isWeb(uri) && request.hasUserGesture && !request.isDirectNavigation &&

@@ -42,6 +42,15 @@ object Browser {
     /** Settings › Privacy: allow screenshots of private tabs. Off by default. */
     var privateScreenshots by mutableStateOf(false)
     var current by mutableStateOf<Tab?>(null)
+
+    /**
+     * The tab whose video plays in the small floating window while you're in another tab.
+     * Its page stays active; tapping the window goes back to it, × stops it.
+     */
+    var mini by mutableStateOf<Tab?>(null)
+
+    /** A video is playing here and picture-in-picture is on: another page shouldn't replace it. */
+    fun keepsPlaying(tab: Tab?): Boolean = tab != null && prefs.pip && tab.playing && !tab.isBlank
         private set
 
     /** Set by the activity while it is shown: things that need a screen (pickers, other apps). */
@@ -233,10 +242,17 @@ object Browser {
     fun select(tab: Tab) {
         val old = current
         if (old === tab) return
-        if (old != null && old.session.isOpen) {
+        // Leaving a tab that's playing a video: it carries on in the floating window.
+        val toMini = old != null && old !== tab && keepsPlaying(old)
+        if (old != null && old.session.isOpen && !toMini) {
             old.session.setActive(false)
             runCatching { runtime.webExtensionController.setTabActive(old.session, false) }
         }
+        if (toMini) {
+            mini?.takeIf { it !== old }?.let { closeMini(it) }
+            mini = old
+        }
+        if (mini === tab) mini = null
         // Leaving the private tabs locks them again: coming back needs your fingerprint.
         if (old?.isPrivate == true && !tab.isPrivate && prefs.privateLock) privateLocked = true
         current = tab
@@ -276,6 +292,7 @@ object Browser {
         val i = tabs.indexOf(tab)
         if (i < 0) return
         tabs.removeAt(i)
+        if (mini === tab) mini = null
         Prompts.queue.removeAll { it.tab === tab }
         Bar.forget(tab)
         BackPeek.forget(tab)
@@ -392,13 +409,18 @@ object Browser {
     }
 
     fun load(tab: Tab, url: String) {
+        // A video is playing here: the new page opens in its own tab and the video keeps going
+        // in the floating window (back from there returns to the video).
+        if (keepsPlaying(tab)) {
+            newTab(url, isPrivate = tab.isPrivate, opener = tab)
+            return
+        }
         tab.url = url
         tab.loading = true
         if (tab.ready) tab.session.loadUri(url) else tab.pendingUrl = url
         if (current !== tab) select(tab)
     }
 
-    /** Home: the start page in this tab (back returns to the page you were on). */
     /** The tab that opened this one (a link that opened in a new tab), if it is still open. */
     fun openerOf(tab: Tab): Tab? =
         tab.openerId?.let { id -> tabs.firstOrNull { it.id == id && it.isPrivate == tab.isPrivate && it !== tab } }
@@ -411,6 +433,24 @@ object Browser {
         if (openerOf(tab) != null) close(tab) else home(tab)
     }
 
+    /** The home button: the start page, in a new tab when a video is playing here. */
+    fun goHome(tab: Tab?) {
+        if (tab == null) return
+        if (keepsPlaying(tab)) newTab(null, isPrivate = tab.isPrivate, opener = tab) else home(tab)
+    }
+
+    /** The floating window's ×: its video stops, and the page sleeps like any tab in the back. */
+    fun closeMini(tab: Tab? = mini) {
+        val t = tab ?: return
+        if (mini === t) mini = null
+        Pip.pauseTab(t)
+        if (current !== t && t.session.isOpen) {
+            t.session.setActive(false)
+            runCatching { runtime.webExtensionController.setTabActive(t.session, false) }
+        }
+    }
+
+    /** Home: the start page in this tab (back returns to the page you were on). */
     fun home(tab: Tab) {
         if (tab.isBlank) return
         tab.url = ""
