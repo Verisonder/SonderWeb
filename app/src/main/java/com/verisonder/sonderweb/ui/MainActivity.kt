@@ -190,6 +190,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun onResume() {
         super.onResume()
         checkPipEnded()
+        // Back in front at full size: the page may pause its video again (its own pause button).
+        if (!isInPictureInPictureMode) Browser.current?.let { com.verisonder.sonderweb.browser.Pip.hold(it, false) }
         Browser.host = this
         if (launchCheck) {
             launchCheck = false
@@ -202,7 +204,6 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun onStart() {
         super.onStart()
         ownScreen = false
-        Browser.current?.let { com.verisonder.sonderweb.browser.Pip.hold(it, false) }
         com.verisonder.sonderweb.browser.Extensions.wake()
         wake()
     }
@@ -239,6 +240,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun onPause() {
         // A fresh picture of the page you're leaving, for the tab switcher next time.
         Browser.current?.let { com.verisonder.sonderweb.browser.Delegates.capture(it) }
+        // Leaving (or going small) with a video playing: from now on the page may not pause it.
+        Browser.current?.let { if (it.playing) com.verisonder.sonderweb.browser.Pip.hold(it, true) }
         super.onPause()
     }
 
@@ -393,7 +396,10 @@ class MainActivity : ComponentActivity(), Browser.Host {
         super.onUserLeaveHint()
         // Leaving with a video playing: into the small window. Android 12+ may already be doing
         // it by itself; asking again is harmless, and some phones (HyperOS) only do it this way.
-        if (com.verisonder.sonderweb.browser.Pip.ready) enterPip()
+        if (com.verisonder.sonderweb.browser.Pip.ready) {
+            Browser.current?.let { com.verisonder.sonderweb.browser.Pip.hold(it, true) }
+            enterPip()
+        }
     }
 
     /** Opens the small window now (also from the ⋮ menu). False when the phone won't. */
