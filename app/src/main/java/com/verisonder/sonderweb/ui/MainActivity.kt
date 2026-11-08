@@ -321,7 +321,10 @@ class MainActivity : ComponentActivity(), Browser.Host {
         }
     }
 
-    /** The bar is swiped down out of sight: the gesture bar goes too (swipe up from the edge to see it). */
+    /**
+     * The bar is swiped down out of sight: the gesture bar and the status bar go too (swipe from
+     * the edge to see them).
+     */
     var hideNavigation = false
         set(v) {
             if (field == v) return
@@ -351,7 +354,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
         // Dynamic: only while the page is at its top, or on the start page.
         val cur = Browser.current
         val atTop = cur == null || cur.isBlank || cur.atTop
-        if (prefs.showStatusBar && (!prefs.statusBarDynamic || atTop)) {
+        if (prefs.showStatusBar && !hideNavigation && (!prefs.statusBarDynamic || atTop)) {
             c.show(WindowInsetsCompat.Type.statusBars())
         } else {
             c.hide(WindowInsetsCompat.Type.statusBars())

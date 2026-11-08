@@ -222,7 +222,8 @@ fun BrowserScreen(activity: MainActivity) {
     // The strip by the camera hole shows only at the top of a page: once you scroll, the page
     // glides up and fills the screen to the very top.
     val stripState = animateFloatAsState(
-        targetValue = if (pageAtTop) safeTop.toFloat() else 0f,
+        // With the bar swiped away the status bar is gone too: the page goes to the very top.
+        targetValue = if (pageAtTop && !(dynamicStatus && hideNavigation)) safeTop.toFloat() else 0f,
         animationSpec = spring(dampingRatio = 1f, stiffness = 500f),
         label = "strip",
     )
