@@ -42,6 +42,7 @@ object Browser {
     /** Settings › Privacy: allow screenshots of private tabs. Off by default. */
     var privateScreenshots by mutableStateOf(false)
     var current by mutableStateOf<Tab?>(null)
+        private set
 
     /**
      * The tab whose video plays in the small floating window while you're in another tab.
@@ -51,7 +52,6 @@ object Browser {
 
     /** A video is playing here and picture-in-picture is on: another page shouldn't replace it. */
     fun keepsPlaying(tab: Tab?): Boolean = tab != null && prefs.pip && tab.playing && !tab.isBlank
-        private set
 
     /** Set by the activity while it is shown: things that need a screen (pickers, other apps). */
     var host: Host? = null
