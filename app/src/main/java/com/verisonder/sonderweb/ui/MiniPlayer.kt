@@ -19,8 +19,6 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.OpenInFull
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -53,8 +51,8 @@ import org.mozilla.geckoview.GeckoView
 import kotlin.math.roundToInt
 
 /**
- * The floating video window inside the app. Drag it anywhere; tap it for its buttons: open the
- * video full size, play/pause, or stop it.
+ * The floating video window inside the app. Drag it anywhere. Top left opens the video full
+ * size, top right stops it; a tap shows play/pause.
  *
  * It is a second engine view showing that tab's page (drawn as a texture, so it can float, be
  * rounded and be dragged over everything else), with the page's video filling it.
@@ -102,37 +100,39 @@ fun MiniPlayer(tab: Tab, main: GeckoView, bottomGap: androidx.compose.ui.unit.Dp
             MiniView(tab, main)
             // Taps go to the window (its buttons), never to the page inside it.
             Box(Modifier.fillMaxSize().clickable { controls = !controls })
+            // Tap: play/pause in the middle, for a moment.
             AnimatedVisibility(controls, enter = fadeIn(), exit = fadeOut()) {
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f))) {
-                    Row(
-                        Modifier.align(Alignment.Center),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        MiniButton(Icons.Outlined.OpenInFull, "Open") { onOpen() }
-                        MiniButton(if (paused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause, if (paused) "Play" else "Pause") {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f))) {
+                    Box(Modifier.align(Alignment.Center)) {
+                        MiniButton(if (paused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause, if (paused) "Play" else "Pause", 44) {
                             Pip.togglePlay(tab)
                             paused = !paused
                         }
-                        MiniButton(Icons.Outlined.Close, "Stop video") { Browser.closeMini(tab) }
                     }
                 }
+            }
+            // Always there: open the page (top left) and stop (top right).
+            Box(Modifier.align(Alignment.TopStart).padding(4.dp)) {
+                MiniButton(Icons.Outlined.OpenInFull, "Open", 28) { onOpen() }
+            }
+            Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
+                MiniButton(Icons.Outlined.Close, "Stop video", 28) { Browser.closeMini(tab) }
             }
         }
     }
 }
 
 @Composable
-private fun MiniButton(icon: ImageVector, label: String, onClick: () -> Unit) {
+private fun MiniButton(icon: ImageVector, label: String, size: Int, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(40.dp)
+            .size(size.dp)
             .clip(CircleShape)
             .background(Color.Black.copy(alpha = 0.55f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, label, tint = Color.White, modifier = Modifier.size(22.dp))
+        Icon(icon, label, tint = Color.White, modifier = Modifier.size((size * 0.57f).dp))
     }
 }
 
