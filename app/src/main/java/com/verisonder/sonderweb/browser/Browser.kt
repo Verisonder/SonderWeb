@@ -399,6 +399,18 @@ object Browser {
     }
 
     /** Home: the start page in this tab (back returns to the page you were on). */
+    /** The tab that opened this one (a link that opened in a new tab), if it is still open. */
+    fun openerOf(tab: Tab): Tab? =
+        tab.openerId?.let { id -> tabs.firstOrNull { it.id == id && it.isPrivate == tab.isPrivate && it !== tab } }
+
+    /**
+     * Back with nothing left to go back to in this tab: a tab another site opened closes and
+     * that site comes back, like Chrome. Otherwise the start page.
+     */
+    fun backPastStart(tab: Tab) {
+        if (openerOf(tab) != null) close(tab) else home(tab)
+    }
+
     fun home(tab: Tab) {
         if (tab.isBlank) return
         tab.url = ""

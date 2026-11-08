@@ -264,8 +264,9 @@ fun BrowserScreen(activity: MainActivity) {
             // On the start page, back leaves the app.
             tab == null || tab.isBlank -> activity.moveTaskToBack(true)
             tab.canGoBack -> tab.session.goBack()
-            // Nothing left to go back to on this site: the start page (back again leaves the app).
-            else -> Browser.home(tab)
+            // Nothing left to go back to in this tab: the site that opened it, if any, else the
+            // start page (back again leaves the app).
+            else -> Browser.backPastStart(tab)
         }
     }
     // On a site: back with a peek at the page behind (registered last, so it comes first).

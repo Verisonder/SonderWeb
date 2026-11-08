@@ -51,6 +51,9 @@ class BackSwipe {
     /** Back goes to the start page. */
     var home by mutableStateOf(false)
 
+    /** Back closes this tab and goes to the site that opened it. */
+    var toOpener: Tab? = null
+
     /** The layer is on screen. */
     var shown by mutableStateOf(false)
     var fromLeft = true
@@ -82,8 +85,13 @@ fun PageBackGesture(swipe: BackSwipe, tab: Tab?, enabled: Boolean) {
 }
 
 private suspend fun begin(swipe: BackSwipe, t: Tab) {
-    swipe.home = !t.canGoBack
-    swipe.behind = if (swipe.home) null else BackPeek.behind(t)
+    val opener = if (t.canGoBack) null else Browser.openerOf(t)
+    swipe.toOpener = opener
+    swipe.home = !t.canGoBack && opener == null
+    swipe.behind = when {
+        t.canGoBack -> BackPeek.behind(t)
+        else -> opener?.thumbnail
+    }
     swipe.front = null
     swipe.progress.snapTo(0f)
     swipe.leave.snapTo(0f)
@@ -105,9 +113,14 @@ private suspend fun begin(swipe: BackSwipe, t: Tab) {
 /** Let go: the card slides away, back happens, and the picture behind lifts once the page is there. */
 private suspend fun land(swipe: BackSwipe, t: Tab) {
     if (swipe.shown) swipe.leave.animateTo(1f, tween(180, easing = FastOutSlowInEasing))
-    if (swipe.home) Browser.home(t) else t.session.goBack()
+    val opener = swipe.toOpener
+    when {
+        opener != null -> Browser.close(t)
+        swipe.home -> Browser.home(t)
+        else -> t.session.goBack()
+    }
     swipe.front = null
-    if (swipe.shown && !swipe.home) {
+    if (swipe.shown && !swipe.home && opener == null) {
         // Wait for the page to come back (most come back at once), then uncover it.
         withTimeoutOrNull(250) { snapshotFlow { t.loading }.first { it } }
         withTimeoutOrNull(900) { snapshotFlow { t.loading }.first { !it } }
@@ -121,6 +134,7 @@ private fun end(swipe: BackSwipe) {
     swipe.shown = false
     swipe.front = null
     swipe.behind = null
+    swipe.toOpener = null
 }
 
 /** Drawn over the page while the gesture runs. [pageY] is where the engine view sits. */
