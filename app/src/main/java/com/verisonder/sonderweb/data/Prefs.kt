@@ -165,6 +165,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("status_bar", false)
         set(v) = sp.edit().putBoolean("status_bar", v).apply()
 
+    /** With the status bar on: show it only at the top of a page (and on the start page). */
+    var statusBarDynamic: Boolean
+        get() = sp.getBoolean("status_bar_dynamic", false)
+        set(v) = sp.edit().putBoolean("status_bar_dynamic", v).apply()
+
     /** Start page background colour (ARGB); 0 = the theme's own. */
     var startBgColor: Int
         get() = sp.getInt("start_bg_color", 0)

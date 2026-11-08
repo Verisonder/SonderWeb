@@ -497,6 +497,7 @@ private fun LookPage(ui: UiState) {
     var barHide by remember { mutableStateOf(prefs.barHide) }
     var floating by remember { mutableStateOf(prefs.barFloating) }
     var status by remember { mutableStateOf(prefs.showStatusBar) }
+    var statusDynamic by remember { mutableStateOf(prefs.statusBarDynamic) }
     val changed = {
         Browser.applySettings()
         ui.themeVersion++
@@ -573,6 +574,14 @@ private fun LookPage(ui: UiState) {
             prefs.showStatusBar = it
             Browser.host?.applySystemBars()
             changed()
+        }
+        if (status) {
+            Toggle("Hide while scrolling", "Shows at the top of a page and on the start page.", statusDynamic) {
+                statusDynamic = it
+                prefs.statusBarDynamic = it
+                Browser.host?.applySystemBars()
+                changed()
+            }
         }
     }
 }

@@ -62,6 +62,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.Snackbar
@@ -197,9 +198,23 @@ fun BrowserScreen(activity: MainActivity) {
     // Top: the page keeps clear of the camera hole; that thin strip takes the colour of the page's
     // top edge. Bottom: the page runs on under the gesture bar, one continuous surface, while the
     // engine is told that strip is covered, so buttons pinned to the bottom of a page sit above it.
-    val showStatus = remember(ui.themeVersion) { Browser.prefs.showStatusBar }
+    // Dynamic status bar: it sits over the page's top strip, which is as tall as the status bar
+    // and glides away with it once you scroll, the same way the camera strip does.
+    val dynamicStatus = remember(ui.themeVersion) { Browser.prefs.showStatusBar && Browser.prefs.statusBarDynamic }
+    val showStatus = remember(ui.themeVersion) { Browser.prefs.showStatusBar } && !dynamicStatus
     val density = LocalDensity.current
-    val safeTop = if (activity.fullView || showStatus) 0 else WindowInsets.displayCutout.getTop(density)
+    val statusTop = statusBarHeight()
+    val safeTop = when {
+        activity.fullView || showStatus -> 0
+        dynamicStatus -> maxOf(WindowInsets.displayCutout.getTop(density), statusTop)
+        else -> WindowInsets.displayCutout.getTop(density)
+    }
+    val pageAtTop = tab?.atTop != false || (dynamicStatus && tab?.isBlank == true)
+    LaunchedEffect(dynamicStatus, tab) {
+        if (!dynamicStatus) return@LaunchedEffect
+        androidx.compose.runtime.snapshotFlow { tab == null || tab.isBlank || tab.atTop }
+            .collect { Browser.host?.applySystemBars() }
+    }
     val safeBottom = if (activity.fullView) 0 else WindowInsets.navigationBars.getBottom(density)
     // The bar already covers the strip on its side: only the rest of it lies over the page.
     val overPage = (barPx - if (barTop) safeTop else safeBottom).coerceAtLeast(0)
@@ -207,7 +222,7 @@ fun BrowserScreen(activity: MainActivity) {
     // The strip by the camera hole shows only at the top of a page: once you scroll, the page
     // glides up and fills the screen to the very top.
     val stripState = animateFloatAsState(
-        targetValue = if (tab?.atTop != false) safeTop.toFloat() else 0f,
+        targetValue = if (pageAtTop) safeTop.toFloat() else 0f,
         animationSpec = spring(dampingRatio = 1f, stiffness = 500f),
         label = "strip",
     )
@@ -989,3 +1004,9 @@ fun LoadLine(progress: Int, color: androidx.compose.ui.graphics.Color) {
             .drawBehind { drawRect(color, size = androidx.compose.ui.geometry.Size(size.width * w.value, size.height)) },
     )
 }
+
+/** The status bar's height, also while it is hidden. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun statusBarHeight(): Int =
+    WindowInsets.statusBarsIgnoringVisibility.getTop(LocalDensity.current)

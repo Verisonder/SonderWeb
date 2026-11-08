@@ -342,7 +342,11 @@ class MainActivity : ComponentActivity(), Browser.Host {
         } else {
             c.show(WindowInsetsCompat.Type.navigationBars())
         }
-        if (Browser.prefs.showStatusBar) {
+        val prefs = Browser.prefs
+        // Dynamic: only while the page is at its top, or on the start page.
+        val cur = Browser.current
+        val atTop = cur == null || cur.isBlank || cur.atTop
+        if (prefs.showStatusBar && (!prefs.statusBarDynamic || atTop)) {
             c.show(WindowInsetsCompat.Type.statusBars())
         } else {
             c.hide(WindowInsetsCompat.Type.statusBars())
