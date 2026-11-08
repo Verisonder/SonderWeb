@@ -53,7 +53,11 @@
     exportFunction(function () {
       // Held: nothing on the page can pause it. In the small windows the page can't be touched;
       // the window's own buttons and the media controls don't come through here.
-      if (hold) return undefined;
+      if (hold) {
+        // The player now thinks it paused: told to play again in a moment.
+        setTimeout(keepGoing, 300);
+        return undefined;
+      }
       strayPause = { at: Date.now(), el: this };
       return realPause.call(this);
     }, mproto, { defineAs: "pause" });
@@ -66,8 +70,45 @@
 
   // On while the video is in a small window or the app is in the background; off again at full size.
   function setHold(on) {
+    // A fresh hold (you just left with it playing): an old pause of yours no longer counts.
+    if (on && !hold) userPaused = false;
     hold = on;
-    if (on) resumeStray();
+    if (on) {
+      resumeStray();
+      if (!keeper) keeper = setInterval(keepGoing, 1000);
+    } else if (keeper) {
+      clearInterval(keeper);
+      keeper = null;
+    }
+  }
+
+  // Blocking YouTube's pause() keeps the picture moving, but YouTube's player then thinks it is
+  // paused and stops loading more of the video: it ran for about 30 seconds and stopped. While
+  // held, the player itself is told to play again, so it keeps loading. Your own pause (the
+  // window's buttons, the media controls) is remembered and left alone.
+  let keeper = null;
+  let userPaused = false;
+  function youtube() {
+    try {
+      const mp = document.getElementById("movie_player");
+      const p = mp && mp.wrappedJSObject;
+      return p && typeof p.getPlayerState === "function" ? p : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function keepGoing() {
+    if (!hold || userPaused) return;
+    const v = (filledVideo && filledVideo.isConnected) ? filledVideo : video;
+    if (!v || v.ended) return;
+    try {
+      const p = youtube();
+      // 2 is YouTube's "paused"; 0 is "ended", which is left alone.
+      if (p && p.getPlayerState() === 2) p.playVideo();
+      if (v.paused) v.play().catch(() => {});
+    } catch (e) {}
+    // YouTube also stops after a long time with no touches ("Continue watching?").
+    try { window.wrappedJSObject._lact = Date.now(); } catch (e) {}
   }
 
   function connect() {
@@ -213,9 +254,22 @@
     if (m.pip === false) unfill();
     if (m.hold === true) setHold(true);
     if (m.hold === false && !filled) setHold(false);
-    if (m.pause && video) video.pause();
+    if (m.pause && video) {
+      userPaused = true;
+      video.pause();
+    }
+    if (m.userPaused === true) userPaused = true;
+    if (m.userPaused === false) userPaused = false;
     if (m.toggle && video) {
-      if (video.paused) video.play().catch(() => {}); else video.pause();
+      if (video.paused) {
+        userPaused = false;
+        const p = youtube();
+        if (p) try { p.playVideo(); } catch (e) {}
+        video.play().catch(() => {});
+      } else {
+        userPaused = true;
+        video.pause();
+      }
     }
   }
 })();

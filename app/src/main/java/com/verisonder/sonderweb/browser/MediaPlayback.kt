@@ -133,6 +133,8 @@ object MediaPlayback {
 
     fun command(cmd: String) {
         val m = media ?: return
+        val pausing = cmd == "pause" || (cmd == "toggle" && playing)
+        if (cmd == "play" || cmd == "pause" || cmd == "toggle") tab?.let { Pip.userPaused(it, pausing) }
         when (cmd) {
             "play" -> m.play()
             "pause" -> m.pause()

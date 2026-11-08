@@ -163,6 +163,12 @@ object Pip {
         runCatching { port.postMessage(JSONObject().put("hold", on)) }
     }
 
+    /** You paused or played from the phone's media controls: a held video respects that. */
+    fun userPaused(tab: Tab, paused: Boolean) {
+        val port = ports[tab] ?: return
+        runCatching { port.postMessage(JSONObject().put("userPaused", paused)) }
+    }
+
     /** Stop the video in a tab that isn't the one on screen. */
     fun pauseTab(tab: Tab) {
         runCatching { tab.media?.pause() }
