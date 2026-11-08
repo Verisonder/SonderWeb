@@ -259,7 +259,13 @@ private fun SheetSuggestions(ui: UiState, tab: Tab, enter: () -> Float) {
             }
             is Resolved.Search -> resolved.query to Icons.Outlined.Search
         }
-        SheetRow(title, row++, enter, { Glyph(icon, tint = p.accent) }) { submit(ui, text) }
+        // An address shows that site's own icon once it's known; the globe until then.
+        val glyph: @Composable () -> Unit = if (resolved is Resolved.Address) {
+            { SiteGlyph(resolved.url, icon) }
+        } else {
+            { Glyph(icon, tint = p.accent) }
+        }
+        SheetRow(title, row++, enter, glyph) { submit(ui, text) }
     }
     bangHints.forEach { b ->
         SheetRow("!" + b.trigger + " · " + b.name, row++, enter, { Glyph(Icons.Outlined.Search) }) {
