@@ -6,3 +6,6 @@
 **Floating video window**
 - Top left opens the video full size, top right (×) stops it; tap the video for play/pause.
 - It also shows over Settings, the tab list and the other full-screen pages.
+
+**Status bar**
+- Swiping the search bar away hides the status bar too, along with the gesture line.
