@@ -129,17 +129,8 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                 Spacer(Modifier.height(6.dp))
             }
 
-            Item("New tab", Icons.Outlined.Add) {
-                Browser.newTab(null, isPrivate = false)
-                close()
-            }
-            Item("New private tab", Icons.Outlined.VisibilityOff) {
-                Browser.newTab(null, isPrivate = true)
-                close()
-            }
             // Private tabs stay apart: no way into your normal history, downloads or bookmarks from here.
             if (!tab.isPrivate) {
-                Divider()
                 Item("History", Icons.Outlined.History) {
                     ui.panel = Panel.History
                     close()
@@ -154,7 +145,7 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                 }
             }
             if (web) {
-                Divider()
+                if (!tab.isPrivate) Divider()
                 Item("Find in page", Icons.Outlined.FindInPage) {
                     ui.findQuery = ""
                     ui.findResult = ""
@@ -220,11 +211,6 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
             Item("Settings", Icons.Outlined.Settings, dot = com.verisonder.sonderweb.data.AppUpdate.available != null) {
                 ui.panel = Panel.Settings
                 close()
-            }
-            Item("Exit", Icons.AutoMirrored.Outlined.Logout) {
-                close()
-                Browser.saveTabs()
-                (ctx as? android.app.Activity)?.finishAndRemoveTask()
             }
             if (!top) actions()
         }
