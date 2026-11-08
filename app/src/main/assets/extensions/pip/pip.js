@@ -155,7 +155,7 @@
     const saved = [];
     // Players pause a video whose own box has scrolled out of sight (YouTube does): its box is
     // brought into view first, and the page goes back to where it was afterwards.
-    scrolled = [window.scrollX, window.scrollY];
+    if (!scrolled) scrolled = [window.scrollX, window.scrollY];
     try { v.scrollIntoView({ block: "center", inline: "center" }); } catch (e) {}
     const set = (el, rules) => {
       saved.push([el, el.getAttribute("style")]);
@@ -165,16 +165,43 @@
     for (let el = v.parentElement; el && el !== document.documentElement; el = el.parentElement) set(el, FREE);
     set(document.documentElement, [["overflow", "hidden"], ["background", "#000"]]);
     filled = saved;
+    filledVideo = v;
+    video = v;
     setHold(true);
+    if (!watch) watch = setInterval(check, 1000);
   }
 
-  function unfill() {
-    setHold(false);
+  // While the video fills a small window: the next video, an ad in its own player, or the site
+  // redrawing its player can leave the window showing the page's header over black. Checked
+  // every second, and the right video is put back in the window.
+  let filledVideo = null;
+  let watch = null;
+  function check() {
+    if (!filled) return;
+    const kept = filledVideo && filledVideo.isConnected;
+    const cur = playing() || (kept ? filledVideo : document.querySelector("video"));
+    const lost = !kept || filledVideo.style.getPropertyValue("position") !== "fixed";
+    if (cur && (cur !== filledVideo || lost)) {
+      restore();
+      video = cur;
+      fill();
+    }
+  }
+
+  function restore() {
     if (!filled) return;
     for (const [el, style] of filled.reverse()) {
       if (style === null) el.removeAttribute("style"); else el.setAttribute("style", style);
     }
     filled = null;
+    filledVideo = null;
+  }
+
+  function unfill() {
+    setHold(false);
+    if (watch) { clearInterval(watch); watch = null; }
+    if (!filled) return;
+    restore();
     if (scrolled) {
       try { window.scrollTo(scrolled[0], scrolled[1]); } catch (e) {}
       scrolled = null;
