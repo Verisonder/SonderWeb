@@ -147,9 +147,23 @@ object Pip {
         MediaPlayback.ended(tab)
     }
 
-    /** A video is playing in the tab on screen (or just was), and picture-in-picture is on. */
+    /**
+     * The tab whose video goes into the small window on leaving: the one in the floating window
+     * (another tab's, or this tab's under Settings or the tab list), else the tab on screen.
+     */
+    val target: Tab?
+        get() = if (!Browser.prefs.pip) {
+            null
+        } else {
+            Browser.mini?.takeIf { playingNow(it) } ?: Browser.current?.takeIf { playingNow(it) }
+        }
+
+    /** A video is playing (or just was) and picture-in-picture is on. */
     val ready: Boolean
-        get() = Browser.prefs.pip && Browser.current.let { it != null && playingNow(it) }
+        get() = target != null
+
+    /** In the small picture-in-picture window right now. */
+    private var showing = false
 
     /**
      * YouTube pauses its own video the moment you swipe home, often just before the phone tells
@@ -176,12 +190,16 @@ object Pip {
 
     /** The small window opened or closed: the video fills it, or goes back into its page. */
     fun shown(on: Boolean) {
+        showing = on
         val port = Browser.current?.let { ports[it] } ?: return
         runCatching { port.postMessage(JSONObject().put("pip", on)) }
     }
 
     /** The floating window in the app: the tab's video fills it, or goes back into its page. */
     fun fill(tab: Tab, on: Boolean) {
+        // The floating window closing because the app went into the small window: the video
+        // stays filling it.
+        if (!on && showing && tab === Browser.current) return
         val port = ports[tab] ?: return
         runCatching { port.postMessage(JSONObject().put("pip", on)) }
     }

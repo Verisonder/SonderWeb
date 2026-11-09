@@ -522,6 +522,8 @@ fun BrowserScreen(activity: MainActivity) {
                 ui.panel != Panel.None && Browser.keepsPlaying(it) && Browser.miniStopped !== it
             }
             LaunchedEffect(ui.panel) { if (ui.panel == Panel.None) Browser.miniStopped = null }
+            // Whether swiping home opens the small window depends on the floating window too.
+            LaunchedEffect(Browser.mini) { activity.updatePip() }
             if (miniTab != null && !activity.inPip && !activity.fullView) {
                 MiniPlayer(
                     miniTab,
