@@ -28,6 +28,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -47,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -372,6 +375,10 @@ private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser
                     shortcuts,
                     onOpen = { Browser.load(tab, it.url) },
                     onEdit = { editing = it },
+                    onRemove = { i ->
+                        prefs.shortcuts = shortcuts.filterIndexed { j, _ -> j != i }
+                        version++
+                    },
                     onAdd = { editing = -1 },
                     onReorder = { list ->
                         prefs.shortcuts = list
@@ -414,15 +421,19 @@ private fun ShortcutGrid(
     shortcuts: List<Shortcut>,
     onOpen: (Shortcut) -> Unit,
     onEdit: (Int) -> Unit,
+    onRemove: (Int) -> Unit,
     onAdd: () -> Unit,
     onReorder: (List<Shortcut>) -> Unit,
 ) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    // Hold an icon and drag it to move it; let go where you want it. Hold without moving: edit it.
+    // Hold an icon: its menu (Edit, Remove) opens above it at once. Drag on from there to move it;
+    // the menu closes as soon as it moves.
     val order = remember(shortcuts) { androidx.compose.runtime.mutableStateListOf<Shortcut>().apply { addAll(shortcuts) } }
     var dragged by remember { mutableStateOf<Shortcut?>(null) }
+    var menuFor by remember { mutableStateOf<Shortcut?>(null) }
+    var menuOpen by remember { mutableStateOf(false) }
     var dragX by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     var dragY by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     var rowPx by remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
@@ -448,6 +459,7 @@ private fun ShortcutGrid(
                     val isDragged = dragged == s
                     val open by androidx.compose.runtime.rememberUpdatedState(onOpen)
                     val edit by androidx.compose.runtime.rememberUpdatedState(onEdit)
+                    val remove by androidx.compose.runtime.rememberUpdatedState(onRemove)
                     val save by androidx.compose.runtime.rememberUpdatedState(onReorder)
                     Column(
                         Modifier
@@ -477,6 +489,8 @@ private fun ShortcutGrid(
                                     if (moved) return@awaitEachGesture
                                     // Picked up.
                                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    menuFor = s
+                                    menuOpen = true
                                     dragged = s
                                     dragX = 0f
                                     dragY = 0f
@@ -486,6 +500,7 @@ private fun ShortcutGrid(
                                         val d = c.positionChange()
                                         c.consume()
                                         travelled += d.getDistance()
+                                        if (menuOpen && travelled > slop) menuOpen = false
                                         dragX += d.x
                                         dragY += d.y
                                         // Over another spot: move there; the icon stays under the finger.
@@ -508,11 +523,7 @@ private fun ShortcutGrid(
                                     dragged = null
                                     dragX = 0f
                                     dragY = 0f
-                                    if (order.toList() != shortcuts) {
-                                        save(order.toList())
-                                    } else if (travelled < slop * 2) {
-                                        edit(shortcuts.indexOf(s))
-                                    }
+                                    if (order.toList() != shortcuts) save(order.toList())
                                 }
                             }
                             .graphicsLayer {
@@ -529,6 +540,21 @@ private fun ShortcutGrid(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         SiteTile(host, s.title)
+                        if (menuFor == s) {
+                            ShortcutMenu(
+                                open = menuOpen,
+                                onDismiss = { menuOpen = false },
+                                onClosed = { if (!menuOpen && menuFor == s) menuFor = null },
+                                onEdit = {
+                                    menuOpen = false
+                                    edit(shortcuts.indexOf(s))
+                                },
+                                onRemove = {
+                                    menuOpen = false
+                                    remove(shortcuts.indexOf(s))
+                                },
+                            )
+                        }
                         if (names) {
                             Spacer(Modifier.height(6.dp))
                             Text(
@@ -770,4 +796,96 @@ private fun DrawScope.drawCloud(c: Offset, w: Float, color: Color) {
     )
     drawCircle(color, h * 0.62f, Offset(c.x - w * 0.12f, c.y - h * 0.45f))
     drawCircle(color, h * 0.48f, Offset(c.x + w * 0.16f, c.y - h * 0.32f))
+}
+
+/** The menu above a held start page icon. */
+@Composable
+private fun ShortcutMenu(
+    open: Boolean,
+    onDismiss: () -> Unit,
+    onClosed: () -> Unit,
+    onEdit: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val p = LocalPalette.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val show by androidx.compose.animation.core.animateFloatAsState(
+        if (open) 1f else 0f,
+        androidx.compose.animation.core.spring(dampingRatio = 0.75f, stiffness = 520f),
+        label = "shortcutMenu",
+        finishedListener = { if (it == 0f) onClosed() },
+    )
+    // Room around the menu inside its popup window, so the shadow is never cut off.
+    val room = with(density) { 24.dp.roundToPx() }
+    val gap = with(density) { 6.dp.roundToPx() }
+    var above by remember { mutableStateOf(true) }
+    val place = remember(room, gap) {
+        object : androidx.compose.ui.window.PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: androidx.compose.ui.unit.IntRect,
+                windowSize: androidx.compose.ui.unit.IntSize,
+                layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+                popupContentSize: androidx.compose.ui.unit.IntSize,
+            ): androidx.compose.ui.unit.IntOffset {
+                val x = (anchorBounds.center.x - popupContentSize.width / 2)
+                    .coerceIn(-room, (windowSize.width - popupContentSize.width + room).coerceAtLeast(-room))
+                val top = anchorBounds.top - gap - popupContentSize.height + room
+                val fits = top + room >= 0
+                above = fits
+                val y = if (fits) top else anchorBounds.bottom + gap - room
+                return androidx.compose.ui.unit.IntOffset(x, y)
+            }
+        }
+    }
+    androidx.compose.ui.window.Popup(
+        popupPositionProvider = place,
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.PopupProperties(focusable = true, clippingEnabled = false),
+    ) {
+        val shape = RoundedCornerShape(20.dp)
+        Column(
+            Modifier
+                .padding(with(density) { room.toDp() })
+                .graphicsLayer {
+                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, if (above) 1f else 0f)
+                    val k = 0.85f + 0.15f * show
+                    scaleX = k
+                    scaleY = k
+                    alpha = show.coerceIn(0f, 1f)
+                }
+                .width(190.dp)
+                .shadow(14.dp, shape)
+                .clip(shape)
+                .background(p.card)
+                .padding(vertical = 6.dp),
+        ) {
+            ShortcutMenuRow(Icons.Outlined.Edit, "Edit", p.text, onEdit)
+            ShortcutMenuRow(Icons.Outlined.Delete, "Remove", p.text, onRemove)
+        }
+    }
+}
+
+@Composable
+private fun ShortcutMenuRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    color: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit,
+) {
+    val p = LocalPalette.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .padding(horizontal = 6.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = p.mute, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(14.dp))
+        Text(label, color = color, fontSize = 15.sp)
+    }
 }
