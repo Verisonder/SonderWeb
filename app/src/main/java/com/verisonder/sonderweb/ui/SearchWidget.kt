@@ -19,6 +19,7 @@ data class WidgetLook(
     val theme: Int = DARK,
     val mono: Boolean = true,
     val logo: Boolean = true,
+    val arcs: Boolean = false,
     val voice: Boolean = true,
     val image: Boolean = true,
     val label: Boolean = true,
@@ -44,6 +45,7 @@ data class WidgetLook(
                     theme = j.optInt("theme", DARK).let { if (it == ADAPTIVE && Build.VERSION.SDK_INT < 31) DARK else it },
                     mono = j.optBoolean("mono", true),
                     logo = j.optBoolean("logo", true),
+                    arcs = j.optBoolean("arcs", false),
                     voice = j.optBoolean("voice", true),
                     image = j.optBoolean("image", true),
                     label = j.optBoolean("label", true),
@@ -60,6 +62,7 @@ data class WidgetLook(
                 .put("theme", look.theme)
                 .put("mono", look.mono)
                 .put("logo", look.logo)
+                .put("arcs", look.arcs)
                 .put("voice", look.voice)
                 .put("image", look.image)
                 .put("label", look.label)
@@ -145,10 +148,23 @@ class SearchWidget : AppWidgetProvider() {
             paint(R.id.widget_bg, "setColorFilter", BG, bg?.let { it or 0xFF000000.toInt() })
             v.setInt(R.id.widget_bg, "setImageAlpha", bg?.let { it ushr 24 } ?: 255)
             v.setViewVisibility(R.id.widget_shadow, if (look.shadow) View.VISIBLE else View.GONE)
+            // The pill fills the widget's width; with the shadow it leaves room for it.
+            if (Build.VERSION.SDK_INT >= 31) {
+                for (id in intArrayOf(R.id.widget_bg, R.id.widget_pill)) {
+                    v.setViewLayoutMargin(id, RemoteViews.MARGIN_START, if (look.shadow) 3f else 0f, TypedValue.COMPLEX_UNIT_DIP)
+                    v.setViewLayoutMargin(id, RemoteViews.MARGIN_END, if (look.shadow) 3f else 0f, TypedValue.COMPLEX_UNIT_DIP)
+                    v.setViewLayoutMargin(id, RemoteViews.MARGIN_TOP, if (look.shadow) 1f else 3f, TypedValue.COMPLEX_UNIT_DIP)
+                    v.setViewLayoutMargin(id, RemoteViews.MARGIN_BOTTOM, if (look.shadow) 5f else 3f, TypedValue.COMPLEX_UNIT_DIP)
+                }
+            }
 
-            // The logo: one colour with its highlights cut out, or the blue sphere.
+            // The logo: one colour with its highlights cut out, the blue sphere, or just the three arcs.
             v.setViewVisibility(R.id.widget_logo, if (look.logo) View.VISIBLE else View.GONE)
-            if (look.mono || look.tint != null) {
+            if (look.arcs) {
+                v.setImageViewResource(R.id.widget_logo_disc, R.drawable.widget_logo_arcs)
+                paint(R.id.widget_logo_disc, "setColorFilter", if (look.mono) ICON else ACCENT, look.tint)
+                v.setViewVisibility(R.id.widget_logo_marks, View.GONE)
+            } else if (look.mono || look.tint != null) {
                 v.setImageViewResource(R.id.widget_logo_disc, R.drawable.widget_logo_disc)
                 paint(R.id.widget_logo_disc, "setColorFilter", ICON, look.tint)
                 v.setViewVisibility(R.id.widget_logo_marks, View.VISIBLE)
@@ -170,7 +186,7 @@ class SearchWidget : AppWidgetProvider() {
             paint(R.id.widget_image, "setColorFilter", iconRole, look.tint)
             // Without the picture button, the mic takes its place at the end.
             if (Build.VERSION.SDK_INT >= 31) {
-                v.setViewLayoutMargin(R.id.widget_voice, RemoteViews.MARGIN_END, if (look.image) 6f else 0f, TypedValue.COMPLEX_UNIT_DIP)
+                v.setViewLayoutMargin(R.id.widget_voice, RemoteViews.MARGIN_END, if (look.image) 10f else 0f, TypedValue.COMPLEX_UNIT_DIP)
             }
 
             if (clickable) {

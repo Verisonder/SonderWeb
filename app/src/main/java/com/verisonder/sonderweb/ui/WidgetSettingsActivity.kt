@@ -154,6 +154,10 @@ private fun WidgetSettings(start: WidgetLook, onCancel: () -> Unit, onSave: (Wid
             Group {
                 Toggle("Monochrome icons", "One colour, matching the theme (off: the blue logo)", look.mono) { look = look.copy(mono = it) }
                 Toggle("Logo", "Show the SonderWeb logo", look.logo) { look = look.copy(logo = it) }
+                if (look.logo) {
+                    Choice("Full logo", !look.arcs, "The sphere with its three arcs") { look = look.copy(arcs = false) }
+                    Choice("Arcs only", look.arcs, "Just the three arcs") { look = look.copy(arcs = true) }
+                }
                 Toggle("Voice search", "Show the microphone", look.voice) { look = look.copy(voice = it) }
                 Toggle("Search with a picture", "Show the picture button", look.image) { look = look.copy(image = it) }
             }

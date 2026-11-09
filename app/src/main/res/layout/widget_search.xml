@@ -43,13 +43,14 @@
             android:layout_marginBottom="5dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="13dp">
+            android:paddingStart="13dp"
+            android:paddingEnd="1dp">
 
             <FrameLayout
                 android:id="@+id/widget_logo"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:layout_marginEnd="12dp">
+                android:layout_marginEnd="13dp">
 
                 <ImageView
                     android:id="@+id/widget_logo_disc"
@@ -76,7 +77,7 @@
                 android:maxLines="1"
                 android:text="@string/widget_search"
                 android:textColor="#F4F4F4"
-                android:textSize="20sp"
+                android:textSize="17sp"
                 android:textStyle="bold" />
 
             <!-- Home screen widgets may only use a few view classes: a plain View isn't one. -->
@@ -89,9 +90,9 @@
                 android:id="@+id/widget_voice"
                 android:layout_width="48dp"
                 android:layout_height="match_parent"
-                android:layout_marginEnd="6dp"
+                android:layout_marginEnd="10dp"
                 android:contentDescription="@string/widget_voice"
-                android:padding="13dp"
+                android:padding="11dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/widget_mic"
                 android:tint="#DEDEDE" />
@@ -101,7 +102,7 @@
                 android:layout_width="48dp"
                 android:layout_height="match_parent"
                 android:contentDescription="@string/widget_image"
-                android:padding="13dp"
+                android:padding="11dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/widget_image_search"
                 android:tint="#DEDEDE" />

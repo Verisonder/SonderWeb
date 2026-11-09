@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget logo as three arcs on their own, in the icon colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="38"
+    android:viewportHeight="38">
+    <!-- Cropped to the arcs, so they fill the logo's space like the full logo does. -->
+    <group
+        android:translateX="-6"
+        android:translateY="-6">
+    <path
+        android:pathData="M9,21 A17,17 0,0 1,23 8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M18.25,18.25 A17,17 0,0 1,31.75 31.75"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M41,29 A17,17 0,0 1,27 42"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    </group>
+</vector>
