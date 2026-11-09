@@ -51,6 +51,18 @@ object MediaPlayback {
     private var channelMade = false
 
     /** A tab's media is playing in the tab on screen and should keep going when you leave. */
+    /**
+     * The video in the small window (or playing with the app in the background) is being kept
+     * going, even when the page says it paused. The service keeps running meanwhile: without it
+     * the phone treats SonderWeb as idle in the background and stops it.
+     */
+    var held = false
+        set(v) {
+            if (field == v) return
+            field = v
+            if (tab != null) sync()
+        }
+
     val keepAwake: Boolean
         get() = playing && tab != null && tab === Browser.current
 
@@ -202,7 +214,7 @@ object MediaPlayback {
         val running = MediaService.instance
         if (running != null) {
             running.refresh()
-        } else if (playing) {
+        } else if (playing || held) {
             runCatching { ContextCompat.startForegroundService(app, Intent(app, MediaService::class.java)) }
         } else {
             app.getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(app))
@@ -330,7 +342,7 @@ class MediaService : Service() {
                 nm.cancel(MediaPlayback.NOTIFICATION_ID)
                 stopSelf()
             }
-            MediaPlayback.playing -> runCatching {
+            MediaPlayback.playing || MediaPlayback.held -> runCatching {
                 val n = MediaPlayback.notification(this)
                 if (Build.VERSION.SDK_INT >= 29) {
                     startForeground(MediaPlayback.NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)

@@ -138,6 +138,10 @@ object Pip {
     }
 
     fun forget(tab: Tab) {
+        if (kept === tab) {
+            kept = null
+            MediaPlayback.held = false
+        }
         ports.remove(tab)
         stoppedAt.remove(tab)
         MediaPlayback.ended(tab)
@@ -184,18 +188,47 @@ object Pip {
 
     /** The app went to the background with the video playing (or came back): the page may not pause it meanwhile. */
     fun hold(tab: Tab, on: Boolean) {
+        keepAlive(tab, on)
         val port = ports[tab] ?: return
         runCatching { port.postMessage(JSONObject().put("hold", on)) }
     }
 
+    /**
+     * Out of the app (small window, background), the phone may freeze or slow down the engine's
+     * page process after a short while: the video stopped after about 30 seconds in the small
+     * window, while the floating window inside the app kept going. While a video is held its page
+     * process is marked important and the media service keeps running.
+     */
+    private var kept: Tab? = null
+
+    private fun keepAlive(tab: Tab, on: Boolean) {
+        if (on) {
+            if (kept !== tab) kept?.let { release(it) }
+            kept = tab
+            runCatching { tab.session.setPriorityHint(org.mozilla.geckoview.GeckoSession.PRIORITY_HIGH) }
+            MediaPlayback.held = true
+        } else if (kept === tab) {
+            release(tab)
+            kept = null
+        }
+    }
+
+    private fun release(tab: Tab) {
+        runCatching { tab.session.setPriorityHint(org.mozilla.geckoview.GeckoSession.PRIORITY_DEFAULT) }
+        MediaPlayback.held = false
+    }
+
     /** You paused or played from the phone's media controls: a held video respects that. */
     fun userPaused(tab: Tab, paused: Boolean) {
+        // Paused by you: the service may stop like for any paused video (it comes back if you play).
+        if (kept === tab) MediaPlayback.held = !paused
         val port = ports[tab] ?: return
         runCatching { port.postMessage(JSONObject().put("userPaused", paused)) }
     }
 
     /** Stop the video in a tab that isn't the one on screen. */
     fun pauseTab(tab: Tab) {
+        keepAlive(tab, false)
         runCatching { tab.media?.pause() }
         runCatching { ports[tab]?.postMessage(JSONObject().put("pause", true)) }
     }
@@ -203,6 +236,7 @@ object Pip {
     /** The small window was closed: the video stops. */
     fun pause() {
         val tab = Browser.current ?: return
+        keepAlive(tab, false)
         runCatching { tab.media?.pause() }
         runCatching { ports[tab]?.postMessage(JSONObject().put("pause", true)) }
     }
