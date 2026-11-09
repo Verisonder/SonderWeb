@@ -18,8 +18,8 @@ android {
         applicationId = "com.verisonder.sonderweb"
         minSdk = 26
         targetSdk = 35
-        versionCode = 27
-        versionName = "1.9.0"
+        versionCode = 28
+        versionName = "1.9.1"
         buildConfigField("String", "UBLOCK_VERSION", "\"$ublockVersion\"")
         // The engine is large; ship the 64-bit ARM build only (every current phone).
         ndk { abiFilters += listOf("arm64-v8a") }
