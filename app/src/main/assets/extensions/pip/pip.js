@@ -71,7 +71,13 @@
   // On while the video is in a small window or the app is in the background; off again at full size.
   function setHold(on) {
     // A fresh hold (you just left with it playing): an old pause of yours no longer counts.
-    if (on && !hold) userPaused = false;
+    if (on && !hold) {
+      userPaused = false;
+      lastTime = -1;
+      stuckFor = 0;
+      loadedEnd = 0;
+      loadedSince = Date.now();
+    }
     hold = on;
     if (on) {
       resumeStray();
@@ -97,16 +103,65 @@
       return null;
     }
   }
+  // How far ahead the video has loaded from where it's playing, in seconds.
+  function ahead(v) {
+    try {
+      const b = v.buffered;
+      for (let i = 0; i < b.length; i++) {
+        if (b.start(i) <= v.currentTime + 0.25 && b.end(i) >= v.currentTime) return b.end(i) - v.currentTime;
+      }
+    } catch (e) {}
+    return 0;
+  }
+
+  // Watching for the video running dry. Even told to play, YouTube sometimes stops loading the
+  // rest while it's small or in the background: it plays what it has (about 30 seconds) and
+  // stops. A seek to where it already is makes it load from there again.
+  let lastTime = -1;
+  let stuckFor = 0;
+  let loadedEnd = 0;
+  let loadedSince = 0;
+  let nudgedAt = 0;
+  function watchLoading(v, p) {
+    const now = Date.now();
+    const t = v.currentTime;
+    stuckFor = (!v.paused && Math.abs(t - lastTime) < 0.05) ? stuckFor + 1 : 0;
+    lastTime = t;
+    const left = ahead(v);
+    const end = t + left;
+    if (end > loadedEnd + 0.5) { loadedEnd = end; loadedSince = now; }
+    if (end < loadedEnd - 5) { loadedEnd = end; loadedSince = now; } // moved back (a seek, the next video)
+    if (v.ended || now - nudgedAt < 6000) return;
+    const dry = stuckFor >= 2;
+    // Nothing new loaded for a while and only a few seconds left: loading stopped.
+    const stalling = left < 6 && now - loadedSince > 8000;
+    if (!dry && !stalling) return;
+    nudgedAt = now;
+    loadedSince = now;
+    stuckFor = 0;
+    try {
+      if (p && typeof p.seekTo === "function") {
+        p.seekTo(p.getCurrentTime(), true);
+        p.playVideo();
+      } else {
+        v.currentTime = t;
+        if (v.paused) v.play().catch(() => {});
+      }
+    } catch (e) {}
+  }
+
   function keepGoing() {
     if (!hold || userPaused) return;
     const v = (filledVideo && filledVideo.isConnected) ? filledVideo : video;
     if (!v || v.ended) return;
+    let p = null;
     try {
-      const p = youtube();
+      p = youtube();
       // 2 is YouTube's "paused"; 0 is "ended", which is left alone.
       if (p && p.getPlayerState() === 2) p.playVideo();
       if (v.paused) v.play().catch(() => {});
     } catch (e) {}
+    watchLoading(v, p);
     // YouTube also stops after a long time with no touches ("Continue watching?").
     try { window.wrappedJSObject._lact = Date.now(); } catch (e) {}
   }
@@ -162,9 +217,26 @@
   // size they saw first, which left it stuck at the top. Telling the page the size changed again
   // once things settle puts the video back in the middle.
   // Safety net: back at full size, the video goes back into its page even if the browser's
-  // "small window closed" message never came.
+  // "small window closed" message never came. Only once it has stayed big for a moment (the
+  // window passes through other sizes while it shrinks), and it stays held: whether the page
+  // may pause it again is the browser's call (it says so when you're back in the app).
+  let bigSince = 0;
   window.addEventListener("resize", () => {
-    if (filled && (window.innerWidth > 480 || window.innerHeight > 480)) unfill();
+    if (!filled) return;
+    const big = window.innerWidth > 480 || window.innerHeight > 480;
+    if (!big) { bigSince = 0; return; }
+    if (!bigSince) bigSince = Date.now();
+    const since = bigSince;
+    setTimeout(() => {
+      if (filled && bigSince === since && (window.innerWidth > 480 || window.innerHeight > 480)) {
+        if (watch) { clearInterval(watch); watch = null; }
+        restore();
+        if (scrolled) {
+          try { window.scrollTo(scrolled[0], scrolled[1]); } catch (e) {}
+          scrolled = null;
+        }
+      }
+    }, 1000);
   });
 
   document.addEventListener("fullscreenchange", () => {

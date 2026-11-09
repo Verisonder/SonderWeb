@@ -66,18 +66,21 @@ object Pip {
                 }
 
                 override fun onPause(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
+                    stopping(tab)
                     tab.mediaPlaying = false
                     MediaPlayback.paused(tab)
                     changed()
                 }
 
                 override fun onStop(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
+                    stopping(tab)
                     tab.mediaPlaying = false
                     MediaPlayback.paused(tab)
                     changed()
                 }
 
                 override fun onDeactivated(session: org.mozilla.geckoview.GeckoSession, media: org.mozilla.geckoview.MediaSession) {
+                    stopping(tab)
                     tab.mediaPlaying = false
                     MediaPlayback.ended(tab)
                     changed()
@@ -109,6 +112,7 @@ object Pip {
                                 // The frame that's playing is the one to talk to; others only when they're the last one.
                                 if (playing || ports[tab] === port) {
                                     ports[tab] = port
+                                    if (!playing) stopping(tab)
                                     tab.videoPlaying = playing
                                     val w = m.optInt("w", 16).coerceAtLeast(1)
                                     val h = m.optInt("h", 9).coerceAtLeast(1)
@@ -120,6 +124,7 @@ object Pip {
                             override fun onDisconnect(port: WebExtension.Port) {
                                 if (ports[tab] === port) {
                                     ports.remove(tab)
+                                    stopping(tab)
                                     tab.videoPlaying = false
                                     changed()
                                 }
@@ -134,12 +139,32 @@ object Pip {
 
     fun forget(tab: Tab) {
         ports.remove(tab)
+        stoppedAt.remove(tab)
         MediaPlayback.ended(tab)
     }
 
-    /** A video is playing in the tab on screen, and picture-in-picture is on. */
+    /** A video is playing in the tab on screen (or just was), and picture-in-picture is on. */
     val ready: Boolean
-        get() = Browser.prefs.pip && Browser.current.let { it != null && (it.videoPlaying || it.mediaPlaying) }
+        get() = Browser.prefs.pip && Browser.current.let { it != null && playingNow(it) }
+
+    /**
+     * YouTube pauses its own video the moment you swipe home, often just before the phone tells
+     * us you're leaving. So a video that stopped a moment ago still counts as playing: the small
+     * window opens, and the helper undoes that pause.
+     */
+    private const val GRACE_MS = 1500L
+    private val stoppedAt = HashMap<Tab, Long>()
+
+    fun playingNow(tab: Tab): Boolean =
+        tab.playing || (stoppedAt[tab]?.let { android.os.SystemClock.elapsedRealtime() - it < GRACE_MS } ?: false)
+
+    /** Called just before a tab's playing flags go off. */
+    private fun stopping(tab: Tab) {
+        if (!tab.playing) return
+        stoppedAt[tab] = android.os.SystemClock.elapsedRealtime()
+        // When the moment has passed, the small window stops opening by itself.
+        Browser.main.postDelayed({ changed() }, GRACE_MS + 50)
+    }
 
     private fun changed() {
         Browser.host?.updatePip()

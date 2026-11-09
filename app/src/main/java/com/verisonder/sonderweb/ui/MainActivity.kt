@@ -325,7 +325,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
         // A fresh picture of the page you're leaving, for the tab switcher next time.
         Browser.current?.let { com.verisonder.sonderweb.browser.Delegates.capture(it) }
         // Leaving (or going small) with a video playing: from now on the page may not pause it.
-        Browser.current?.let { if (it.playing) com.verisonder.sonderweb.browser.Pip.hold(it, true) }
+        Browser.current?.let { if (com.verisonder.sonderweb.browser.Pip.playingNow(it)) com.verisonder.sonderweb.browser.Pip.hold(it, true) }
         super.onPause()
     }
 
