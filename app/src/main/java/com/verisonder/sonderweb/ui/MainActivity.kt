@@ -275,7 +275,17 @@ class MainActivity : ComponentActivity(), Browser.Host {
         super.onResume()
         checkPipEnded()
         // Back in front at full size: the page may pause its video again (its own pause button).
-        if (!isInPictureInPictureMode) Browser.current?.let { com.verisonder.sonderweb.browser.Pip.hold(it, false) }
+        if (!isInPictureInPictureMode) {
+            Browser.current?.let { t ->
+                com.verisonder.sonderweb.browser.Pip.hold(t, false)
+                // Back at full size: the video goes back into its page, even when the phone never
+                // said the small window closed (HyperOS). Left filling the screen, a video that had
+                // stopped showed as a black page. Not while it's the floating window's video.
+                if (::geckoView.isInitialized && geckoView.session === t.session && Browser.mini !== t) {
+                    com.verisonder.sonderweb.browser.Pip.fill(t, false)
+                }
+            }
+        }
         Browser.host = this
         if (launchCheck) {
             launchCheck = false
@@ -331,7 +341,10 @@ class MainActivity : ComponentActivity(), Browser.Host {
 
     override fun onStop() {
         super.onStop()
-        Browser.current?.let { it.flatWhenLeft = it.lastFlat }
+        // Whether the page was one plain colour when you left (then an empty-looking page on return
+        // is left alone). Not known when leaving from the small window: what it showed was the
+        // video filling it, often black.
+        Browser.current?.let { it.flatWhenLeft = if (isInPictureInPictureMode || inPip) null else it.lastFlat }
         Browser.saveTabs()
         // Still on screen in the small picture-in-picture window: the page keeps playing, and
         // private tabs don't lock under it. That happens when the window is closed.
