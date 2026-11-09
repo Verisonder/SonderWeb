@@ -1,5 +1,9 @@
 package com.verisonder.sonderweb.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.calculateTargetValue
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -28,16 +32,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -47,6 +53,7 @@ import com.verisonder.sonderweb.browser.Browser
 import com.verisonder.sonderweb.browser.Pip
 import com.verisonder.sonderweb.browser.Tab
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.mozilla.geckoview.GeckoView
 import kotlin.math.roundToInt
 
@@ -71,8 +78,25 @@ fun MiniPlayer(tab: Tab, main: GeckoView, bottomGap: androidx.compose.ui.unit.Dp
         val maxX = with(d) { (maxWidth - width).toPx() }.coerceAtLeast(0f)
         val maxY = with(d) { (maxHeight - height).toPx() }.coerceAtLeast(0f)
         // Starts in the bottom-right corner, above the bar.
-        var x by remember { mutableFloatStateOf(maxX) }
-        var y by remember { mutableFloatStateOf(maxY) }
+        val x = remember { Animatable(maxX) }
+        val y = remember { Animatable(maxY) }
+        var onRight by remember { mutableStateOf(true) }
+        val scope = rememberCoroutineScope()
+        val decay = rememberSplineBasedDecay<Float>()
+        // The space changed (bar, turning the phone): it stays on its side, inside the screen.
+        LaunchedEffect(maxX, maxY) {
+            if (!x.isRunning) x.snapTo(if (onRight) maxX else 0f)
+            if (!y.isRunning) y.snapTo(y.value.coerceIn(0f, maxY))
+        }
+        // Thrown like the phone's own picture-in-picture: it glides on with the speed of your
+        // finger, then settles against the nearest side, at the height it was heading for.
+        fun throwTo(vx: Float, vy: Float) {
+            val px = decay.calculateTargetValue(x.value, vx)
+            val py = decay.calculateTargetValue(y.value, vy)
+            onRight = px > maxX / 2
+            scope.launch { x.animateTo(if (onRight) maxX else 0f, spring(dampingRatio = 0.78f, stiffness = 320f), vx) }
+            scope.launch { y.animateTo(py.coerceIn(0f, maxY), spring(dampingRatio = 0.85f, stiffness = 320f), vy) }
+        }
         var controls by remember { mutableStateOf(false) }
         var paused by remember(tab) { mutableStateOf(false) }
         // The buttons fade away again on their own.
@@ -84,16 +108,37 @@ fun MiniPlayer(tab: Tab, main: GeckoView, bottomGap: androidx.compose.ui.unit.Dp
         }
         Box(
             Modifier
-                .offset { IntOffset(x.coerceIn(0f, maxX).roundToInt(), y.coerceIn(0f, maxY).roundToInt()) }
+                .offset { IntOffset(x.value.roundToInt(), y.value.roundToInt()) }
                 .size(width, height)
                 .shadow(12.dp, RoundedCornerShape(14.dp))
                 .clip(RoundedCornerShape(14.dp))
                 .background(Color.Black)
                 .pointerInput(maxX, maxY) {
-                    detectDragGestures { change, drag ->
+                    // The window moves with the finger, so its speed is measured from how far it
+                    // has been dragged, not from where the finger is on it.
+                    val tracker = VelocityTracker()
+                    var moved = Offset.Zero
+                    detectDragGestures(
+                        onDragStart = {
+                            tracker.resetTracking()
+                            moved = Offset.Zero
+                            scope.launch { x.stop() }
+                            scope.launch { y.stop() }
+                        },
+                        onDragEnd = {
+                            val v = tracker.calculateVelocity()
+                            throwTo(v.x, v.y)
+                        },
+                        onDragCancel = { throwTo(0f, 0f) },
+                    ) { change, drag ->
                         change.consume()
-                        x = (x + drag.x).coerceIn(0f, maxX)
-                        y = (y + drag.y).coerceIn(0f, maxY)
+                        moved += drag
+                        tracker.addPosition(change.uptimeMillis, moved)
+                        scope.launch {
+                            // A little give past the edges while dragging, like a rubber band.
+                            x.snapTo(rubber(x.value + drag.x, maxX))
+                            y.snapTo(rubber(y.value + drag.y, maxY))
+                        }
                     }
                 },
         ) {
@@ -120,6 +165,13 @@ fun MiniPlayer(tab: Tab, main: GeckoView, bottomGap: androidx.compose.ui.unit.Dp
             }
         }
     }
+}
+
+/** Past an edge, the window follows the finger less and less. */
+private fun rubber(v: Float, max: Float): Float = when {
+    v < 0f -> v * 0.85f
+    v > max -> max + (v - max) * 0.85f
+    else -> v
 }
 
 @Composable
