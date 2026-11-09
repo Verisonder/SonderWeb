@@ -286,16 +286,7 @@ private fun MainPage(
             "Extensions",
             ublockStatus(),
         ) { onOpen(Page.Shields) }
-        NavRow(Icons.Outlined.Dashboard, "Start page", null) { onOpen(Page.Start) }
-        val widgets = remember { SearchWidget.placed(ctx).size }
-        NavRow(
-            Icons.Outlined.Widgets,
-            "Search widget",
-            if (widgets > 0) "On your home screen" else "Add it to your home screen",
-            last = true,
-        ) {
-            SearchWidget.openSettings(ctx)
-        }
+        NavRow(Icons.Outlined.Dashboard, "Start page", null, last = true) { onOpen(Page.Start) }
     }
 
     GroupTitle("General")
@@ -312,6 +303,20 @@ private fun MainPage(
             Browser.host?.askDefaultBrowser()
         }
         NavRow(Icons.Outlined.DeleteSweep, "Clear browsing data", null, last = true, onClick = onClear)
+    }
+
+    GroupTitle("Widget")
+    Group {
+        val widgets = remember { SearchWidget.placed(ctx).size }
+        NavRow(
+            Icons.Outlined.Widgets,
+            "Search widget",
+            if (widgets > 0) "On your home screen" else "Add it to your home screen",
+            first = true,
+            last = true,
+        ) {
+            SearchWidget.openSettings(ctx)
+        }
     }
 
     GroupTitle("About")
