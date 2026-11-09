@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The logo for the search widget: the sphere in white, its three highlights cut out. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="50"
+    android:viewportHeight="50">
+    <path android:pathData="M25,0a25,25 0,1 1,-0.01 0z" android:fillColor="#DEDEDE" />
+    <path
+        android:pathData="M9,21 A17,17 0,0 1,23 8"
+        android:strokeColor="#1C1C1C"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M18.25,18.25 A17,17 0,0 1,31.75 31.75"
+        android:strokeColor="#1C1C1C"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M41,29 A17,17 0,0 1,27 42"
+        android:strokeColor="#1C1C1C"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>

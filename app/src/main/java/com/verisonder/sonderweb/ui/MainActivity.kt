@@ -156,6 +156,90 @@ class MainActivity : ComponentActivity(), Browser.Host {
     /** Whether SonderWeb opens links from other apps (for Settings). */
     fun defaultBrowser(): Boolean = isDefaultBrowser()
 
+    // ---- The search widget ----
+
+    /** The widget asked for the search to open (BrowserScreen opens it on a fresh tab). */
+    var openSearch by mutableStateOf(false)
+
+    /** The widget's picture button: "Take a photo / Choose a photo" is showing. */
+    var askImage by mutableStateOf(false)
+
+    /** Where the camera saves the photo for an image search. */
+    private var photoUri: Uri? = null
+
+    private val voiceSearch = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        ownScreen = false
+        val heard = r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (r.resultCode == Activity.RESULT_OK && !heard.isNullOrBlank()) Browser.go(heard, freshTab())
+    }
+
+    private val takePhoto = registerForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        ownScreen = false
+        val uri = photoUri
+        if (ok && uri != null) searchImage(uri)
+    }
+
+    private val choosePhoto = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        ownScreen = false
+        if (uri != null) searchImage(uri)
+    }
+
+    /** A new tab to search in: the empty tab you're on, or one you have, or a new one. */
+    private fun freshTab(): Tab {
+        val cur = Browser.current
+        if (cur != null && cur.isBlank && !cur.isPrivate) return cur
+        Browser.tabs.lastOrNull { !it.isPrivate && it.isBlank }?.let {
+            Browser.select(it)
+            return it
+        }
+        return Browser.newTab(null, isPrivate = false)
+    }
+
+    private fun searchImage(uri: Uri) {
+        com.verisonder.sonderweb.browser.ImageSearch.search(this, uri) { page -> Browser.load(freshTab(), page) }
+    }
+
+    private fun startVoiceSearch() {
+        val intent = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Search")
+        try {
+            ownScreen = true
+            voiceSearch.launch(intent)
+        } catch (_: ActivityNotFoundException) {
+            ownScreen = false
+            toast("No voice input on this phone")
+        }
+    }
+
+    fun takePhotoForSearch() {
+        requestAndroidPermissions(arrayOf(android.Manifest.permission.CAMERA)) { granted ->
+            if (!granted) {
+                toast("SonderWeb needs the camera for this")
+                return@requestAndroidPermissions
+            }
+            val dir = java.io.File(cacheDir, "images").apply { mkdirs() }
+            val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.files", java.io.File(dir, "search.jpg"))
+            photoUri = uri
+            try {
+                ownScreen = true
+                takePhoto.launch(uri)
+            } catch (_: ActivityNotFoundException) {
+                ownScreen = false
+                toast("No camera app on this phone")
+            }
+        }
+    }
+
+    fun choosePhotoForSearch() {
+        try {
+            ownScreen = true
+            choosePhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        } catch (_: ActivityNotFoundException) {
+            ownScreen = false
+        }
+    }
+
     private val askPerms = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
         ownScreen = false
         permsResult?.invoke(r.isNotEmpty() && r.values.all { it })
@@ -273,6 +357,21 @@ class MainActivity : ComponentActivity(), Browser.Host {
     /** Links from other apps open in a new tab; shared text and searches too. */
     private fun handleIntent(intent: Intent?) {
         intent ?: return
+        when (intent.action) {
+            SearchWidget.SEARCH, SearchWidget.VOICE, SearchWidget.IMAGE -> {
+                // From the home screen widget: that is what you see, not the start page.
+                launchCheck = false
+                when (intent.action) {
+                    SearchWidget.SEARCH -> {
+                        freshTab()
+                        openSearch = true
+                    }
+                    SearchWidget.VOICE -> startVoiceSearch()
+                    else -> askImage = true
+                }
+                return
+            }
+        }
         if (intent.getBooleanExtra(com.verisonder.sonderweb.browser.DownloadNotifications.EXTRA_SHOW_DOWNLOADS, false)) {
             launchCheck = false
             com.verisonder.sonderweb.browser.Downloads.showPage = true

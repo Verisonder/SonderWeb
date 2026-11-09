@@ -124,6 +124,19 @@
             android:name=".browser.MediaActions"
             android:exported="false" />
 
+        <!-- The home screen search widget. -->
+        <receiver
+            android:name=".ui.SearchWidget"
+            android:exported="false"
+            android:label="@string/widget_search">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/search_widget" />
+        </receiver>
+
         <!-- The Cancel button on a download's notification. -->
         <receiver
             android:name=".browser.DownloadActions"

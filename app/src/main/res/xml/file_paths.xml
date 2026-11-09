@@ -4,4 +4,6 @@
     <external-files-path name="downloads" path="Download/" />
     <!-- App updates, downloaded before Android's installer opens them. -->
     <cache-path name="updates" path="updates/" />
+    <!-- A photo taken for an image search. -->
+    <cache-path name="images" path="images/" />
 </paths>

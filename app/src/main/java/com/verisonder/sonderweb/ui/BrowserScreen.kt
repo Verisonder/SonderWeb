@@ -132,6 +132,15 @@ fun BrowserScreen(activity: MainActivity) {
             ui.panel = Panel.Downloads
         }
     }
+    // The search widget was tapped: the search opens, on a fresh tab, over whatever was showing.
+    LaunchedEffect(activity.openSearch) {
+        if (activity.openSearch) {
+            activity.openSearch = false
+            ui.panel = Panel.None
+            ui.menu = false
+            startEditing(ui, Browser.current)
+        }
+    }
     val tab = Browser.current
     // Reading themeVersion makes a theme change in Settings recompose this screen.
     val theme = ui.themeVersion.let { Browser.prefs.theme }
@@ -452,6 +461,7 @@ fun BrowserScreen(activity: MainActivity) {
             }
 
             ContextMenu.request?.let { ContextSheet(it) }
+            if (activity.askImage) ImageSourceSheet(activity)
             Ublock.popup?.let { UblockSheet(it) }
             Prompts.queue.firstOrNull { it.tab === tab }?.let { PromptDialog(it) }
             com.verisonder.sonderweb.browser.Extensions.pending?.let { InstallDialog(it) }
