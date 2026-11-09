@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget logo in colour: the blue glass sphere with its white highlights. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="50"
+    android:viewportHeight="50">
+    <path android:pathData="M25,0a25,25 0,1 1,-0.01 0z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="19"
+                android:centerY="17"
+                android:gradientRadius="35"
+                android:startColor="#8AB4F8"
+                android:endColor="#1A4FD6" />
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M9,21 A17,17 0,0 1,23 8"
+        android:strokeColor="#D9FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M18.25,18.25 A17,17 0,0 1,31.75 31.75"
+        android:strokeColor="#D9FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M41,29 A17,17 0,0 1,27 42"
+        android:strokeColor="#D9FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>

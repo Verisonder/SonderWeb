@@ -1,54 +1,109 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The home screen search widget: logo, "Search", voice search and image search. -->
+<!-- The home screen search widget: logo, "Search", voice search and search with a picture.
+     Colours, icons and the shadow are set per widget (SearchWidget.views). -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <LinearLayout
-        android:id="@+id/widget_pill"
+    <!-- 56dp: the 50dp pill plus room for its shadow, so the shadow is never cut off. -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:layout_gravity="center_vertical"
-        android:background="@drawable/widget_pill"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="13dp">
+        android:layout_height="56dp"
+        android:layout_gravity="center_vertical">
 
         <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:id="@+id/widget_shadow"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:importantForAccessibility="no"
-            android:src="@drawable/widget_logo" />
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="@string/widget_search"
-            android:textColor="#F4F4F4"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_shadow"
+            android:visibility="gone" />
 
         <ImageView
-            android:id="@+id/widget_voice"
-            android:layout_width="48dp"
+            android:id="@+id/widget_bg"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginEnd="6dp"
-            android:contentDescription="@string/widget_voice"
-            android:padding="13dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/widget_mic" />
+            android:layout_marginStart="3dp"
+            android:layout_marginTop="1dp"
+            android:layout_marginEnd="3dp"
+            android:layout_marginBottom="5dp"
+            android:importantForAccessibility="no"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_pill"
+            android:tint="#1C1C1C" />
 
-        <ImageView
-            android:id="@+id/widget_image"
-            android:layout_width="48dp"
+        <LinearLayout
+            android:id="@+id/widget_pill"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:contentDescription="@string/widget_image"
-            android:padding="13dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/widget_image_search" />
-    </LinearLayout>
+            android:layout_marginStart="3dp"
+            android:layout_marginTop="1dp"
+            android:layout_marginEnd="3dp"
+            android:layout_marginBottom="5dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="13dp">
+
+            <FrameLayout
+                android:id="@+id/widget_logo"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginEnd="12dp">
+
+                <ImageView
+                    android:id="@+id/widget_logo_disc"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/widget_logo_disc"
+                    android:tint="#DEDEDE" />
+
+                <ImageView
+                    android:id="@+id/widget_logo_marks"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/widget_logo_marks"
+                    android:tint="#1C1C1C" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/widget_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/widget_search"
+                android:textColor="#F4F4F4"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <ImageView
+                android:id="@+id/widget_voice"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="6dp"
+                android:contentDescription="@string/widget_voice"
+                android:padding="13dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/widget_mic"
+                android:tint="#DEDEDE" />
+
+            <ImageView
+                android:id="@+id/widget_image"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/widget_image"
+                android:padding="13dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/widget_image_search"
+                android:tint="#DEDEDE" />
+        </LinearLayout>
+    </FrameLayout>
 </FrameLayout>

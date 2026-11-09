@@ -125,6 +125,16 @@
             android:exported="false" />
 
         <!-- The home screen search widget. -->
+        <activity
+            android:name=".ui.WidgetSettingsActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:taskAffinity=""
+            android:label="@string/widget_settings">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
         <receiver
             android:name=".ui.SearchWidget"
             android:exported="false"

@@ -876,7 +876,7 @@ private fun StartBackgroundSettings(ui: UiState) {
 
 /** A round colour to tap; the chosen one has a ring. */
 @Composable
-private fun Swatch(c: Color, selected: Boolean, label: String?, onClick: () -> Unit) {
+internal fun Swatch(c: Color, selected: Boolean, label: String?, onClick: () -> Unit) {
     val p = LocalPalette.current
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
@@ -1191,7 +1191,7 @@ private fun StartSettings(ui: UiState) {
 // ---- Building blocks ----
 
 @Composable
-private fun GroupTitle(title: String) {
+internal fun GroupTitle(title: String) {
     val p = LocalPalette.current
     Text(
         title,
@@ -1203,7 +1203,7 @@ private fun GroupTitle(title: String) {
 
 /** A rounded card holding a few rows, separated by thin gaps like Brave's settings. */
 @Composable
-private fun Group(content: @Composable ColumnScope.() -> Unit) {
+internal fun Group(content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier
             .padding(horizontal = 16.dp)
@@ -1246,13 +1246,13 @@ private fun NavRow(
 }
 
 @Composable
-private fun Hint(text: String) {
+internal fun Hint(text: String) {
     val p = LocalPalette.current
     Text(text, color = p.faint, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(start = 32.dp, end = 24.dp, top = 12.dp))
 }
 
 @Composable
-private fun Choice(label: String, on: Boolean, sub: String? = null, onClick: () -> Unit) {
+internal fun Choice(label: String, on: Boolean, sub: String? = null, onClick: () -> Unit) {
     val p = LocalPalette.current
     Row(
         Modifier
@@ -1280,7 +1280,7 @@ private fun Choice(label: String, on: Boolean, sub: String? = null, onClick: () 
 }
 
 @Composable
-private fun Toggle(title: String, sub: String?, on: Boolean, onChange: (Boolean) -> Unit) {
+internal fun Toggle(title: String, sub: String?, on: Boolean, onChange: (Boolean) -> Unit) {
     val p = LocalPalette.current
     Row(
         Modifier
