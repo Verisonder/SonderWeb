@@ -44,6 +44,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Tab
+import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.AlertDialog
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.offset
@@ -285,7 +286,16 @@ private fun MainPage(
             "Extensions",
             ublockStatus(),
         ) { onOpen(Page.Shields) }
-        NavRow(Icons.Outlined.Dashboard, "Start page", null, last = true) { onOpen(Page.Start) }
+        NavRow(Icons.Outlined.Dashboard, "Start page", null) { onOpen(Page.Start) }
+        val widgets = remember { SearchWidget.placed(ctx).size }
+        NavRow(
+            Icons.Outlined.Widgets,
+            "Search widget",
+            if (widgets > 0) "On your home screen" else "Add it to your home screen",
+            last = true,
+        ) {
+            SearchWidget.openSettings(ctx)
+        }
     }
 
     GroupTitle("General")

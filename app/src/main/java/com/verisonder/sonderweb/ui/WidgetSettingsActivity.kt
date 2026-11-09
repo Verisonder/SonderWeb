@@ -60,6 +60,9 @@ class WidgetSettingsActivity : ComponentActivity() {
 
     private var widgetId = AppWidgetManager.INVALID_APPWIDGET_ID
 
+    // Opened from Settings: every search widget on the home screen takes the new look.
+    private var allIds = IntArray(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -69,6 +72,7 @@ class WidgetSettingsActivity : ComponentActivity() {
             finish()
             return
         }
+        allIds = intent?.getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS) ?: intArrayOf(widgetId)
         // Leaving without saving: nothing changes (a widget being added isn't added).
         setResult(Activity.RESULT_CANCELED, result())
         val start = WidgetLook.load(this, widgetId)
@@ -83,8 +87,10 @@ class WidgetSettingsActivity : ComponentActivity() {
     private fun result() = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
 
     private fun save(look: WidgetLook) {
-        WidgetLook.save(this, widgetId, look)
-        SearchWidget.update(this, widgetId)
+        (allIds + widgetId).distinct().forEach {
+            WidgetLook.save(this, it, look)
+            SearchWidget.update(this, it)
+        }
         setResult(Activity.RESULT_OK, result())
         finish()
     }

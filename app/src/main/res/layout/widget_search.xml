@@ -79,7 +79,8 @@
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
-            <View
+            <!-- Home screen widgets may only use a few view classes: a plain View isn't one. -->
+            <FrameLayout
                 android:layout_width="0dp"
                 android:layout_height="1dp"
                 android:layout_weight="1" />

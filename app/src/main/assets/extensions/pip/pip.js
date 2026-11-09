@@ -74,14 +74,14 @@
     if (on && !hold) {
       userPaused = false;
       lastTime = -1;
-      stuckFor = 0;
+      stuckSince = 0;
       loadedEnd = 0;
       loadedSince = Date.now();
     }
     hold = on;
     if (on) {
       resumeStray();
-      if (!keeper) keeper = setInterval(keepGoing, 1000);
+      if (!keeper) keeper = setInterval(keepGoing, 250);
     } else if (keeper) {
       clearInterval(keeper);
       keeper = null;
@@ -116,29 +116,37 @@
 
   // Watching for the video running dry. Even told to play, YouTube sometimes stops loading the
   // rest while it's small or in the background: it plays what it has (about 30 seconds) and
-  // stops. A seek to where it already is makes it load from there again.
+  // stops. A seek to where it already is makes it load from there again. It's done early, while
+  // there's still some loaded (no visible stop), and at once if it does stop.
   let lastTime = -1;
-  let stuckFor = 0;
+  let stuckSince = 0;
   let loadedEnd = 0;
   let loadedSince = 0;
   let nudgedAt = 0;
-  function watchLoading(v, p) {
+  function watchLoading(v, p, waiting) {
     const now = Date.now();
     const t = v.currentTime;
-    stuckFor = (!v.paused && Math.abs(t - lastTime) < 0.05) ? stuckFor + 1 : 0;
+    if (!v.paused && Math.abs(t - lastTime) < 0.05) {
+      if (!stuckSince) stuckSince = now;
+    } else {
+      stuckSince = 0;
+    }
     lastTime = t;
     const left = ahead(v);
     const end = t + left;
     if (end > loadedEnd + 0.5) { loadedEnd = end; loadedSince = now; }
     if (end < loadedEnd - 5) { loadedEnd = end; loadedSince = now; } // moved back (a seek, the next video)
-    if (v.ended || now - nudgedAt < 6000) return;
-    const dry = stuckFor >= 2;
-    // Nothing new loaded for a while and only a few seconds left: loading stopped.
-    const stalling = left < 6 && now - loadedSince > 8000;
+    if (v.ended) return;
+    // Stopped: the video says it's waiting for data, or hasn't moved for a moment.
+    const dry = (waiting && left < 0.5) || (stuckSince && now - stuckSince >= 300);
+    // Nothing new loaded for a while and not much left: loading stopped, so it's restarted
+    // before the video runs out.
+    const stalling = left < 12 && now - loadedSince > 4000;
     if (!dry && !stalling) return;
+    if (now - nudgedAt < (dry ? 1200 : 5000)) return;
     nudgedAt = now;
     loadedSince = now;
-    stuckFor = 0;
+    stuckSince = 0;
     try {
       if (p && typeof p.seekTo === "function") {
         p.seekTo(p.getCurrentTime(), true);
@@ -150,7 +158,7 @@
     } catch (e) {}
   }
 
-  function keepGoing() {
+  function keepGoing(waiting) {
     if (!hold || userPaused) return;
     const v = (filledVideo && filledVideo.isConnected) ? filledVideo : video;
     if (!v || v.ended) return;
@@ -161,9 +169,16 @@
       if (p && p.getPlayerState() === 2) p.playVideo();
       if (v.paused) v.play().catch(() => {});
     } catch (e) {}
-    watchLoading(v, p);
+    watchLoading(v, p, waiting === true);
     // YouTube also stops after a long time with no touches ("Continue watching?").
     try { window.wrappedJSObject._lact = Date.now(); } catch (e) {}
+  }
+
+  // The moment the video runs out of data, not at the next check (timers slow down in the background).
+  for (const t of ["waiting", "stalled"]) {
+    document.addEventListener(t, (e) => {
+      if (hold && e.target instanceof HTMLMediaElement) keepGoing(true);
+    }, true);
   }
 
   function connect() {

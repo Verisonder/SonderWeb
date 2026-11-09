@@ -3,12 +3,14 @@ package com.verisonder.sonderweb.ui
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
+import android.widget.Toast
 import com.verisonder.sonderweb.R
 import org.json.JSONObject
 
@@ -92,6 +94,29 @@ class SearchWidget : AppWidgetProvider() {
         private const val TEXT = 1
         private const val ICON = 2
         private const val ACCENT = 3
+
+        /** The search widgets on the home screen. */
+        fun placed(context: Context): IntArray =
+            AppWidgetManager.getInstance(context).getAppWidgetIds(ComponentName(context, SearchWidget::class.java))
+
+        /** From Settings: the widgets' settings screen, or, with none placed, asks the launcher to add one. */
+        fun openSettings(context: Context) {
+            val ids = placed(context)
+            if (ids.isNotEmpty()) {
+                context.startActivity(
+                    Intent(context, WidgetSettingsActivity::class.java)
+                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, ids.last())
+                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids),
+                )
+                return
+            }
+            val manager = AppWidgetManager.getInstance(context)
+            val asked = manager.isRequestPinAppWidgetSupported &&
+                manager.requestPinAppWidget(ComponentName(context, SearchWidget::class.java), null, null)
+            if (!asked) {
+                Toast.makeText(context, "Hold your home screen, then Widgets › SonderWeb", Toast.LENGTH_LONG).show()
+            }
+        }
 
         /** Redraws one widget with its saved look. */
         fun update(context: Context, id: Int) {
