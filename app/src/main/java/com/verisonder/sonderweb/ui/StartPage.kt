@@ -447,7 +447,8 @@ private fun ShortcutGrid(
         val cell = maxWidth / columns
         val cellPx = with(androidx.compose.ui.platform.LocalDensity.current) { cell.toPx() }
         val names = Browser.prefs.showShortcutNames
-        val showAdd = Browser.prefs.showAddShortcut && shortcuts.size < 24
+        // With no shortcuts yet the + is always there, so you can add the first one.
+        val showAdd = (shortcuts.isEmpty() || Browser.prefs.showAddShortcut) && shortcuts.size < 24
         FlowRow(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,

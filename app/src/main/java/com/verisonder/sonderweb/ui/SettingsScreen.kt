@@ -1116,7 +1116,7 @@ private fun StartSettings(ui: UiState) {
             prefs.showShortcutNames = it
             ui.themeVersion++
         }
-        Toggle("Add button", "The + after the shortcuts (or ⋮ › Add to start page on a site)", addTile) {
+        Toggle("Add button", "The + after the shortcuts. Always shown while there are none", addTile) {
             addTile = it
             prefs.showAddShortcut = it
             ui.themeVersion++
