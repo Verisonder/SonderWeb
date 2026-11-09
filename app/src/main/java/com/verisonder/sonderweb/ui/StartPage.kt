@@ -447,6 +447,7 @@ private fun ShortcutGrid(
         val cell = maxWidth / columns
         val cellPx = with(androidx.compose.ui.platform.LocalDensity.current) { cell.toPx() }
         val names = Browser.prefs.showShortcutNames
+        val showAdd = Browser.prefs.showAddShortcut && shortcuts.size < 24
         FlowRow(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -466,7 +467,7 @@ private fun ShortcutGrid(
                             .width(cell)
                             .onSizeChanged { rowPx = it.height.toFloat().coerceAtLeast(1f) }
                             .zIndex(if (isDragged) 1f else 0f)
-                            .pointerInput(s) {
+                            .pointerInput(s, showAdd) {
                                 val slop = viewConfiguration.touchSlop
                                 awaitEachGesture {
                                     val down = awaitFirstDown()
@@ -504,19 +505,26 @@ private fun ShortcutGrid(
                                         dragX += d.x
                                         dragY += d.y
                                         // Over another spot: move there; the icon stays under the finger.
+                                        // Rows are centred, so a short last row starts further in.
+                                        val total = order.size + if (showAdd) 1 else 0
+                                        fun spotX(i: Int): Float {
+                                            val inRow = minOf(columns, total - (i / columns) * columns)
+                                            return ((columns - inRow) / 2f + i % columns) * cellPx
+                                        }
                                         val from = order.indexOf(s)
-                                        val dc = kotlin.math.round(dragX / cellPx).toInt()
-                                        val dr = kotlin.math.round(dragY / rowPx).toInt()
-                                        val to = (from + dr * columns + dc).coerceIn(0, order.size - 1)
+                                        val atX = spotX(from) + dragX
+                                        val atY = (from / columns) * rowPx + dragY
+                                        val to = order.indices.minBy { i ->
+                                            val ddx = spotX(i) - atX
+                                            val ddy = (i / columns) * rowPx - atY
+                                            ddx * ddx + ddy * ddy
+                                        }
                                         if (to != from) {
-                                            val shift = to - from
                                             order.removeAt(from)
                                             order.add(to, s)
-                                            val oldCol = from % columns
-                                            val newCol = to % columns
-                                            dragX -= (newCol - oldCol) * cellPx
+                                            dragX -= spotX(to) - spotX(from)
                                             dragY -= (to / columns - from / columns) * rowPx
-                                            if (shift != 0) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                                         }
                                         if (!c.pressed) break
                                     }
@@ -570,7 +578,7 @@ private fun ShortcutGrid(
                     }
                 }
             }
-            if (shortcuts.size < 24) {
+            if (showAdd) {
                 Column(
                     Modifier
                         .width(cell)

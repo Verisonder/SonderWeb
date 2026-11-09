@@ -132,6 +132,7 @@ private val index: List<Pair<String, Page>> = listOf(
     "Greeting" to Page.Start,
     "Shortcuts" to Page.Start,
     "Shortcut names" to Page.Start,
+    "Add button" to Page.Start,
     "Picture-in-picture" to Page.Tabs,
     "Videos" to Page.Tabs,
     "Search engine" to Page.Search,
@@ -1090,6 +1091,7 @@ private fun StartSettings(ui: UiState) {
     var rest by remember { mutableStateOf(prefs.restLift.toFloat()) }
     var greeting by remember { mutableStateOf(prefs.showGreeting) }
     var names by remember { mutableStateOf(prefs.showShortcutNames) }
+    var addTile by remember { mutableStateOf(prefs.showAddShortcut) }
     var weatherOn by remember { mutableStateOf(prefs.weatherOn) }
     var fahrenheit by remember { mutableStateOf(prefs.fahrenheit) }
     var place by remember { mutableStateOf(prefs.place) }
@@ -1112,6 +1114,11 @@ private fun StartSettings(ui: UiState) {
         Toggle("Shortcut names", "The site's name under each shortcut", names) {
             names = it
             prefs.showShortcutNames = it
+            ui.themeVersion++
+        }
+        Toggle("Add button", "The + after the shortcuts (or ⋮ › Add to start page on a site)", addTile) {
+            addTile = it
+            prefs.showAddShortcut = it
             ui.themeVersion++
         }
         Toggle("Weather", "From Open-Meteo. Only the city you pick is sent.", weatherOn) {

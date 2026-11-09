@@ -199,6 +199,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("show_clock", true)
         set(v) = sp.edit().putBoolean("show_clock", v).apply()
 
+    /** The + after the start page shortcuts, to add one. */
+    var showAddShortcut: Boolean
+        get() = sp.getBoolean("shortcut_add", true)
+        set(v) = sp.edit().putBoolean("shortcut_add", v).apply()
+
     /** Names under the start page shortcuts. */
     var showShortcutNames: Boolean
         get() = sp.getBoolean("shortcut_names", true)
