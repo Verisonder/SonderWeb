@@ -86,6 +86,7 @@ class SearchWidget : AppWidgetProvider() {
         const val SEARCH = "com.verisonder.sonderweb.WIDGET_SEARCH"
         const val VOICE = "com.verisonder.sonderweb.WIDGET_VOICE"
         const val IMAGE = "com.verisonder.sonderweb.WIDGET_IMAGE"
+        const val HOME = "com.verisonder.sonderweb.WIDGET_HOME"
 
         // The fixed themes: background, text, icons, coloured icons.
         private val DARK_COLORS = intArrayOf(0xFF1C1C1C.toInt(), 0xFFF4F4F4.toInt(), 0xFFDEDEDE.toInt(), 0xFF8AB4F8.toInt())
@@ -193,6 +194,8 @@ class SearchWidget : AppWidgetProvider() {
                 v.setOnClickPendingIntent(R.id.widget_pill, open(context, SEARCH, 1))
                 v.setOnClickPendingIntent(R.id.widget_voice, open(context, VOICE, 2))
                 v.setOnClickPendingIntent(R.id.widget_image, open(context, IMAGE, 3))
+                // The logo: just the start page, without the search.
+                v.setOnClickPendingIntent(R.id.widget_logo, open(context, HOME, 4))
             }
             return v
         }

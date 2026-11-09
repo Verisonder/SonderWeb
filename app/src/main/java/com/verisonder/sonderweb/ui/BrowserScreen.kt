@@ -141,6 +141,14 @@ fun BrowserScreen(activity: MainActivity) {
             startEditing(ui, Browser.current)
         }
     }
+    LaunchedEffect(activity.openHome) {
+        if (activity.openHome) {
+            activity.openHome = false
+            ui.panel = Panel.None
+            ui.menu = false
+            ui.editing = false
+        }
+    }
     val tab = Browser.current
     // Reading themeVersion makes a theme change in Settings recompose this screen.
     val theme = ui.themeVersion.let { Browser.prefs.theme }

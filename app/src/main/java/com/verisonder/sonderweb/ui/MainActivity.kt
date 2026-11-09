@@ -161,6 +161,9 @@ class MainActivity : ComponentActivity(), Browser.Host {
     /** The widget asked for the search to open (BrowserScreen opens it on a fresh tab). */
     var openSearch by mutableStateOf(false)
 
+    /** From the widget's logo: the start page, with nothing open over it. */
+    var openHome by mutableStateOf(false)
+
     /** The widget's picture button: "Take a photo / Choose a photo" is showing. */
     var askImage by mutableStateOf(false)
 
@@ -371,13 +374,17 @@ class MainActivity : ComponentActivity(), Browser.Host {
     private fun handleIntent(intent: Intent?) {
         intent ?: return
         when (intent.action) {
-            SearchWidget.SEARCH, SearchWidget.VOICE, SearchWidget.IMAGE -> {
+            SearchWidget.SEARCH, SearchWidget.VOICE, SearchWidget.IMAGE, SearchWidget.HOME -> {
                 // From the home screen widget: that is what you see, not the start page.
                 launchCheck = false
                 when (intent.action) {
                     SearchWidget.SEARCH -> {
                         freshTab()
                         openSearch = true
+                    }
+                    SearchWidget.HOME -> {
+                        freshTab()
+                        openHome = true
                     }
                     SearchWidget.VOICE -> startVoiceSearch()
                     else -> askImage = true
