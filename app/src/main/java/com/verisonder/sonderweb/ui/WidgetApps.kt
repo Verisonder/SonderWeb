@@ -167,8 +167,11 @@ object WidgetIcons {
         return listOfNotNull(appIcon(context, app.pkg, app.cls)?.let { toBitmap(it) })
     }
 
-    /** GIF frames are kept this small (px), so several can go on the home screen at once. */
-    private const val GIF_PX = 72
+    /**
+     * GIF frames are kept this big (px): sharp at the widget's icon sizes, yet small enough that
+     * several animated icons fit in what the home screen allows a widget.
+     */
+    private const val GIF_PX = 112
 
     /** At most this many frames from one GIF. */
     const val GIF_MAX_FRAMES = 24
@@ -176,6 +179,24 @@ object WidgetIcons {
     /** A GIF picked: whether [uri] is one. */
     fun isGif(context: Context, uri: Uri): Boolean =
         context.contentResolver.getType(uri)?.equals("image/gif", ignoreCase = true) == true
+
+    /**
+     * Makes a picture smaller in halves, smoothing at each step. One big jump (or drawing the GIF
+     * straight at the small size) skips pixels, and a GIF's hard-edged transparency then shows
+     * as jagged edges; halving averages them into smooth ones, like a PNG's.
+     */
+    private fun shrink(src: Bitmap, to: Int): Bitmap {
+        var b = src
+        while (b.width / 2 >= to) {
+            val half = Bitmap.createScaledBitmap(b, b.width / 2, b.height / 2, true)
+            if (b !== src) b.recycle()
+            b = half
+        }
+        if (b.width == to) return b
+        val out = Bitmap.createScaledBitmap(b, to, to, true)
+        if (b !== src) b.recycle()
+        return out
+    }
 
     /**
      * A GIF's frames, cut to a square from the middle and laid side by side in one picture, with
@@ -193,19 +214,27 @@ object WidgetIcons {
         val n = if (duration <= 0) 1 else (duration / 80).coerceIn(2, GIF_MAX_FRAMES)
         val interval = if (n <= 1) 0 else (duration / n).coerceAtLeast(40)
         val side = minOf(w, h)
-        val scale = GIF_PX.toFloat() / side
+        // Each frame is first drawn at its own size (up to 1024 px), then made small smoothly.
+        val big = minOf(side, 1024)
+        val bigScale = big.toFloat() / side
+        val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG)
+        val frame = Bitmap.createBitmap(big, big, Bitmap.Config.ARGB_8888)
+        val frameCanvas = Canvas(frame)
         val strip = Bitmap.createBitmap(GIF_PX * n, GIF_PX, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(strip)
         for (i in 0 until n) {
             movie.setTime(if (n <= 1) 0 else i * duration / n)
-            canvas.save()
-            canvas.translate((i * GIF_PX).toFloat(), 0f)
-            canvas.clipRect(0, 0, GIF_PX, GIF_PX)
-            canvas.scale(scale, scale)
-            canvas.translate(-(w - side) / 2f, -(h - side) / 2f)
-            movie.draw(canvas, 0f, 0f)
-            canvas.restore()
+            frame.eraseColor(android.graphics.Color.TRANSPARENT)
+            frameCanvas.save()
+            frameCanvas.scale(bigScale, bigScale)
+            frameCanvas.translate(-(w - side) / 2f, -(h - side) / 2f)
+            movie.draw(frameCanvas, 0f, 0f, paint)
+            frameCanvas.restore()
+            val small = shrink(frame, GIF_PX)
+            canvas.drawBitmap(small, (i * GIF_PX).toFloat(), 0f, paint)
+            if (small !== frame) small.recycle()
         }
+        frame.recycle()
         Triple(strip, n, interval)
     }.getOrNull()
 
