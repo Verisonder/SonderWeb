@@ -448,7 +448,9 @@ object FxSync {
                 reason = reason,
                 engines = SyncEngineSelection.Some(listOf(PASSWORDS)),
                 enabledChanges = emptyMap(),
-                localEncryptionKeys = mapOf(PASSWORDS to (loginsKey ?: error("No passwords key"))),
+                // The passwords database encrypts with its own key (handed to it when it opens);
+                // the sync engine takes none and refuses one.
+                localEncryptionKeys = emptyMap(),
                 authInfo = SyncAuthInfo(
                     kid = key.kid,
                     fxaAccessToken = token.token,
