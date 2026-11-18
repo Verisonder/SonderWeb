@@ -134,18 +134,19 @@ private fun WidgetSettings(start: WidgetLook, onCancel: () -> Unit, onSave: (Wid
     val gapPx = with(LocalDensity.current) { 2.dp.toPx() }
     var rowPx by remember { mutableFloatStateOf(200f) }
     fun setIcon(index: Int, path: String?) {
-        look = look.copy(apps = look.apps.mapIndexed { i, a -> if (i == index) a.copy(icon = path, frames = 1, interval = 0) else a })
+        look = look.copy(apps = look.apps.mapIndexed { i, a -> if (i == index) a.copy(icon = path, frames = 1, interval = 0, seq = null) else a })
     }
     val choosePicture = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         val i = pictureFor
         pictureFor = null
         if (uri != null && i != null) {
-            val gif = if (WidgetIcons.isGif(ctx, uri)) WidgetIcons.gifStrip(ctx, uri) else null
-            if (gif != null && gif.second > 1) {
-                WidgetIcons.keep(ctx, gif.first)?.let { path ->
+            // An animation (GIF, animated WebP or animated PNG) plays; anything else is a still icon.
+            val anim = AnimatedIcons.read(ctx, uri)
+            if (anim != null) {
+                WidgetIcons.keep(ctx, anim.strip)?.let { path ->
                     look = look.copy(
                         apps = look.apps.mapIndexed { n, a ->
-                            if (n == i) a.copy(icon = path, frames = gif.second, interval = gif.third) else a
+                            if (n == i) a.copy(icon = path, frames = anim.count, interval = anim.tick, seq = anim.seq) else a
                         },
                     )
                 }

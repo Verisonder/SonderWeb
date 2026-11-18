@@ -201,11 +201,13 @@ class SearchWidget : AppWidgetProvider() {
             }
 
             // Your apps, in their own colours (not tinted): on the left after the logo, or on the
-            // right before the microphone, in your order. A GIF plays as its frames, flipped by the
-            // home screen; all GIFs together share a frame budget so the widget stays light.
+            // right before the microphone, in your order. An animation plays as its frames, flipped
+            // by the home screen; all animations together share a budget of distinct pictures (a
+            // frame shown several times is the same picture, sent once) and of steps.
             val apps = look.apps.filter { WidgetIcons.installed(context, it) }
             val gifs = apps.count { it.frames > 1 }
             val perGif = if (gifs == 0) 0 else (FRAME_BUDGET / gifs).coerceAtLeast(2)
+            val perSteps = if (gifs == 0) 0 else STEP_BUDGET / gifs
             val sides = listOf(apps.filter { it.left } to LEFT_VIEWS, apps.filter { !it.left } to APP_VIEWS)
             for ((list, views) in sides) {
                 views.forEachIndexed { i, view ->
@@ -216,14 +218,22 @@ class SearchWidget : AppWidgetProvider() {
                         v.setViewVisibility(view, View.GONE)
                         return@forEachIndexed
                     }
+                    // Over the budget: every step-th picture kept, the others shown as the one before.
                     val step = if (all.size > 1) (all.size + perGif - 1) / perGif else 1
-                    val shown = all.filterIndexed { n, _ -> n % step == 0 }
-                    shown.forEach { bmp ->
+                    // (Icons made before the play order was kept: their pictures in turn.)
+                    var order = (app.seq?.filter { it in all.indices }?.map { it - it % step }
+                        ?: all.indices.filter { it % step == 0 })
+                        .ifEmpty { listOf(0) }
+                    // Too many steps: every few kept, each shown that much longer.
+                    val every = if (all.size > 1 && perSteps > 0 && order.size > perSteps) (order.size + perSteps - 1) / perSteps else 1
+                    if (every > 1) order = order.filterIndexed { n, _ -> n % every == 0 }
+                    order.forEach { n ->
                         val frame = RemoteViews(context.packageName, R.layout.widget_app_frame)
-                        frame.setImageViewBitmap(R.id.widget_app_frame, bmp)
+                        frame.setImageViewBitmap(R.id.widget_app_frame, all[n])
                         v.addView(view, frame)
                     }
-                    v.setInt(view, "setFlipInterval", (app.interval * step).coerceAtLeast(40))
+                    val stepMs = if (app.seq != null) app.interval else app.interval * step
+                    v.setInt(view, "setFlipInterval", (stepMs * every).coerceAtLeast(40))
                     v.setViewVisibility(view, View.VISIBLE)
                     v.setContentDescription(view, WidgetIcons.label(context, app))
                     if (Build.VERSION.SDK_INT >= 31) {
@@ -251,6 +261,9 @@ class SearchWidget : AppWidgetProvider() {
 
         /** GIF frames on one widget, all GIFs together (each frame is a small picture sent to the home screen). */
         private const val FRAME_BUDGET = 24
+
+        /** Steps (pictures flipped through) on one widget, all animations together. */
+        private const val STEP_BUDGET = 240
 
         /** Opens one of your apps, as its home screen icon would. Each widget's buttons have their own code. */
         private fun launch(context: Context, app: WidgetApp, code: Int): PendingIntent =
