@@ -163,6 +163,12 @@ dependencies {
     implementation(libs.androidx.compose.icons)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.geckoview)
+    // Firefox Sync (an option, off by default): Mozilla account sign-in, saved passwords and syncing.
+    implementation(libs.appservices.fxaclient)
+    implementation(libs.appservices.logins)
+    implementation(libs.appservices.syncmanager)
+    implementation(libs.appservices.viaduct)
+    implementation(libs.appservices.init)
 
     testImplementation(libs.junit)
 }

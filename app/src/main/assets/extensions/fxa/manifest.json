@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "SonderWeb account sign-in",
+  "version": "1.0",
+  "description": "Lets Mozilla's sign-in page hand SonderWeb the result when you sign in for Firefox Sync.",
+  "browser_specific_settings": { "gecko": { "id": "fxa@sonderweb" } },
+  "permissions": ["mozillaAddons", "geckoViewAddons", "nativeMessaging", "nativeMessagingFromContent"],
+  "content_scripts": [
+    {
+      "matches": ["https://accounts.firefox.com/*"],
+      "js": ["channel.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

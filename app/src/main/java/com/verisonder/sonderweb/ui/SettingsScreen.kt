@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.DeleteSweep
@@ -95,6 +96,7 @@ import org.mozilla.geckoview.StorageController
 /** Settings pages, Brave-style: a grouped list on the first page, details one tap away. */
 private enum class Page(val title: String) {
     Privacy("Privacy & security"),
+    Sync("Firefox Sync"),
     Shields("Extensions"),
     Start("Start page"),
     Search("Search engine"),
@@ -105,6 +107,9 @@ private enum class Page(val title: String) {
 
 /** Every setting by name, so the search box can find it. */
 private val index: List<Pair<String, Page>> = listOf(
+    "Firefox Sync" to Page.Sync,
+    "Mozilla account" to Page.Sync,
+    "Saved passwords" to Page.Sync,
     "Strict tracking protection" to Page.Privacy,
     "HTTPS only" to Page.Privacy,
     "Fingerprinting" to Page.Privacy,
@@ -212,6 +217,7 @@ fun SettingsScreen(ui: UiState) {
             when (shown) {
                 null -> MainPage(query, { query = it }, onOpen = { page = it }, onClear = { clearing = true })
                 Page.Privacy -> PrivacyPage { clearing = true }
+                Page.Sync -> SyncPage(ui)
                 Page.Shields -> ShieldsPage(ui)
                 Page.Start -> StartSettings(ui)
                 Page.Search -> SearchPage()
@@ -283,6 +289,15 @@ private fun MainPage(
     Group {
         NavRow(Icons.Outlined.Security, "Privacy & security", null, first = true) { onOpen(Page.Privacy) }
         NavRow(
+            Icons.Outlined.Sync,
+            "Firefox Sync",
+            when {
+                !com.verisonder.sonderweb.sync.FxSync.enabled -> "Off"
+                com.verisonder.sonderweb.sync.FxSync.signedIn -> com.verisonder.sonderweb.sync.FxSync.email ?: "Signed in"
+                else -> "On, not signed in"
+            },
+        ) { onOpen(Page.Sync) }
+        NavRow(
             Icons.Outlined.Extension,
             "Extensions",
             ublockStatus(),
@@ -345,6 +360,7 @@ private fun ublockStatus(): String = when {
 
 private fun iconFor(page: Page): ImageVector = when (page) {
     Page.Privacy -> Icons.Outlined.Security
+    Page.Sync -> Icons.Outlined.Sync
     Page.Shields -> Icons.Outlined.Extension
     Page.Start -> Icons.Outlined.Dashboard
     Page.Search -> Icons.Outlined.Search

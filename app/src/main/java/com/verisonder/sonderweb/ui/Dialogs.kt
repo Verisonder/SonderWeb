@@ -168,6 +168,30 @@ fun PromptDialog(prompt: PromptUi) {
 
         is PromptUi.Choose -> ChooseDialog(prompt) { picked -> finish { prompt.onResult(picked) } }
 
+        is PromptUi.PickLogin -> AlertDialog(
+            onDismissRequest = { finish { prompt.onResult(null) } },
+            containerColor = p.card,
+            title = { Text(prompt.title, color = p.text, fontSize = 18.sp) },
+            text = {
+                LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                    itemsIndexed(prompt.rows) { i, row ->
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { finish { prompt.onResult(i) } }
+                                .padding(horizontal = 8.dp, vertical = 10.dp),
+                        ) {
+                            Text(row.first, color = p.text, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(row.second, color = p.faint, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton({ finish { prompt.onResult(null) } }) { Text("Cancel", color = p.text) } },
+        )
+
         is PromptUi.PickColor -> {
             val colors = remember(prompt) {
                 (prompt.presets + listOf(
