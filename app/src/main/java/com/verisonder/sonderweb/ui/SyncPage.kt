@@ -57,7 +57,7 @@ internal fun SyncPage(ui: UiState) {
             "Firefox Sync",
             "Sign in with your Mozilla account: SonderWeb saves passwords and syncs them with Firefox",
             FxSync.enabled,
-        ) { FxSync.setEnabled(it) }
+        ) { FxSync.turn(it) }
     }
 
     if (FxSync.enabled) {

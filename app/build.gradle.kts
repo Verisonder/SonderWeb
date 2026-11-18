@@ -170,6 +170,13 @@ val styleFonts by tasks.registering(Sync::class) {
 
 tasks.named("preBuild") { dependsOn(unpackUblock, styleFonts) }
 
+// Mozilla's telemetry library comes along with the sync libraries; its native part is a copy of
+// the engine's own libxul.so (GeckoView already carries it), so it's left out, as Firefox does.
+// Telemetry itself is never started: nothing is sent.
+configurations.configureEach {
+    exclude(group = "org.mozilla.telemetry", module = "glean-native")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
