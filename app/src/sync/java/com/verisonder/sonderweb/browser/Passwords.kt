@@ -15,7 +15,7 @@ object Passwords {
 
     /** The option on: the engine fills and offers to save sign-ins; off: it leaves them alone. */
     fun applyOption() {
-        val on = FxSync.enabled
+        val on = FxSync.enabled && FxSync.fillPasswords
         runCatching { Browser.runtime.settings.setLoginAutofillEnabled(on) }
         Browser.runtime.autocompleteStorageDelegate = if (on) storage else null
     }

@@ -18,6 +18,19 @@ object FxSync {
     val lastSynced = 0L
     val problem: String? = null
     val passwordCount = 0
+    val displayName: String? = null
+    val avatar: android.graphics.Bitmap? = null
+    val deviceName = ""
+    val syncPasswords = false
+    val fillPasswords = false
+
+    fun setFillPasswords(on: Boolean) = Unit
+
+    fun manageAccount(open: (String) -> Unit) = Unit
+
+    fun setDeviceName(name: String) = Unit
+
+    fun setSyncPasswords(on: Boolean) = Unit
 
     fun init(context: Context) = Unit
 
