@@ -384,4 +384,33 @@ object FxSync {
     internal fun changed() {
         scope.launch { countPasswords() }
     }
+
+    /** The saved passwords, by site, handed to [done] on the main thread. */
+    fun listPasswords(done: (List<SavedPassword>) -> Unit) {
+        withStore { store ->
+            val all = runCatching { store.list() }.getOrDefault(emptyList())
+                .map {
+                    SavedPassword(
+                        it.id,
+                        com.verisonder.sonderweb.core.UrlText.host(it.origin).ifEmpty { it.origin },
+                        it.username,
+                        it.password,
+                    )
+                }
+                .sortedBy { it.site }
+            ui { done(all) }
+        }
+    }
+
+    /** Deletes a saved password (on your other devices too, at the next sync). */
+    fun deletePassword(id: String, done: () -> Unit) {
+        withStore { store ->
+            runCatching { store.delete(id) }
+            countPasswords()
+            ui {
+                done()
+                sync(user = false)
+            }
+        }
+    }
 }

@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon testDebugUnitTest 2>&1 | tee build-output.txt
+          gradle --no-daemon testStandardDebugUnitTest 2>&1 | tee build-output.txt
       - name: Build
         shell: bash
         run: |

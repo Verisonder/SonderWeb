@@ -106,10 +106,14 @@ private enum class Page(val title: String) {
 }
 
 /** Every setting by name, so the search box can find it. */
-private val index: List<Pair<String, Page>> = listOf(
-    "Firefox Sync" to Page.Sync,
-    "Mozilla account" to Page.Sync,
-    "Saved passwords" to Page.Sync,
+private val index: List<Pair<String, Page>> = (
+    // Firefox Sync is in SonderWeb Sync only.
+    if (BuildConfig.FIREFOX_SYNC) {
+        listOf("Firefox Sync" to Page.Sync, "Mozilla account" to Page.Sync, "Saved passwords" to Page.Sync)
+    } else {
+        emptyList()
+    }
+) + listOf(
     "Strict tracking protection" to Page.Privacy,
     "HTTPS only" to Page.Privacy,
     "Fingerprinting" to Page.Privacy,
@@ -288,15 +292,17 @@ private fun MainPage(
     GroupTitle("Features")
     Group {
         NavRow(Icons.Outlined.Security, "Privacy & security", null, first = true) { onOpen(Page.Privacy) }
-        NavRow(
-            Icons.Outlined.Sync,
-            "Firefox Sync",
-            when {
-                !com.verisonder.sonderweb.sync.FxSync.enabled -> "Off"
-                com.verisonder.sonderweb.sync.FxSync.signedIn -> com.verisonder.sonderweb.sync.FxSync.email ?: "Signed in"
-                else -> "On, not signed in"
-            },
-        ) { onOpen(Page.Sync) }
+        if (BuildConfig.FIREFOX_SYNC) {
+            NavRow(
+                Icons.Outlined.Sync,
+                "Firefox Sync",
+                when {
+                    !com.verisonder.sonderweb.sync.FxSync.enabled -> "Off"
+                    com.verisonder.sonderweb.sync.FxSync.signedIn -> com.verisonder.sonderweb.sync.FxSync.email ?: "Signed in"
+                    else -> "On, not signed in"
+                },
+            ) { onOpen(Page.Sync) }
+        }
         NavRow(
             Icons.Outlined.Extension,
             "Extensions",
