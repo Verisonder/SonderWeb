@@ -79,6 +79,25 @@ object FxSync {
     var email by mutableStateOf<String?>(null)
         private set
 
+    /** Your account's name and picture (null: none set). */
+    var displayName by mutableStateOf<String?>(null)
+        private set
+
+    var avatar by mutableStateOf<android.graphics.Bitmap?>(null)
+        private set
+
+    /** This phone's name in your account's device list (and on Firefox's "Send tab" lists). */
+    var deviceName by mutableStateOf("")
+        private set
+
+    /** SonderWeb offers to save passwords and fills them in (separate from syncing them). */
+    var fillPasswords by mutableStateOf(true)
+        private set
+
+    /** Choose what to sync: passwords (the only kind SonderWeb Sync syncs for now). */
+    var syncPasswords by mutableStateOf(true)
+        private set
+
     var syncing by mutableStateOf(false)
         private set
 
@@ -111,6 +130,11 @@ object FxSync {
         enabled = prefs.getBoolean("enabled", false)
         lastSynced = prefs.getLong("last_synced", 0L)
         email = prefs.getString("email", null)
+        displayName = prefs.getString("name", null)
+        deviceName = prefs.getString("device_name", null) ?: defaultDeviceName()
+        syncPasswords = prefs.getBoolean("sync_passwords", true)
+        fillPasswords = prefs.getBoolean("fill_passwords", true)
+        avatar = runCatching { android.graphics.BitmapFactory.decodeFile(avatarFile().path) }.getOrNull()
         if (enabled) start(syncSoon = true)
     }
 
@@ -202,7 +226,11 @@ object FxSync {
         capabilities = emptyList(),
     )
 
-    private fun deviceName() = "SonderWeb on " + Build.MODEL
+    private fun defaultDeviceName() = "SonderWeb on " + Build.MODEL
+
+    private fun deviceName() = prefs.getString("device_name", null) ?: defaultDeviceName()
+
+    private fun avatarFile() = java.io.File(app.filesDir, "fxa_avatar.png")
 
     private fun openAccount() {
         if (account != null) return
@@ -227,16 +255,97 @@ object FxSync {
         val now = state is FxaState.Connected
         val issues = state is FxaState.AuthIssues
         connected = now
-        val mail = if (now) runCatching { account?.getProfile(false)?.email }.getOrNull() else null
+        val profile = if (now) runCatching { account?.getProfile(false) }.getOrNull() else null
+        val mail = profile?.email
         persist()
-        if (mail != null) prefs.edit().putString("email", mail).apply()
+        if (profile != null) {
+            prefs.edit().putString("email", profile.email).putString("name", profile.displayName).apply()
+        }
+        val picture = profile?.let { loadAvatar(it.avatar, it.isDefaultAvatar) }
         ui {
             signedIn = now || issues
             needsSignIn = issues
-            if (mail != null) email = mail
-            if (!now && !issues) email = null
+            if (profile != null) {
+                email = profile.email
+                displayName = profile.displayName
+                avatar = picture
+            }
+            if (!now && !issues) {
+                email = null
+                displayName = null
+                avatar = null
+            }
         }
         return if (now) mail ?: prefs.getString("email", null) ?: "" else null
+    }
+
+    /** Your account's picture, downloaded once (and again when it changes); none for the default one. */
+    private fun loadAvatar(url: String, isDefault: Boolean): android.graphics.Bitmap? {
+        val file = avatarFile()
+        if (isDefault || url.isBlank()) {
+            file.delete()
+            prefs.edit().remove("avatar_url").apply()
+            return null
+        }
+        if (prefs.getString("avatar_url", null) == url && file.exists()) {
+            return android.graphics.BitmapFactory.decodeFile(file.path)
+        }
+        return runCatching {
+            val c = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+            c.connectTimeout = 15_000
+            c.readTimeout = 15_000
+            val bytes = try {
+                c.inputStream.use { it.readBytes() }
+            } finally {
+                c.disconnect()
+            }
+            val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+            val side = minOf(bmp.width, bmp.height)
+            val small = android.graphics.Bitmap.createScaledBitmap(
+                android.graphics.Bitmap.createBitmap(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side),
+                192,
+                192,
+                true,
+            )
+            file.outputStream().use { small.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            prefs.edit().putString("avatar_url", url).apply()
+            small
+        }.getOrNull()
+    }
+
+    /** Mozilla's page to manage your account (password, data, deleting it), for [open] to load in a tab. */
+    fun manageAccount(open: (String) -> Unit) {
+        scope.launch {
+            val url = runCatching { account?.getManageAccountURL("preferences") }.getOrNull()
+                ?: (ACCOUNTS + "/settings")
+            ui { open(url) }
+        }
+    }
+
+    /** Renames this phone in your account. */
+    fun setDeviceName(name: String) {
+        val clean = name.trim().ifEmpty { defaultDeviceName() }.take(64)
+        deviceName = clean
+        prefs.edit().putString("device_name", clean).apply()
+        scope.launch {
+            runCatching { account?.setDeviceDisplayName(clean) }
+            persist()
+        }
+    }
+
+    /** Saving and filling passwords on or off (signing in and syncing are left as they are). */
+    fun setFillPasswords(on: Boolean) {
+        if (on && !enabled) turn(true)
+        fillPasswords = on
+        prefs.edit().putBoolean("fill_passwords", on).apply()
+        com.verisonder.sonderweb.browser.Passwords.applyOption()
+    }
+
+    /** Choose what to sync: passwords on or off (on this phone only; your other devices keep theirs). */
+    fun setSyncPasswords(on: Boolean) {
+        syncPasswords = on
+        prefs.edit().putBoolean("sync_passwords", on).apply()
+        if (on) sync(user = false)
     }
 
     /**
@@ -302,11 +411,14 @@ object FxSync {
                 connected = false
                 secrets.put("account", null)
                 secrets.put("sync_state", null)
-                prefs.edit().remove("email").remove("last_synced").apply()
+                prefs.edit().remove("email").remove("name").remove("avatar_url").remove("last_synced").apply()
+                avatarFile().delete()
                 ui {
                     signedIn = false
                     needsSignIn = false
                     email = null
+                    displayName = null
+                    avatar = null
                     lastSynced = 0L
                     syncing = false
                 }
@@ -322,6 +434,7 @@ object FxSync {
 
     private fun syncNow(reason: SyncReason) {
         val client = account ?: return
+        if (!prefs.getBoolean("sync_passwords", true)) return
         ui {
             syncing = true
             problem = null

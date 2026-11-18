@@ -96,7 +96,7 @@ import org.mozilla.geckoview.StorageController
 /** Settings pages, Brave-style: a grouped list on the first page, details one tap away. */
 private enum class Page(val title: String) {
     Privacy("Privacy & security"),
-    Sync("Firefox Sync"),
+    Sync("Account and sync"),
     Shields("Extensions"),
     Start("Start page"),
     Search("Search engine"),
@@ -219,7 +219,7 @@ fun SettingsScreen(ui: UiState) {
                 .padding(bottom = 28.dp),
         ) {
             when (shown) {
-                null -> MainPage(query, { query = it }, onOpen = { page = it }, onClear = { clearing = true })
+                null -> MainPage(ui, query, { query = it }, onOpen = { page = it }, onClear = { clearing = true })
                 Page.Privacy -> PrivacyPage { clearing = true }
                 Page.Sync -> SyncPage(ui)
                 Page.Shields -> ShieldsPage(ui)
@@ -240,6 +240,7 @@ fun SettingsScreen(ui: UiState) {
 
 @Composable
 private fun MainPage(
+    ui: UiState,
     query: String,
     onQuery: (String) -> Unit,
     onOpen: (Page) -> Unit,
@@ -289,20 +290,12 @@ private fun MainPage(
         return
     }
 
+    // SonderWeb Sync: your Mozilla account at the top (sign in, or your picture, name and email).
+    if (BuildConfig.FIREFOX_SYNC) AccountCard(ui) { onOpen(Page.Sync) }
+
     GroupTitle("Features")
     Group {
         NavRow(Icons.Outlined.Security, "Privacy & security", null, first = true) { onOpen(Page.Privacy) }
-        if (BuildConfig.FIREFOX_SYNC) {
-            NavRow(
-                Icons.Outlined.Sync,
-                "Firefox Sync",
-                when {
-                    !com.verisonder.sonderweb.sync.FxSync.enabled -> "Off"
-                    com.verisonder.sonderweb.sync.FxSync.signedIn -> com.verisonder.sonderweb.sync.FxSync.email ?: "Signed in"
-                    else -> "On, not signed in"
-                },
-            ) { onOpen(Page.Sync) }
-        }
         NavRow(
             Icons.Outlined.Extension,
             "Extensions",

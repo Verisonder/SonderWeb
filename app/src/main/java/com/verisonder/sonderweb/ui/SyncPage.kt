@@ -5,6 +5,18 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,71 +53,200 @@ import com.verisonder.sonderweb.browser.Browser
 import com.verisonder.sonderweb.sync.FxSync
 import com.verisonder.sonderweb.sync.SavedPassword
 
-/** Settings › Firefox Sync: the option, your Mozilla account, and the saved passwords. */
+/** Starts signing in: turns Firefox Sync on and opens Mozilla's sign-in page in a tab. */
+internal fun startSignIn(ui: UiState) {
+    FxSync.turn(true)
+    FxSync.signIn { url ->
+        ui.panel = Panel.None
+        Browser.newTab(url, isPrivate = false)
+    }
+}
+
+/** Opens a page of Mozilla's (managing your account) in a tab. */
+private fun openInTab(ui: UiState, url: String) {
+    ui.panel = Panel.None
+    Browser.newTab(url, isPrivate = false)
+}
+
+/**
+ * The top of Settings in SonderWeb Sync: signed out, "Sign in"; signed in, your account's
+ * picture, name and email, opening Account and sync.
+ */
+@Composable
+internal fun AccountCard(ui: UiState, onOpen: () -> Unit) {
+    val p = LocalPalette.current
+    val signedIn = FxSync.signedIn
+    Row(
+        Modifier
+            .padding(start = 16.dp, end = 16.dp, top = 14.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(p.field)
+            .clickable { if (signedIn) onOpen() else startSignIn(ui) }
+            .padding(horizontal = 18.dp, vertical = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Avatar(if (signedIn) FxSync.avatar else null, 56)
+        Spacer(Modifier.width(18.dp))
+        Column(Modifier.weight(1f)) {
+            if (signedIn) {
+                Text(
+                    FxSync.displayName?.takeIf { it.isNotBlank() } ?: "Mozilla account",
+                    color = p.text,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    if (FxSync.needsSignIn) "Sign in again to keep syncing" else FxSync.email.orEmpty(),
+                    color = if (FxSync.needsSignIn) p.danger else p.faint,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else {
+                Text("Sign in", color = p.text, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+                Text("Sync your passwords with Firefox on your other devices.", color = p.faint, fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+/** Your account's picture, or a round person mark when there's none. */
+@Composable
+private fun Avatar(picture: android.graphics.Bitmap?, size: Int) {
+    val image = remember(picture) { picture?.asImageBitmap() }
+    Box(
+        Modifier
+            .size(size.dp)
+            .clip(CircleShape)
+            .background(Brush.linearGradient(listOf(Color(0xFF00B3F4), Color(0xFF9059FF)))),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (image != null) {
+            Image(image, "Your account's picture", Modifier.size(size.dp), contentScale = ContentScale.Crop)
+        } else {
+            Icon(Icons.Outlined.Person, null, tint = Color.White, modifier = Modifier.size((size * 0.58f).dp))
+        }
+    }
+}
+
+/** Settings › Account and sync: your account, syncing, this phone's name, what to sync, passwords. */
 @Composable
 internal fun SyncPage(ui: UiState) {
     var signingOut by remember { mutableStateOf(false) }
     var showPasswords by remember { mutableStateOf(false) }
-    fun signIn() = FxSync.signIn { url ->
-        ui.panel = Panel.None
-        Browser.newTab(url, isPrivate = false)
-    }
+    var renaming by remember { mutableStateOf(false) }
 
-    GroupTitle("Firefox Sync")
-    Group {
-        Toggle(
-            "Firefox Sync",
-            "Sign in with your Mozilla account: SonderWeb saves passwords and syncs them with Firefox",
-            FxSync.enabled,
-        ) { FxSync.turn(it) }
-    }
-
-    if (FxSync.enabled) {
-        GroupTitle("Account")
-        Group {
-            when {
-                !FxSync.signedIn -> ActionRow("Sign in", "Opens Mozilla's sign-in page in a tab") { signIn() }
-                FxSync.needsSignIn -> {
-                    ActionRow(FxSync.email ?: "Your account", "Signed in")
-                    ActionRow("Sign in again", "Your account asks you to sign in again to keep syncing") { signIn() }
-                }
-                else -> {
-                    ActionRow(FxSync.email ?: "Your account", "Signed in")
-                    ActionRow(
-                        "Sync now",
-                        when {
-                            FxSync.syncing -> "Syncing…"
-                            FxSync.lastSynced > 0 -> "Last synced " + DateUtils.getRelativeTimeSpanString(
-                                FxSync.lastSynced,
-                                System.currentTimeMillis(),
-                                DateUtils.MINUTE_IN_MILLIS,
-                            )
-                            else -> "Not synced yet"
-                        },
-                    ) { FxSync.sync() }
-                }
+    if (!FxSync.signedIn) {
+        AccountCard(ui) {}
+        Hint(
+            "Your saved passwords come over from Firefox, and the ones you save here go to your other devices. " +
+                "They're encrypted on this phone first: Mozilla can't read them. SonderWeb Sync signs in as Firefox for Android.",
+        )
+    } else {
+        // Your account at the top, as on the main page.
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Avatar(FxSync.avatar, 64)
+            Spacer(Modifier.width(18.dp))
+            Column(Modifier.weight(1f)) {
+                val p = LocalPalette.current
+                Text(
+                    FxSync.displayName?.takeIf { it.isNotBlank() } ?: "Mozilla account",
+                    color = p.text,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(FxSync.email.orEmpty(), color = p.faint, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            if (FxSync.signedIn) ActionRow("Sign out", "Your saved passwords stay on this phone", danger = true) { signingOut = true }
+        }
+
+        Group {
+            if (FxSync.needsSignIn) {
+                ActionRow("Sign in again", "Your account asks you to sign in again to keep syncing") { startSignIn(ui) }
+            }
+            ActionRow("Manage account", "Change your password, manage data collection, or delete your account") {
+                FxSync.manageAccount { openInTab(ui, it) }
+            }
+            ActionRow(
+                "Sync now",
+                when {
+                    FxSync.syncing -> "Syncing…"
+                    FxSync.lastSynced > 0 -> "Last synced " + DateUtils.getRelativeTimeSpanString(
+                        FxSync.lastSynced,
+                        System.currentTimeMillis(),
+                        DateUtils.MINUTE_IN_MILLIS,
+                    )
+                    else -> "Not synced yet"
+                },
+            ) { FxSync.sync() }
+            ActionRow("Device name", FxSync.deviceName) { renaming = true }
+            ActionRow("Sign out", "Your saved passwords stay on this phone", danger = true) { signingOut = true }
         }
         FxSync.problem?.let { Hint(it) }
 
-        GroupTitle("Passwords")
+        GroupTitle("Choose what to sync")
         Group {
+            Toggle("Passwords", null, FxSync.syncPasswords) { FxSync.setSyncPasswords(it) }
+        }
+        Hint("Bookmarks, history and open tabs come in a later version.")
+    }
+
+    GroupTitle("Passwords")
+    Group {
+        Toggle(
+            "Save and fill passwords",
+            "Offers to save the passwords you sign in with, and fills them in",
+            FxSync.enabled && FxSync.fillPasswords,
+        ) { FxSync.setFillPasswords(it) }
+        if (FxSync.enabled) {
             ActionRow(
                 "Saved passwords",
                 when (FxSync.passwordCount) {
-                    0 -> "None yet: SonderWeb offers to save them when you sign in to a site"
+                    0 -> "None yet"
                     1 -> "1 saved"
                     else -> "${FxSync.passwordCount} saved"
                 },
             ) { showPasswords = true }
         }
-        Hint(
-            "Passwords are encrypted on your phone before they're synced, so Mozilla can't read them. " +
-                "Only passwords sync for now. SonderWeb signs in to your account as Firefox for Android.",
-        )
     }
 
+    if (renaming) {
+        val p = LocalPalette.current
+        var name by remember { mutableStateOf(FxSync.deviceName) }
+        AlertDialog(
+            onDismissRequest = { renaming = false },
+            containerColor = p.card,
+            title = { Text("Device name", color = p.text, fontSize = 18.sp) },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it.take(64) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = p.text,
+                        unfocusedTextColor = p.text,
+                        focusedBorderColor = p.accent,
+                        unfocusedBorderColor = p.line,
+                        cursorColor = p.accent,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton({
+                    renaming = false
+                    FxSync.setDeviceName(name)
+                }) { Text("Save", color = p.accent) }
+            },
+            dismissButton = { TextButton({ renaming = false }) { Text("Cancel", color = p.text) } },
+        )
+    }
     if (signingOut) {
         val p = LocalPalette.current
         AlertDialog(
@@ -220,11 +361,7 @@ internal fun FirstSyncAsk(ui: UiState) {
         confirmButton = {
             TextButton({
                 done()
-                FxSync.turn(true)
-                FxSync.signIn { url ->
-                    ui.panel = Panel.None
-                    Browser.newTab(url, isPrivate = false)
-                }
+                startSignIn(ui)
             }) { Text("Sign in", color = p.accent) }
         },
         dismissButton = {
