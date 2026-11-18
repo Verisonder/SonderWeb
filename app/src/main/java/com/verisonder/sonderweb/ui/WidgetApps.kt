@@ -33,10 +33,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DragHandle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -62,19 +67,50 @@ import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
 import java.util.UUID
 
-/** An app on the search widget: what it opens, and the icon you picked for it (null: the app's own). */
-data class WidgetApp(val pkg: String, val cls: String, val icon: String? = null) {
-    fun toJson(): JSONObject = JSONObject().put("pkg", pkg).put("cls", cls).also { j -> icon?.let { j.put("icon", it) } }
+/**
+ * An app on the search widget: what it opens, the icon you picked for it (null: the app's own),
+ * which side it sits on, and its size (null: the size all apps share).
+ */
+data class WidgetApp(
+    val pkg: String,
+    val cls: String,
+    val icon: String? = null,
+    /** More than 1: [icon] is a GIF's frames side by side, shown [interval] ms each. */
+    val frames: Int = 1,
+    val interval: Int = 0,
+    /** On the left, after the logo (otherwise on the right, before the microphone). */
+    val left: Boolean = false,
+    val size: Int? = null,
+) {
+    fun toJson(): JSONObject = JSONObject().put("pkg", pkg).put("cls", cls).also { j ->
+        icon?.let { j.put("icon", it) }
+        if (frames > 1) j.put("frames", frames).put("interval", interval)
+        if (left) j.put("left", true)
+        size?.let { j.put("size", it) }
+    }
 
     companion object {
         /** At most this many apps on one widget. */
         const val MAX = 4
 
+        /** Icon sizes on the widget, in dp (the pill is 50 dp tall). */
+        const val SIZE_MIN = 16
+        const val SIZE_MAX = 44
+        const val SIZE_DEFAULT = 28
+
         fun fromJson(j: JSONObject): WidgetApp? {
             val pkg = j.optString("pkg")
             val cls = j.optString("cls")
             if (pkg.isEmpty() || cls.isEmpty()) return null
-            return WidgetApp(pkg, cls, j.optString("icon").ifEmpty { null })
+            return WidgetApp(
+                pkg,
+                cls,
+                j.optString("icon").ifEmpty { null },
+                frames = j.optInt("frames", 1).coerceAtLeast(1),
+                interval = j.optInt("interval", 0),
+                left = j.optBoolean("left", false),
+                size = if (j.has("size")) j.getInt("size").coerceIn(SIZE_MIN, SIZE_MAX) else null,
+            )
         }
     }
 }
@@ -116,11 +152,62 @@ object WidgetIcons {
         context.packageManager.getActivityIcon(ComponentName(pkg, cls))
     }.getOrNull()
 
-    /** The icon the widget shows for [app]: the one you picked, or the app's own. */
-    fun bitmap(context: Context, app: WidgetApp): Bitmap? {
-        app.icon?.let { path -> BitmapFactory.decodeFile(path)?.let { return it } }
-        return appIcon(context, app.pkg, app.cls)?.let { toBitmap(it) }
+    /** The icon the widget shows for [app]: the one you picked (a GIF's first frame), or the app's own. */
+    fun bitmap(context: Context, app: WidgetApp): Bitmap? = frames(context, app).firstOrNull()
+
+    /** The icon's pictures: one, or a GIF's frames in order. */
+    fun frames(context: Context, app: WidgetApp): List<Bitmap> {
+        app.icon?.let { path ->
+            BitmapFactory.decodeFile(path)?.let { strip ->
+                if (app.frames <= 1) return listOf(strip)
+                val w = strip.width / app.frames
+                if (w > 0) return (0 until app.frames).map { Bitmap.createBitmap(strip, it * w, 0, w, strip.height) }
+            }
+        }
+        return listOfNotNull(appIcon(context, app.pkg, app.cls)?.let { toBitmap(it) })
     }
+
+    /** GIF frames are kept this small (px), so several can go on the home screen at once. */
+    private const val GIF_PX = 72
+
+    /** At most this many frames from one GIF. */
+    const val GIF_MAX_FRAMES = 24
+
+    /** A GIF picked: whether [uri] is one. */
+    fun isGif(context: Context, uri: Uri): Boolean =
+        context.contentResolver.getType(uri)?.equals("image/gif", ignoreCase = true) == true
+
+    /**
+     * A GIF's frames, cut to a square from the middle and laid side by side in one picture, with
+     * how many there are and how long each shows (ms). Null when it can't be read.
+     */
+    @Suppress("DEPRECATION")
+    fun gifStrip(context: Context, uri: Uri): Triple<Bitmap, Int, Int>? = runCatching {
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+        val movie = android.graphics.Movie.decodeByteArray(bytes, 0, bytes.size) ?: return null
+        val w = movie.width()
+        val h = movie.height()
+        if (w <= 0 || h <= 0) return null
+        val duration = movie.duration()
+        // About one frame every 80 ms, up to the limit (a still GIF: one frame).
+        val n = if (duration <= 0) 1 else (duration / 80).coerceIn(2, GIF_MAX_FRAMES)
+        val interval = if (n <= 1) 0 else (duration / n).coerceAtLeast(40)
+        val side = minOf(w, h)
+        val scale = GIF_PX.toFloat() / side
+        val strip = Bitmap.createBitmap(GIF_PX * n, GIF_PX, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(strip)
+        for (i in 0 until n) {
+            movie.setTime(if (n <= 1) 0 else i * duration / n)
+            canvas.save()
+            canvas.translate((i * GIF_PX).toFloat(), 0f)
+            canvas.clipRect(0, 0, GIF_PX, GIF_PX)
+            canvas.scale(scale, scale)
+            canvas.translate(-(w - side) / 2f, -(h - side) / 2f)
+            movie.draw(canvas, 0f, 0f)
+            canvas.restore()
+        }
+        Triple(strip, n, interval)
+    }.getOrNull()
 
     fun toBitmap(d: Drawable, size: Int = SIZE): Bitmap {
         val b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -250,31 +337,131 @@ object IconPacks {
 
 // ---- Settings screen pieces ----
 
-/** One app on the widget: its icon and name; tap to change the icon, × to take it off. */
+/**
+ * One app on the widget: a handle to drag it, its icon and name, where it sits and how big;
+ * tap for its options, × to take it off.
+ */
 @Composable
-internal fun WidgetAppRow(app: WidgetApp, onIcon: () -> Unit, onRemove: () -> Unit) {
+internal fun WidgetAppRow(
+    app: WidgetApp,
+    sizeAll: Int,
+    handle: Modifier,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
     val icon by produceState<ImageBitmap?>(null, app) {
         value = withContext(Dispatchers.IO) { WidgetIcons.bitmap(ctx, app)?.asImageBitmap() }
     }
     val name = remember(app.pkg, app.cls) { WidgetIcons.label(ctx, app) }
+    val details = listOf(
+        if (app.left) "Left" else "Right",
+        "${app.size ?: sizeAll} dp",
+        when {
+            app.icon == null -> "own icon"
+            app.frames > 1 -> "GIF"
+            else -> "your icon"
+        },
+    ).joinToString(" · ")
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .background(p.field)
-            .clickable(onClick = onIcon)
+            .clickable(onClick = onClick)
             .heightIn(min = 64.dp)
-            .padding(start = 20.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+            .padding(start = 4.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(handle.size(44.dp), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.DragHandle, "Drag to move", tint = p.faint)
+        }
+        Spacer(Modifier.width(4.dp))
         Box(Modifier.size(36.dp)) { icon?.let { Image(it, null, Modifier.size(36.dp)) } }
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(name, color = p.text, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(if (app.icon == null) "App's own icon · tap to change" else "Your icon · tap to change", color = p.faint, fontSize = 13.sp)
+            Text(details, color = p.faint, fontSize = 13.sp)
         }
         IconButtonSmall(Icons.Outlined.Close, "Remove", size = 44, onClick = onRemove)
+    }
+}
+
+/** An app's options: its icon, which side it sits on, and its own size or the shared one. */
+@Composable
+internal fun WidgetAppOptionsDialog(
+    app: WidgetApp,
+    sizeAll: Int,
+    onDismiss: () -> Unit,
+    onIcon: () -> Unit,
+    onChange: (WidgetApp) -> Unit,
+) {
+    val p = LocalPalette.current
+    val ctx = LocalContext.current
+    val name = remember(app.pkg, app.cls) { WidgetIcons.label(ctx, app) }
+    var size by remember(app.size) { mutableStateOf((app.size ?: sizeAll).toFloat()) }
+    @Composable
+    fun Pick(label: String, on: Boolean, onClick: () -> Unit) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(on, onClick, colors = RadioButtonDefaults.colors(selectedColor = p.accent, unselectedColor = p.faint))
+            Text(label, color = p.text, fontSize = 15.sp)
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = p.card,
+        title = { Text(name, color = p.text) },
+        text = {
+            Column {
+                TextButton(onClick = onIcon) { Text("Change icon", color = p.accent, fontSize = 15.sp) }
+                Text("Side", color = p.mute, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
+                Pick("Left, after the logo", app.left) { onChange(app.copy(left = true)) }
+                Pick("Right, before the microphone", !app.left) { onChange(app.copy(left = false)) }
+                Text("Size", color = p.mute, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
+                Pick("Same as the others ($sizeAll dp)", app.size == null) { onChange(app.copy(size = null)) }
+                Pick("Its own: ${size.toInt()} dp", app.size != null) { onChange(app.copy(size = size.toInt())) }
+                if (app.size != null) {
+                    Slider(
+                        value = size,
+                        onValueChange = { size = it },
+                        valueRange = WidgetApp.SIZE_MIN.toFloat()..WidgetApp.SIZE_MAX.toFloat(),
+                        steps = (WidgetApp.SIZE_MAX - WidgetApp.SIZE_MIN) / 2 - 1,
+                        onValueChangeFinished = { onChange(app.copy(size = size.toInt())) },
+                        colors = SliderDefaults.colors(thumbColor = p.accent, activeTrackColor = p.accent, inactiveTrackColor = p.line),
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done", color = p.accent) } },
+    )
+}
+
+/** The size all the apps share (an app can have its own in its options). */
+@Composable
+internal fun WidgetAppSizeRow(size: Int, onChange: (Int) -> Unit) {
+    val p = LocalPalette.current
+    var value by remember(size) { mutableStateOf(size.toFloat()) }
+    Column(Modifier.fillMaxWidth().background(p.field).padding(horizontal = 20.dp, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Icon size", color = p.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            Text("${value.toInt()} dp", color = p.faint, fontSize = 14.sp)
+        }
+        Slider(
+            value = value,
+            onValueChange = { value = it },
+            valueRange = WidgetApp.SIZE_MIN.toFloat()..WidgetApp.SIZE_MAX.toFloat(),
+            steps = (WidgetApp.SIZE_MAX - WidgetApp.SIZE_MIN) / 2 - 1,
+            onValueChangeFinished = { onChange(value.toInt()) },
+            colors = SliderDefaults.colors(thumbColor = p.accent, activeTrackColor = p.accent, inactiveTrackColor = p.line),
+        )
     }
 }
 
@@ -394,7 +581,7 @@ internal fun IconSourceDialog(
         text = {
             Column(Modifier.heightIn(max = 460.dp)) {
                 Option("App's own icon", null, onOwn)
-                Option("A picture", "From your photos, cut to a square", onPicture)
+                Option("A picture or GIF", "From your photos, cut to a square (a GIF plays on the widget)", onPicture)
                 Text("Icon packs", color = p.mute, fontSize = 14.sp, modifier = Modifier.padding(start = 8.dp, top = 12.dp, bottom = 4.dp))
                 when {
                     packs == null -> Text("Loading…", color = p.faint, modifier = Modifier.padding(8.dp))

@@ -29,6 +29,8 @@ data class WidgetLook(
     val tint: Int? = null,
     /** Up to [WidgetApp.MAX] apps, next to the microphone. */
     val apps: List<WidgetApp> = emptyList(),
+    /** The apps' icon size in dp (an app can have its own). */
+    val appSize: Int = WidgetApp.SIZE_DEFAULT,
 ) {
     companion object {
         const val DARK = 0
@@ -58,6 +60,7 @@ data class WidgetLook(
                     apps = j.optJSONArray("apps")?.let { a ->
                         (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { WidgetApp.fromJson(it) } }
                     }.orEmpty().take(WidgetApp.MAX),
+                    appSize = j.optInt("app_size", WidgetApp.SIZE_DEFAULT).coerceIn(WidgetApp.SIZE_MIN, WidgetApp.SIZE_MAX),
                 )
             }.getOrDefault(WidgetLook())
         }
@@ -76,6 +79,7 @@ data class WidgetLook(
             look.text?.let { j.put("text", it.toLong() and 0xFFFFFFFFL) }
             look.tint?.let { j.put("tint", it.toLong() and 0xFFFFFFFFL) }
             if (look.apps.isNotEmpty()) j.put("apps", org.json.JSONArray(look.apps.map { it.toJson() }))
+            if (look.appSize != WidgetApp.SIZE_DEFAULT) j.put("app_size", look.appSize)
             sp(context).edit().putString("look_$id", j.toString()).apply()
         }
 
@@ -196,18 +200,39 @@ class SearchWidget : AppWidgetProvider() {
                 v.setViewLayoutMargin(R.id.widget_voice, RemoteViews.MARGIN_END, if (look.image) 10f else 0f, TypedValue.COMPLEX_UNIT_DIP)
             }
 
-            // Your apps, in their own colours (not tinted), before the microphone.
+            // Your apps, in their own colours (not tinted): on the left after the logo, or on the
+            // right before the microphone, in your order. A GIF plays as its frames, flipped by the
+            // home screen; all GIFs together share a frame budget so the widget stays light.
             val apps = look.apps.filter { WidgetIcons.installed(context, it) }
-            APP_VIEWS.forEachIndexed { i, view ->
-                val app = apps.getOrNull(i)
-                val bmp = app?.let { WidgetIcons.bitmap(context, it) }
-                if (app == null || bmp == null) {
-                    v.setViewVisibility(view, View.GONE)
-                } else {
+            val gifs = apps.count { it.frames > 1 }
+            val perGif = if (gifs == 0) 0 else (FRAME_BUDGET / gifs).coerceAtLeast(2)
+            val sides = listOf(apps.filter { it.left } to LEFT_VIEWS, apps.filter { !it.left } to APP_VIEWS)
+            for ((list, views) in sides) {
+                views.forEachIndexed { i, view ->
+                    val app = list.getOrNull(i)
+                    val all = app?.let { WidgetIcons.frames(context, it) }.orEmpty()
+                    v.removeAllViews(view)
+                    if (app == null || all.isEmpty()) {
+                        v.setViewVisibility(view, View.GONE)
+                        return@forEachIndexed
+                    }
+                    val step = if (all.size > 1) (all.size + perGif - 1) / perGif else 1
+                    val shown = all.filterIndexed { n, _ -> n % step == 0 }
+                    shown.forEach { bmp ->
+                        val frame = RemoteViews(context.packageName, R.layout.widget_app_frame)
+                        frame.setImageViewBitmap(R.id.widget_app_frame, bmp)
+                        v.addView(view, frame)
+                    }
+                    v.setInt(view, "setFlipInterval", (app.interval * step).coerceAtLeast(40))
                     v.setViewVisibility(view, View.VISIBLE)
-                    v.setImageViewBitmap(view, bmp)
                     v.setContentDescription(view, WidgetIcons.label(context, app))
-                    if (clickable) v.setOnClickPendingIntent(view, launch(context, app, 100 + id * WidgetApp.MAX + i))
+                    if (Build.VERSION.SDK_INT >= 31) {
+                        val size = (app.size ?: look.appSize).toFloat()
+                        v.setViewLayoutWidth(view, size + 12f, TypedValue.COMPLEX_UNIT_DIP)
+                        v.setViewLayoutHeight(view, size, TypedValue.COMPLEX_UNIT_DIP)
+                    }
+                    val index = look.apps.indexOf(app)
+                    if (clickable) v.setOnClickPendingIntent(view, launch(context, app, 100 + id * WidgetApp.MAX + index))
                 }
             }
 
@@ -222,6 +247,10 @@ class SearchWidget : AppWidgetProvider() {
         }
 
         private val APP_VIEWS = intArrayOf(R.id.widget_app1, R.id.widget_app2, R.id.widget_app3, R.id.widget_app4)
+        private val LEFT_VIEWS = intArrayOf(R.id.widget_appl1, R.id.widget_appl2, R.id.widget_appl3, R.id.widget_appl4)
+
+        /** GIF frames on one widget, all GIFs together (each frame is a small picture sent to the home screen). */
+        private const val FRAME_BUDGET = 24
 
         /** Opens one of your apps, as its home screen icon would. Each widget's buttons have their own code. */
         private fun launch(context: Context, app: WidgetApp, code: Int): PendingIntent =

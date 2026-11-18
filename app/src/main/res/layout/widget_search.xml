@@ -69,6 +69,47 @@
                     android:tint="#1C1C1C" />
             </FrameLayout>
 
+            <!-- Your apps on the left (after the logo). Each is a flipper: one picture, or a GIF's frames. -->
+            <ViewFlipper
+                android:id="@+id/widget_appl1"
+                android:layout_width="40dp"
+                android:layout_height="28dp"
+                android:autoStart="true"
+                android:flipInterval="100"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:visibility="gone" />
+
+            <ViewFlipper
+                android:id="@+id/widget_appl2"
+                android:layout_width="40dp"
+                android:layout_height="28dp"
+                android:autoStart="true"
+                android:flipInterval="100"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:visibility="gone" />
+
+            <ViewFlipper
+                android:id="@+id/widget_appl3"
+                android:layout_width="40dp"
+                android:layout_height="28dp"
+                android:autoStart="true"
+                android:flipInterval="100"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:visibility="gone" />
+
+            <ViewFlipper
+                android:id="@+id/widget_appl4"
+                android:layout_width="40dp"
+                android:layout_height="28dp"
+                android:autoStart="true"
+                android:flipInterval="100"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:visibility="gone" />
+
             <!-- Takes the free space (and gives way to your apps when it's tight). -->
             <TextView
                 android:id="@+id/widget_label"
@@ -89,48 +130,45 @@
                 android:layout_height="1dp"
                 android:layout_weight="0.001" />
 
-            <ImageView
+            <!-- Your apps on the right (before the microphone). -->
+            <ViewFlipper
                 android:id="@+id/widget_app1"
                 android:layout_width="40dp"
-                android:layout_height="match_parent"
+                android:layout_height="28dp"
+                android:autoStart="true"
+                android:flipInterval="100"
                 android:paddingStart="6dp"
-                android:paddingTop="11dp"
                 android:paddingEnd="6dp"
-                android:paddingBottom="11dp"
-                android:scaleType="fitCenter"
                 android:visibility="gone" />
 
-            <ImageView
+            <ViewFlipper
                 android:id="@+id/widget_app2"
                 android:layout_width="40dp"
-                android:layout_height="match_parent"
+                android:layout_height="28dp"
+                android:autoStart="true"
+                android:flipInterval="100"
                 android:paddingStart="6dp"
-                android:paddingTop="11dp"
                 android:paddingEnd="6dp"
-                android:paddingBottom="11dp"
-                android:scaleType="fitCenter"
                 android:visibility="gone" />
 
-            <ImageView
+            <ViewFlipper
                 android:id="@+id/widget_app3"
                 android:layout_width="40dp"
-                android:layout_height="match_parent"
+                android:layout_height="28dp"
+                android:autoStart="true"
+                android:flipInterval="100"
                 android:paddingStart="6dp"
-                android:paddingTop="11dp"
                 android:paddingEnd="6dp"
-                android:paddingBottom="11dp"
-                android:scaleType="fitCenter"
                 android:visibility="gone" />
 
-            <ImageView
+            <ViewFlipper
                 android:id="@+id/widget_app4"
                 android:layout_width="40dp"
-                android:layout_height="match_parent"
+                android:layout_height="28dp"
+                android:autoStart="true"
+                android:flipInterval="100"
                 android:paddingStart="6dp"
-                android:paddingTop="11dp"
                 android:paddingEnd="6dp"
-                android:paddingBottom="11dp"
-                android:scaleType="fitCenter"
                 android:visibility="gone" />
 
             <ImageView

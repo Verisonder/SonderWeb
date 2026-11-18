@@ -53,6 +53,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.zIndex
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -118,14 +127,31 @@ private fun WidgetSettings(start: WidgetLook, onCancel: () -> Unit, onSave: (Wid
     var iconFor by remember { mutableStateOf<Int?>(null) }
     var packFor by remember { mutableStateOf<Pair<Int, IconPack>?>(null) }
     var pictureFor by remember { mutableStateOf<Int?>(null) }
+    var optionsFor by remember { mutableStateOf<Int?>(null) }
+    // Dragging an app's row: which one, how far, and how tall a row is (with the gap between rows).
+    var dragging by remember { mutableStateOf(-1) }
+    var dragY by remember { mutableFloatStateOf(0f) }
+    val gapPx = with(LocalDensity.current) { 2.dp.toPx() }
+    var rowPx by remember { mutableFloatStateOf(200f) }
     fun setIcon(index: Int, path: String?) {
-        look = look.copy(apps = look.apps.mapIndexed { i, a -> if (i == index) a.copy(icon = path) else a })
+        look = look.copy(apps = look.apps.mapIndexed { i, a -> if (i == index) a.copy(icon = path, frames = 1, interval = 0) else a })
     }
     val choosePicture = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         val i = pictureFor
         pictureFor = null
         if (uri != null && i != null) {
-            WidgetIcons.fromPicture(ctx, uri)?.let { WidgetIcons.keep(ctx, it) }?.let { setIcon(i, it) }
+            val gif = if (WidgetIcons.isGif(ctx, uri)) WidgetIcons.gifStrip(ctx, uri) else null
+            if (gif != null && gif.second > 1) {
+                WidgetIcons.keep(ctx, gif.first)?.let { path ->
+                    look = look.copy(
+                        apps = look.apps.mapIndexed { n, a ->
+                            if (n == i) a.copy(icon = path, frames = gif.second, interval = gif.third) else a
+                        },
+                    )
+                }
+            } else {
+                WidgetIcons.fromPicture(ctx, uri)?.let { WidgetIcons.keep(ctx, it) }?.let { setIcon(i, it) }
+            }
         }
     }
     BackHandler(onBack = onCancel)
@@ -189,15 +215,55 @@ private fun WidgetSettings(start: WidgetLook, onCancel: () -> Unit, onSave: (Wid
             GroupTitle("Apps")
             Group {
                 look.apps.forEachIndexed { i, app ->
-                    WidgetAppRow(
-                        app,
-                        onIcon = { iconFor = i },
-                        onRemove = { look = look.copy(apps = look.apps.filterIndexed { j, _ -> j != i }) },
-                    )
+                    key(app.pkg + "/" + app.cls) {
+                        val index by rememberUpdatedState(i)
+                        val dragged = dragging == i
+                        WidgetAppRow(
+                            app,
+                            look.appSize,
+                            handle = Modifier.pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDragStart = {
+                                        dragging = index
+                                        dragY = 0f
+                                    },
+                                    onDragEnd = { dragging = -1 },
+                                    onDragCancel = { dragging = -1 },
+                                ) { change, amount ->
+                                    change.consume()
+                                    dragY += amount.y
+                                    val at = dragging
+                                    // Past half a row: it swaps places with its neighbour.
+                                    if (dragY > rowPx / 2 && at in 0 until look.apps.size - 1) {
+                                        look = look.copy(apps = look.apps.toMutableList().apply { add(at + 1, removeAt(at)) })
+                                        dragging = at + 1
+                                        dragY -= rowPx
+                                    } else if (dragY < -rowPx / 2 && at > 0) {
+                                        look = look.copy(apps = look.apps.toMutableList().apply { add(at - 1, removeAt(at)) })
+                                        dragging = at - 1
+                                        dragY += rowPx
+                                    }
+                                }
+                            },
+                            onClick = { optionsFor = i },
+                            onRemove = { look = look.copy(apps = look.apps.filterIndexed { j, _ -> j != i }) },
+                            modifier = Modifier
+                                .onSizeChanged { rowPx = it.height + gapPx }
+                                .zIndex(if (dragged) 1f else 0f)
+                                .graphicsLayer {
+                                    translationY = if (dragged) dragY else 0f
+                                    shadowElevation = if (dragged) 8f else 0f
+                                },
+                        )
+                    }
                 }
                 if (look.apps.size < WidgetApp.MAX) AddWidgetAppRow { addingApp = true }
+                if (look.apps.isNotEmpty()) WidgetAppSizeRow(look.appSize) { look = look.copy(appSize = it) }
             }
-            Hint("Up to ${WidgetApp.MAX} apps, next to the microphone. Tap one to give it an icon from an icon pack or a picture.")
+            Hint(
+                "Up to ${WidgetApp.MAX} apps. Drag the handle to change their order; tap one for its icon " +
+                    "(an icon pack, a picture or a GIF), its side and its size.",
+            )
 
             GroupTitle("Display")
             Group {
@@ -247,7 +313,22 @@ private fun WidgetSettings(start: WidgetLook, onCancel: () -> Unit, onSave: (Wid
     if (addingApp) {
         AppPickerDialog(onDismiss = { addingApp = false }) { app ->
             addingApp = false
-            if (look.apps.size < WidgetApp.MAX) look = look.copy(apps = look.apps + WidgetApp(app.pkg, app.cls))
+            val already = look.apps.any { it.pkg == app.pkg && it.cls == app.cls }
+            if (look.apps.size < WidgetApp.MAX && !already) look = look.copy(apps = look.apps + WidgetApp(app.pkg, app.cls))
+        }
+    }
+    optionsFor?.let { i ->
+        look.apps.getOrNull(i)?.let { app ->
+            WidgetAppOptionsDialog(
+                app,
+                look.appSize,
+                onDismiss = { optionsFor = null },
+                onIcon = {
+                    optionsFor = null
+                    iconFor = i
+                },
+                onChange = { changed -> look = look.copy(apps = look.apps.mapIndexed { n, a -> if (n == i) changed else a }) },
+            )
         }
     }
     iconFor?.let { i ->
