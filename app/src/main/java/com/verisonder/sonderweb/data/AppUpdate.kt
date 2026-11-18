@@ -65,14 +65,17 @@ object AppUpdate {
     /** Once an update is installed its download isn't needed: delete it (it's about 100 MB). */
     private fun cleanUp(ctx: Context) {
         updatesDir(ctx).listFiles()?.forEach { f ->
-            val v = f.name.removePrefix("SonderWeb-").removeSuffix(".part").removeSuffix(".apk")
+            val v = f.name.removePrefix(BuildConfig.APK_NAME + "-").removeSuffix(".part").removeSuffix(".apk")
             if (!newer(v, BuildConfig.VERSION_NAME)) f.delete()
         }
     }
 
     private fun updatesDir(ctx: Context) = File(ctx.cacheDir, "updates").apply { mkdirs() }
 
-    private fun apk(ctx: Context, version: String) = File(updatesDir(ctx), "SonderWeb-$version.apk")
+    private fun apk(ctx: Context, version: String) = File(updatesDir(ctx), apkName(version))
+
+    /** This edition's APK on the release page: SonderWeb-X.Y.Z.apk, or SonderWeb-Sync-X.Y.Z.apk. */
+    private fun apkName(version: String) = BuildConfig.APK_NAME + "-" + version + ".apk"
 
     /** A finished download of the available version is kept, so it isn't fetched again. */
     fun markReady(ctx: Context) {
@@ -114,7 +117,7 @@ object AppUpdate {
         val version = tag.removePrefix("v")
         val notes = Net.text("$RAW/$tag/docs/releasenote/release_notes_$tag.md")
             ?.lines()?.dropWhile { it.isBlank() || it.startsWith("## ") }?.joinToString("\n")?.trim() ?: ""
-        return Info(version, notes, "$REPO/releases/download/$tag/SonderWeb-$version.apk", 0L)
+        return Info(version, notes, "$REPO/releases/download/$tag/" + apkName(version), 0L)
     }
 
     /** The same through GitHub's API (also gives the download's size). */
@@ -135,7 +138,7 @@ object AppUpdate {
             for (i in 0 until (assets?.length() ?: 0)) {
                 val a = assets!!.getJSONObject(i)
                 val name = a.optString("name")
-                if (name.startsWith("SonderWeb-") && name.endsWith(".apk")) {
+                if (name == apkName(version)) {
                     url = a.optString("browser_download_url")
                     size = a.optLong("size")
                 }

@@ -56,6 +56,24 @@ android {
         }
     }
 
+    // Two apps from the same code, installable side by side: SonderWeb, and SonderWeb Sync with
+    // Firefox Sync (Mozilla account sign-in, saved passwords). Only the second carries Mozilla's
+    // sync libraries; its own code is in src/sync, and src/standard has stand-ins.
+    flavorDimensions += "edition"
+    productFlavors {
+        create("standard") {
+            dimension = "edition"
+            buildConfigField("boolean", "FIREFOX_SYNC", "false")
+            buildConfigField("String", "APK_NAME", "\"SonderWeb\"")
+        }
+        create("sync") {
+            dimension = "edition"
+            applicationIdSuffix = ".sync"
+            buildConfigField("boolean", "FIREFOX_SYNC", "true")
+            buildConfigField("String", "APK_NAME", "\"SonderWeb-Sync\"")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -163,12 +181,12 @@ dependencies {
     implementation(libs.androidx.compose.icons)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.geckoview)
-    // Firefox Sync (an option, off by default): Mozilla account sign-in, saved passwords and syncing.
-    implementation(libs.appservices.fxaclient)
-    implementation(libs.appservices.logins)
-    implementation(libs.appservices.syncmanager)
-    implementation(libs.appservices.viaduct)
-    implementation(libs.appservices.init)
+    // SonderWeb Sync only: Firefox Sync (Mozilla account sign-in, saved passwords, syncing).
+    "syncImplementation"(libs.appservices.fxaclient)
+    "syncImplementation"(libs.appservices.logins)
+    "syncImplementation"(libs.appservices.syncmanager)
+    "syncImplementation"(libs.appservices.viaduct)
+    "syncImplementation"(libs.appservices.init)
 
     testImplementation(libs.junit)
 }

@@ -38,8 +38,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verisonder.sonderweb.browser.Browser
-import com.verisonder.sonderweb.core.UrlText
 import com.verisonder.sonderweb.sync.FxSync
+import com.verisonder.sonderweb.sync.SavedPassword
 
 /** Settings › Firefox Sync: the option, your Mozilla account, and the saved passwords. */
 @Composable
@@ -141,25 +141,15 @@ private fun ActionRow(title: String, sub: String?, danger: Boolean = false, onCl
     }
 }
 
-/** One saved sign-in, as the list shows it. */
-private class SavedLogin(val id: String, val site: String, val username: String, val password: String)
-
 /** The saved passwords: tap one to show its password, copy it, or delete it. */
 @Composable
 private fun PasswordsDialog(onClose: () -> Unit) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
-    var list by remember { mutableStateOf<List<SavedLogin>?>(null) }
+    var list by remember { mutableStateOf<List<SavedPassword>?>(null) }
     var shown by remember { mutableStateOf<String?>(null) }
     var version by remember { mutableStateOf(0) }
-    LaunchedEffect(version) {
-        FxSync.withStore { store ->
-            val all = runCatching { store.list() }.getOrDefault(emptyList())
-                .map { SavedLogin(it.id, UrlText.host(it.origin).ifEmpty { it.origin }, it.username, it.password) }
-                .sortedBy { it.site }
-            Browser.main.post { list = all }
-        }
-    }
+    LaunchedEffect(version) { FxSync.listPasswords { list = it } }
     AlertDialog(
         onDismissRequest = onClose,
         containerColor = p.card,
@@ -192,14 +182,7 @@ private fun PasswordsDialog(onClose: () -> Unit) {
                             }
                             Spacer(Modifier.width(2.dp))
                             IconButtonSmall(Icons.Outlined.DeleteOutline, "Delete", size = 40, tint = Color(0xFFE57373)) {
-                                FxSync.withStore { store ->
-                                    runCatching { store.delete(login.id) }
-                                    FxSync.changed()
-                                    Browser.main.post {
-                                        version++
-                                        FxSync.sync(user = false)
-                                    }
-                                }
+                                FxSync.deletePassword(login.id) { version++ }
                             }
                         }
                     }

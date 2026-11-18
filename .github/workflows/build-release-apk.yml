@@ -51,7 +51,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon testDebugUnitTest 2>&1 | tee build-output.txt
+          gradle --no-daemon testStandardDebugUnitTest 2>&1 | tee build-output.txt
       - name: Build
         shell: bash
         env:
@@ -68,16 +68,22 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_PAT || github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n 1)
-          if [ -z "$APK" ]; then
-            echo "::error::No APK was produced."
+          # Two apps: SonderWeb, and SonderWeb Sync (with Firefox Sync).
+          APK=$(find app/build/outputs/apk/standard/release -name '*.apk' | head -n 1)
+          SYNC_APK=$(find app/build/outputs/apk/sync/release -name '*.apk' | head -n 1)
+          if [ -z "$APK" ] || [ -z "$SYNC_APK" ]; then
+            echo "::error::An APK is missing (SonderWeb: '$APK', SonderWeb Sync: '$SYNC_APK')."
             exit 1
           fi
           cp "$APK" "SonderWeb-$VERSION.apk"
-          gh release create "$GITHUB_REF_NAME" "SonderWeb-$VERSION.apk" \
+          cp "$SYNC_APK" "SonderWeb-Sync-$VERSION.apk"
+          # SonderWeb Sync first: older SonderWeb versions take the last APK whose name starts
+          # with "SonderWeb-", so theirs has to come last.
+          gh release create "$GITHUB_REF_NAME" "SonderWeb-Sync-$VERSION.apk" \
             --repo "$GITHUB_REPOSITORY" \
             --title "SonderWeb $VERSION" \
             --notes-file docs/releasenote/release_notes_$GITHUB_REF_NAME.md
+          gh release upload "$GITHUB_REF_NAME" "SonderWeb-$VERSION.apk" --repo "$GITHUB_REPOSITORY"
       - name: Report the failure
         if: failure()
         shell: bash
