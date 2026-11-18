@@ -25,7 +25,7 @@ object FxSync {
 
     fun signIn(open: (String) -> Unit) = Unit
 
-    fun finishSignIn(code: String, state: String) = Unit
+    fun finishSignIn(code: String, state: String, done: (String?) -> Unit) = done(null)
 
     fun signedInEmail(): String? = null
 
