@@ -23,6 +23,8 @@ object AppLinks {
         val intent: Intent,
         /** Where "Stay in browser" goes: the web address itself, or a page's fallback. Null: nowhere. */
         val stay: String?,
+        /** The site that tried to open the app on its own (you didn't tap anything). Null: you tapped. */
+        val site: String? = null,
     )
 
     var ask by mutableStateOf<Ask?>(null)
@@ -30,6 +32,9 @@ object AppLinks {
 
     /** Sites you chose to keep in the browser: not asked again until the app restarts. */
     private val stayHosts = HashSet<String>()
+
+    /** Sites you didn't let open an app on their own: not asked again until the app restarts. */
+    private val quietSites = HashSet<String>()
 
     /**
      * A tapped web link that an installed app (not a browser) also handles. Returns true when
@@ -45,11 +50,22 @@ object AppLinks {
         return true
     }
 
-    /** tel:, mailto:, intent:, market: and other app links. Always asks; false when no app can open it. */
-    fun askForAppLink(tab: Tab, url: String): Boolean {
+    /**
+     * tel:, mailto:, intent:, market: and other app links. Always asks; false when no app can open it.
+     * [byPage]: the page tried it on its own, without a tap; you're told which site, once per site.
+     */
+    fun askForAppLink(tab: Tab, url: String, byPage: Boolean = false): Boolean {
+        val site = UrlText.host(tab.url).ifEmpty { "This page" }
+        if (byPage && (site in quietSites || ask != null)) return true
         val intent = parse(url) ?: return false
         val fallback = intent.getStringExtra("browser_fallback_url")?.takeIf { UrlText.isWeb(it) }
         val app = handlerOf(intent, skipBrowsers = false)
+        // On its own, a page (or a frame in it) only gets to ask for an app that's installed, and
+        // saying no leaves the page where it is.
+        if (byPage) {
+            if (app != null) show(Ask(tab, app.second, icon(app.first), intent, null, site))
+            return true
+        }
         if (app == null && fallback != null) {
             // No app for it: the page's own web fallback opens in the browser.
             Browser.load(tab, fallback)
@@ -73,6 +89,7 @@ object AppLinks {
     fun stayInBrowser() {
         val a = ask ?: return
         ask = null
+        a.site?.let { quietSites += it }
         a.stay?.let { stay(a, it) }
     }
 

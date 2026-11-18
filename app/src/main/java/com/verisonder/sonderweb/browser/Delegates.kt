@@ -95,10 +95,21 @@ object Delegates {
                 }
                 return GeckoResult.allow()
             }
-            // tel:, mailto:, intent:, market: … belong to other apps. Only when you tapped
-            // something (pages may not launch apps on their own), and only after you say so.
-            if (!request.hasUserGesture && !request.isDirectNavigation) return GeckoResult.deny()
-            if (!AppLinks.askForAppLink(tab, uri)) Browser.host?.toast("No app can open this link")
+            // tel:, mailto:, intent:, market: … belong to other apps, and open only after you say so.
+            // A page trying it on its own (you didn't tap anything) is named, so you know who asks.
+            val byPage = !request.hasUserGesture && !request.isDirectNavigation
+            if (!AppLinks.askForAppLink(tab, uri, byPage) && !byPage) Browser.host?.toast("No app can open this link")
+            return GeckoResult.deny()
+        }
+
+        // A frame inside the page (an ad, an embedded widget) trying to open an app: asked the same way.
+        override fun onSubframeLoadRequest(
+            session: GeckoSession,
+            request: NavigationDelegate.LoadRequest,
+        ): GeckoResult<AllowOrDeny>? {
+            val uri = request.uri
+            if (UrlText.isInternal(uri)) return GeckoResult.allow()
+            AppLinks.askForAppLink(tab, uri, byPage = !request.hasUserGesture)
             return GeckoResult.deny()
         }
 

@@ -439,10 +439,14 @@ fun OpenAppDialog(ask: com.verisonder.sonderweb.browser.AppLinks.Ask) {
                 )
             }
         },
-        title = { Text("Open in ${ask.app}?", color = p.text, fontSize = 18.sp) },
+        title = { Text(if (ask.site != null) "Open ${ask.app}?" else "Open in ${ask.app}?", color = p.text, fontSize = 18.sp) },
         text = {
             Text(
-                if (ask.stay != null) "This link can open in the app, or stay here in SonderWeb." else "This link wants to open another app.",
+                when {
+                    ask.site != null -> "${ask.site} is trying to open ${ask.app} on its own. Nothing opens unless you say so."
+                    ask.stay != null -> "This link can open in the app, or stay here in SonderWeb."
+                    else -> "This link wants to open another app."
+                },
                 color = p.mute,
             )
         },
@@ -451,7 +455,14 @@ fun OpenAppDialog(ask: com.verisonder.sonderweb.browser.AppLinks.Ask) {
         },
         dismissButton = {
             TextButton({ links.stayInBrowser() }) {
-                Text(if (ask.stay != null) "Stay in browser" else "Cancel", color = p.text)
+                Text(
+                    when {
+                        ask.site != null -> "Don't open"
+                        ask.stay != null -> "Stay in browser"
+                        else -> "Cancel"
+                    },
+                    color = p.text,
+                )
             }
         },
     )

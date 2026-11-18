@@ -8,5 +8,8 @@
 - Pages no longer stay blank after the phone restarts their process: they show again by themselves, and a refresh always brings them back.
 - A page that failed to load while you were away (no network in the background, or the connection waking up) loads again by itself once you're back and online.
 
+**Opening apps**
+- A site trying to open an app on its own (without a tap) now asks you first, naming the site. Before, it was silently blocked.
+
 **Tabs**
 - Holding the tabs button lists your latest tabs, the most recent nearest your finger, leaving out inactive tabs.
