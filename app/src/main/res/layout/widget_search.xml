@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The home screen search widget: logo, "Search", up to four of your apps, voice search and search with a picture.
+<!-- The home screen search widget: logo, "Search", and up to four of your apps with voice search and search with a picture, in your order on either side.
      Colours, icons and the shadow are set per widget (SearchWidget.views). -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -44,7 +44,7 @@
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingStart="13dp"
-            android:paddingEnd="1dp">
+            android:paddingEnd="6dp">
 
             <FrameLayout
                 android:id="@+id/widget_logo"
@@ -69,7 +69,7 @@
                     android:tint="#1C1C1C" />
             </FrameLayout>
 
-            <!-- Your apps on the left (after the logo). Each is a flipper: one picture, or a GIF's frames. -->
+            <!-- Your apps and the buttons on the left (after the logo). Each is a flipper: one picture, or an animation's frames. -->
             <ViewFlipper
                 android:id="@+id/widget_appl1"
                 android:layout_width="40dp"
@@ -110,6 +110,26 @@
                 android:paddingEnd="6dp"
                 android:visibility="gone" />
 
+            <ViewFlipper
+                android:id="@+id/widget_appl5"
+                android:layout_width="40dp"
+                android:layout_height="28dp"
+                android:autoStart="true"
+                android:flipInterval="100"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:visibility="gone" />
+
+            <ViewFlipper
+                android:id="@+id/widget_appl6"
+                android:layout_width="40dp"
+                android:layout_height="28dp"
+                android:autoStart="true"
+                android:flipInterval="100"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:visibility="gone" />
+
             <!-- Takes the free space (and gives way to your apps when it's tight). -->
             <TextView
                 android:id="@+id/widget_label"
@@ -130,7 +150,7 @@
                 android:layout_height="1dp"
                 android:layout_weight="0.001" />
 
-            <!-- Your apps on the right (before the microphone). -->
+            <!-- Your apps and the buttons (microphone, picture) on the right, in your order. -->
             <ViewFlipper
                 android:id="@+id/widget_app1"
                 android:layout_width="40dp"
@@ -171,26 +191,26 @@
                 android:paddingEnd="6dp"
                 android:visibility="gone" />
 
-            <ImageView
-                android:id="@+id/widget_voice"
-                android:layout_width="48dp"
-                android:layout_height="match_parent"
-                android:layout_marginEnd="10dp"
-                android:contentDescription="@string/widget_voice"
-                android:padding="11dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/widget_mic"
-                android:tint="#DEDEDE" />
+            <ViewFlipper
+                android:id="@+id/widget_app5"
+                android:layout_width="40dp"
+                android:layout_height="28dp"
+                android:autoStart="true"
+                android:flipInterval="100"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:visibility="gone" />
 
-            <ImageView
-                android:id="@+id/widget_image"
-                android:layout_width="48dp"
-                android:layout_height="match_parent"
-                android:contentDescription="@string/widget_image"
-                android:padding="11dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/widget_image_search"
-                android:tint="#DEDEDE" />
+            <ViewFlipper
+                android:id="@+id/widget_app6"
+                android:layout_width="40dp"
+                android:layout_height="28dp"
+                android:autoStart="true"
+                android:flipInterval="100"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:visibility="gone" />
+
         </LinearLayout>
     </FrameLayout>
 </FrameLayout>

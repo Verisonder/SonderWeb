@@ -20,15 +20,16 @@ data class WidgetLook(
     val mono: Boolean = true,
     val logo: Boolean = true,
     val arcs: Boolean = false,
-    val voice: Boolean = true,
-    val image: Boolean = true,
     val label: Boolean = true,
     val shadow: Boolean = false,
     val bg: Int? = null,
     val text: Int? = null,
     val tint: Int? = null,
-    /** Up to [WidgetApp.MAX] apps, next to the microphone. */
-    val apps: List<WidgetApp> = emptyList(),
+    /**
+     * Up to [WidgetApp.MAX] apps, and the microphone and picture button ([voice], [image]) among
+     * them: each on its side, in this order.
+     */
+    val apps: List<WidgetApp> = listOf(WidgetApp.button(WidgetApp.VOICE), WidgetApp.button(WidgetApp.IMAGE)),
     /** The apps' icon size in dp (an app can have its own). */
     val appSize: Int = WidgetApp.SIZE_DEFAULT,
 ) {
@@ -40,6 +41,18 @@ data class WidgetLook(
 
         private fun sp(context: Context) = context.getSharedPreferences("widgets", Context.MODE_PRIVATE)
 
+        /**
+         * Widgets saved before the buttons were in the list: the microphone and picture button
+         * (if shown) go after the apps on the right, where they always were.
+         */
+        private fun withButtons(apps: List<WidgetApp>, voice: Boolean, image: Boolean): List<WidgetApp> {
+            if (apps.any { it.isButton }) return apps
+            return apps + listOfNotNull(
+                if (voice) WidgetApp.button(WidgetApp.VOICE) else null,
+                if (image) WidgetApp.button(WidgetApp.IMAGE) else null,
+            )
+        }
+
         fun load(context: Context, id: Int): WidgetLook {
             val raw = sp(context).getString("look_$id", null) ?: return WidgetLook()
             return runCatching {
@@ -50,8 +63,6 @@ data class WidgetLook(
                     mono = j.optBoolean("mono", true),
                     logo = j.optBoolean("logo", true),
                     arcs = j.optBoolean("arcs", false),
-                    voice = j.optBoolean("voice", true),
-                    image = j.optBoolean("image", true),
                     label = j.optBoolean("label", true),
                     shadow = j.optBoolean("shadow", false),
                     bg = color("bg"),
@@ -59,7 +70,12 @@ data class WidgetLook(
                     tint = color("tint"),
                     apps = j.optJSONArray("apps")?.let { a ->
                         (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { WidgetApp.fromJson(it) } }
-                    }.orEmpty().take(WidgetApp.MAX),
+                    }.orEmpty().let { list ->
+                        val apps = list.filter { !it.isButton }.take(WidgetApp.MAX)
+                        val kept = list.filter { it.isButton }.distinctBy { it.pkg } + apps
+                        val ordered = list.filter { it in kept }.distinctBy { it.pkg + "/" + it.cls }
+                        withButtons(ordered, j.optBoolean("voice", true), j.optBoolean("image", true))
+                    },
                     appSize = j.optInt("app_size", WidgetApp.SIZE_DEFAULT).coerceIn(WidgetApp.SIZE_MIN, WidgetApp.SIZE_MAX),
                 )
             }.getOrDefault(WidgetLook())
@@ -71,14 +87,15 @@ data class WidgetLook(
                 .put("mono", look.mono)
                 .put("logo", look.logo)
                 .put("arcs", look.arcs)
-                .put("voice", look.voice)
-                .put("image", look.image)
+                .put("voice", look.apps.any { it.pkg == WidgetApp.VOICE })
+                .put("image", look.apps.any { it.pkg == WidgetApp.IMAGE })
                 .put("label", look.label)
                 .put("shadow", look.shadow)
             look.bg?.let { j.put("bg", it.toLong() and 0xFFFFFFFFL) }
             look.text?.let { j.put("text", it.toLong() and 0xFFFFFFFFL) }
             look.tint?.let { j.put("tint", it.toLong() and 0xFFFFFFFFL) }
-            if (look.apps.isNotEmpty()) j.put("apps", org.json.JSONArray(look.apps.map { it.toJson() }))
+            // Always written (an empty list too: both buttons hidden, no apps).
+            j.put("apps", org.json.JSONArray(look.apps.map { it.toJson() }))
             if (look.appSize != WidgetApp.SIZE_DEFAULT) j.put("app_size", look.appSize)
             sp(context).edit().putString("look_$id", j.toString()).apply()
         }
@@ -143,14 +160,14 @@ class SearchWidget : AppWidgetProvider() {
 
             // A theme colour: a fixed one, or (Follow phone, Material adaptive) a resource the home
             // screen looks up itself, so it follows dark mode and the wallpaper without asking us.
-            fun paint(view: Int, method: String, role: Int, custom: Int?) {
+            fun paint(view: Int, method: String, role: Int, custom: Int?, rv: RemoteViews = v) {
                 when {
-                    custom != null -> v.setInt(view, method, custom)
+                    custom != null -> rv.setInt(view, method, custom)
                     look.theme == WidgetLook.FOLLOW || look.theme == WidgetLook.ADAPTIVE -> {
                         val res = (if (look.theme == WidgetLook.FOLLOW) FOLLOW_RES else ADAPTIVE_RES)[role]
-                        if (Build.VERSION.SDK_INT >= 31) v.setColor(view, method, res) else v.setInt(view, method, context.getColor(res))
+                        if (Build.VERSION.SDK_INT >= 31) rv.setColor(view, method, res) else rv.setInt(view, method, context.getColor(res))
                     }
-                    else -> v.setInt(view, method, (if (look.theme == WidgetLook.LIGHT) LIGHT_COLORS else DARK_COLORS)[role])
+                    else -> rv.setInt(view, method, (if (look.theme == WidgetLook.LIGHT) LIGHT_COLORS else DARK_COLORS)[role])
                 }
             }
 
@@ -191,29 +208,40 @@ class SearchWidget : AppWidgetProvider() {
             paint(R.id.widget_label, "setTextColor", TEXT, look.text)
 
             val iconRole = if (look.mono) ICON else ACCENT
-            v.setViewVisibility(R.id.widget_voice, if (look.voice) View.VISIBLE else View.GONE)
-            paint(R.id.widget_voice, "setColorFilter", iconRole, look.tint)
-            v.setViewVisibility(R.id.widget_image, if (look.image) View.VISIBLE else View.GONE)
-            paint(R.id.widget_image, "setColorFilter", iconRole, look.tint)
-            // Without the picture button, the mic takes its place at the end.
-            if (Build.VERSION.SDK_INT >= 31) {
-                v.setViewLayoutMargin(R.id.widget_voice, RemoteViews.MARGIN_END, if (look.image) 10f else 0f, TypedValue.COMPLEX_UNIT_DIP)
-            }
 
-            // Your apps, in their own colours (not tinted): on the left after the logo, or on the
-            // right before the microphone, in your order. An animation plays as its frames, flipped
-            // by the home screen; all animations together share a budget of distinct pictures (a
-            // frame shown several times is the same picture, sent once) and of steps.
+            // Your apps, in their own colours (not tinted), and the microphone and picture button (in
+            // the icon colour): on the left after the logo or on the right, in your order. An
+            // animation plays as its frames, flipped by the home screen; all animations together
+            // share a budget of distinct pictures (a frame shown several times is the same picture,
+            // sent once) and of steps.
             val apps = look.apps.filter { WidgetIcons.installed(context, it) }
-            val gifs = apps.count { it.frames > 1 }
+            val gifs = apps.count { !it.isButton && it.frames > 1 }
             val perGif = if (gifs == 0) 0 else (FRAME_BUDGET / gifs).coerceAtLeast(2)
             val perSteps = if (gifs == 0) 0 else STEP_BUDGET / gifs
             val sides = listOf(apps.filter { it.left } to LEFT_VIEWS, apps.filter { !it.left } to APP_VIEWS)
             for ((list, views) in sides) {
                 views.forEachIndexed { i, view ->
                     val app = list.getOrNull(i)
-                    val all = app?.let { WidgetIcons.frames(context, it) }.orEmpty()
                     v.removeAllViews(view)
+                    if (app != null && app.isButton) {
+                        val voice = app.pkg == WidgetApp.VOICE
+                        val button = RemoteViews(context.packageName, R.layout.widget_app_frame)
+                        button.setImageViewResource(R.id.widget_app_frame, if (voice) R.drawable.widget_mic else R.drawable.widget_image_search)
+                        paint(R.id.widget_app_frame, "setColorFilter", iconRole, look.tint, button)
+                        v.addView(view, button)
+                        v.setInt(view, "setFlipInterval", 100_000)
+                        v.setViewVisibility(view, View.VISIBLE)
+                        v.setContentDescription(view, context.getString(if (voice) R.string.widget_voice else R.string.widget_image))
+                        if (Build.VERSION.SDK_INT >= 31) {
+                            v.setViewLayoutWidth(view, 50f, TypedValue.COMPLEX_UNIT_DIP)
+                            v.setViewLayoutHeight(view, 26f, TypedValue.COMPLEX_UNIT_DIP)
+                        }
+                        if (clickable) {
+                            v.setOnClickPendingIntent(view, if (voice) open(context, VOICE, 2) else open(context, IMAGE, 3))
+                        }
+                        return@forEachIndexed
+                    }
+                    val all = app?.let { WidgetIcons.frames(context, it) }.orEmpty()
                     if (app == null || all.isEmpty()) {
                         v.setViewVisibility(view, View.GONE)
                         return@forEachIndexed
@@ -248,16 +276,19 @@ class SearchWidget : AppWidgetProvider() {
 
             if (clickable) {
                 v.setOnClickPendingIntent(R.id.widget_pill, open(context, SEARCH, 1))
-                v.setOnClickPendingIntent(R.id.widget_voice, open(context, VOICE, 2))
-                v.setOnClickPendingIntent(R.id.widget_image, open(context, IMAGE, 3))
                 // The logo: just the start page, without the search.
                 v.setOnClickPendingIntent(R.id.widget_logo, open(context, HOME, 4))
             }
             return v
         }
 
-        private val APP_VIEWS = intArrayOf(R.id.widget_app1, R.id.widget_app2, R.id.widget_app3, R.id.widget_app4)
-        private val LEFT_VIEWS = intArrayOf(R.id.widget_appl1, R.id.widget_appl2, R.id.widget_appl3, R.id.widget_appl4)
+        // Four apps and the two buttons can all be on one side.
+        private val APP_VIEWS = intArrayOf(
+            R.id.widget_app1, R.id.widget_app2, R.id.widget_app3, R.id.widget_app4, R.id.widget_app5, R.id.widget_app6,
+        )
+        private val LEFT_VIEWS = intArrayOf(
+            R.id.widget_appl1, R.id.widget_appl2, R.id.widget_appl3, R.id.widget_appl4, R.id.widget_appl5, R.id.widget_appl6,
+        )
 
         /** GIF frames on one widget, all GIFs together (each frame is a small picture sent to the home screen). */
         private const val FRAME_BUDGET = 24

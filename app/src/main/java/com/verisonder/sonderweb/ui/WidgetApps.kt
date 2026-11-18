@@ -69,7 +69,9 @@ import java.util.UUID
 
 /**
  * An app on the search widget: what it opens, the icon you picked for it (null: the app's own),
- * which side it sits on, and its size (null: the size all apps share).
+ * which side it sits on, and its size (null: the size all apps share). The widget's own buttons
+ * (voice search, search with a picture) are in the same list ([isButton]), so they can be placed
+ * among the apps, on either side, in any order.
  */
 data class WidgetApp(
     val pkg: String,
@@ -86,6 +88,9 @@ data class WidgetApp(
     val left: Boolean = false,
     val size: Int? = null,
 ) {
+    /** The microphone or the picture button, not an app. */
+    val isButton: Boolean get() = pkg == VOICE || pkg == IMAGE
+
     fun toJson(): JSONObject = JSONObject().put("pkg", pkg).put("cls", cls).also { j ->
         icon?.let { j.put("icon", it) }
         if (frames > 1) j.put("frames", frames).put("interval", interval)
@@ -95,8 +100,14 @@ data class WidgetApp(
     }
 
     companion object {
-        /** At most this many apps on one widget. */
+        /** At most this many apps on one widget (the two buttons don't count). */
         const val MAX = 4
+
+        /** The widget's own buttons, kept in the apps' list. */
+        const val VOICE = "#voice"
+        const val IMAGE = "#image"
+
+        fun button(kind: String) = WidgetApp(kind, kind)
 
         /** Icon sizes on the widget, in dp (the pill is 50 dp tall). */
         const val SIZE_MIN = 16
@@ -145,12 +156,18 @@ object WidgetIcons {
             .sortedBy { it.label.lowercase() }
     }
 
-    fun installed(context: Context, app: WidgetApp): Boolean = runCatching {
+    fun installed(context: Context, app: WidgetApp): Boolean = app.isButton || runCatching {
         context.packageManager.getActivityInfo(ComponentName(app.pkg, app.cls), 0)
         true
     }.getOrDefault(false)
 
-    fun label(context: Context, app: WidgetApp): String = runCatching {
+    fun label(context: Context, app: WidgetApp): String = when (app.pkg) {
+        WidgetApp.VOICE -> "Voice search"
+        WidgetApp.IMAGE -> "Search with a picture"
+        else -> appLabel(context, app)
+    }
+
+    private fun appLabel(context: Context, app: WidgetApp): String = runCatching {
         context.packageManager.getActivityInfo(ComponentName(app.pkg, app.cls), 0).loadLabel(context.packageManager).toString()
     }.getOrDefault(app.pkg)
 
@@ -318,18 +335,22 @@ internal fun WidgetAppRow(
     val p = LocalPalette.current
     val ctx = LocalContext.current
     val icon by produceState<ImageBitmap?>(null, app) {
-        value = withContext(Dispatchers.IO) { WidgetIcons.bitmap(ctx, app)?.asImageBitmap() }
+        value = if (app.isButton) null else withContext(Dispatchers.IO) { WidgetIcons.bitmap(ctx, app)?.asImageBitmap() }
     }
     val name = remember(app.pkg, app.cls) { WidgetIcons.label(ctx, app) }
-    val details = listOf(
-        if (app.left) "Left" else "Right",
-        "${app.size ?: sizeAll} dp",
-        when {
-            app.icon == null -> "own icon"
-            app.frames > 1 -> "animated"
-            else -> "your icon"
-        },
-    ).joinToString(" · ")
+    val details = if (app.isButton) {
+        if (app.left) "Left" else "Right"
+    } else {
+        listOf(
+            if (app.left) "Left" else "Right",
+            "${app.size ?: sizeAll} dp",
+            when {
+                app.icon == null -> "own icon"
+                app.frames > 1 -> "animated"
+                else -> "your icon"
+            },
+        ).joinToString(" · ")
+    }
     Row(
         modifier
             .fillMaxWidth()
@@ -343,7 +364,20 @@ internal fun WidgetAppRow(
             Icon(Icons.Outlined.DragHandle, "Drag to move", tint = p.faint)
         }
         Spacer(Modifier.width(4.dp))
-        Box(Modifier.size(36.dp)) { icon?.let { Image(it, null, Modifier.size(36.dp)) } }
+        Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+            if (app.isButton) {
+                Icon(
+                    androidx.compose.ui.res.painterResource(
+                        if (app.pkg == WidgetApp.VOICE) com.verisonder.sonderweb.R.drawable.widget_mic else com.verisonder.sonderweb.R.drawable.widget_image_search,
+                    ),
+                    null,
+                    tint = p.text,
+                    modifier = Modifier.size(26.dp),
+                )
+            } else {
+                icon?.let { Image(it, null, Modifier.size(36.dp)) }
+            }
+        }
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(name, color = p.text, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -386,10 +420,12 @@ internal fun WidgetAppOptionsDialog(
         title = { Text(name, color = p.text) },
         text = {
             Column {
-                TextButton(onClick = onIcon) { Text("Change icon", color = p.accent, fontSize = 15.sp) }
+                if (!app.isButton) TextButton(onClick = onIcon) { Text("Change icon", color = p.accent, fontSize = 15.sp) }
                 Text("Side", color = p.mute, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
                 Pick("Left, after the logo", app.left) { onChange(app.copy(left = true)) }
-                Pick("Right, before the microphone", !app.left) { onChange(app.copy(left = false)) }
+                Pick("Right, at the end", !app.left) { onChange(app.copy(left = false)) }
+                Text("The order on each side is the order in the list: drag to change it.", color = p.faint, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
+                if (app.isButton) return@Column
                 Text("Size", color = p.mute, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
                 Pick("Same as the others ($sizeAll dp)", app.size == null) { onChange(app.copy(size = null)) }
                 Pick("Its own: ${size.toInt()} dp", app.size != null) { onChange(app.copy(size = size.toInt())) }

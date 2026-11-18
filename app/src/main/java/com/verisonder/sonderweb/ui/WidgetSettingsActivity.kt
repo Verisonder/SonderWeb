@@ -209,11 +209,20 @@ private fun WidgetSettings(start: WidgetLook, onCancel: () -> Unit, onSave: (Wid
                     Choice("Full logo", !look.arcs, "The sphere with its three arcs") { look = look.copy(arcs = false) }
                     Choice("Arcs only", look.arcs, "Just the three arcs") { look = look.copy(arcs = true) }
                 }
-                Toggle("Voice search", "Show the microphone", look.voice) { look = look.copy(voice = it) }
-                Toggle("Search with a picture", "Show the picture button", look.image) { look = look.copy(image = it) }
+                // The buttons live in the Apps list (to place and order them); these show or hide them.
+                for ((kind, title, sub) in listOf(
+                    Triple(WidgetApp.VOICE, "Voice search", "Show the microphone"),
+                    Triple(WidgetApp.IMAGE, "Search with a picture", "Show the picture button"),
+                )) {
+                    Toggle(title, sub, look.apps.any { it.pkg == kind }) { on ->
+                        look = look.copy(
+                            apps = if (on) look.apps + WidgetApp.button(kind) else look.apps.filter { it.pkg != kind },
+                        )
+                    }
+                }
             }
 
-            GroupTitle("Apps")
+            GroupTitle("Apps and buttons")
             Group {
                 look.apps.forEachIndexed { i, app ->
                     key(app.pkg + "/" + app.cls) {
@@ -258,12 +267,13 @@ private fun WidgetSettings(start: WidgetLook, onCancel: () -> Unit, onSave: (Wid
                         )
                     }
                 }
-                if (look.apps.size < WidgetApp.MAX) AddWidgetAppRow { addingApp = true }
-                if (look.apps.isNotEmpty()) WidgetAppSizeRow(look.appSize) { look = look.copy(appSize = it) }
+                if (look.apps.count { !it.isButton } < WidgetApp.MAX) AddWidgetAppRow { addingApp = true }
+                if (look.apps.any { !it.isButton }) WidgetAppSizeRow(look.appSize) { look = look.copy(appSize = it) }
             }
             Hint(
-                "Up to ${WidgetApp.MAX} apps. Drag the handle to change their order; tap one for its icon " +
-                    "(an icon pack, a picture or a GIF), its side and its size.",
+                "Up to ${WidgetApp.MAX} apps, with the microphone and picture button among them. Drag the handle " +
+                    "to change the order; tap one for its side (and, for an app, its icon: an icon pack, a picture, " +
+                    "a GIF, WebP or animated PNG, and its size).",
             )
 
             GroupTitle("Display")
@@ -315,7 +325,12 @@ private fun WidgetSettings(start: WidgetLook, onCancel: () -> Unit, onSave: (Wid
         AppPickerDialog(onDismiss = { addingApp = false }) { app ->
             addingApp = false
             val already = look.apps.any { it.pkg == app.pkg && it.cls == app.cls }
-            if (look.apps.size < WidgetApp.MAX && !already) look = look.copy(apps = look.apps + WidgetApp(app.pkg, app.cls))
+            if (look.apps.count { !it.isButton } < WidgetApp.MAX && !already) {
+                // New apps go before the buttons on the right, where apps have always gone.
+                val firstButton = look.apps.indexOfFirst { it.isButton && !it.left }
+                val at = if (firstButton < 0) look.apps.size else firstButton
+                look = look.copy(apps = look.apps.toMutableList().apply { add(at, WidgetApp(app.pkg, app.cls)) })
+            }
         }
     }
     optionsFor?.let { i ->
