@@ -53,6 +53,9 @@ object Delegates {
             // A restored tab that hasn't loaded yet keeps showing the address it will open.
             // A new session reports its empty first page after the real one was asked for:
             // while that loads it isn't the start page (it used to flash in on launch).
+            // Moving on to another page: the picture of the one you're leaving stays at hand for
+            // the back gesture.
+            if (url != null && url != "about:blank" && url != tab.url && tab.url.isNotEmpty()) BackPeek.leaving(tab, tab.url)
             if (url == null || url == "about:blank") {
                 if (!tab.loading || tab.startedPage) tab.url = tab.pendingUrl ?: ""
             } else {
@@ -75,6 +78,13 @@ object Delegates {
             request: NavigationDelegate.LoadRequest,
         ): GeckoResult<AllowOrDeny>? {
             val uri = request.uri
+            // Leaving this page for another: a last picture of it as you see it now (scrolled
+            // where you were), for the back gesture's peek when you come back.
+            if (tab === Browser.current && request.target == NavigationDelegate.TARGET_WINDOW_CURRENT &&
+                !request.isRedirect && UrlText.isWeb(uri) && UrlText.isWeb(tab.url) && uri != tab.url
+            ) {
+                capture(tab, thumbnail = false)
+            }
             if (UrlText.isInternal(uri)) {
                 // A link to another site tapped while this tab plays a video: it opens in a new tab
                 // and the video keeps going in the floating window.
@@ -304,6 +314,9 @@ object Delegates {
         // Still covered: the page hasn't really drawn yet, keep the remembered colours.
         if (tab.covered) return
         val view = Browser.host?.geckoViewFor(tab) ?: return
+        // The page the picture is of: the address now, not when the picture comes back (you may
+        // have moved on by then).
+        val url = tab.url
         runCatching {
             view.capturePixels().accept({ bmp: Bitmap? ->
                 if (bmp == null || bmp.width < 2 || bmp.height < 4) return@accept
@@ -314,7 +327,8 @@ object Delegates {
                 val topKnown = top != null
                 val flat = runCatching { isFlat(bmp) }.getOrDefault(false)
                 // Kept for the back gesture's peek, when you come back here from the next page.
-                BackPeek.remember(tab, tab.url, bmp)
+                // Not if the tab moved on meanwhile: the picture may already show the next page.
+                if (tab.url == url) BackPeek.remember(tab, url, bmp)
                 // No pictures of private pages, not even in memory: only the two colours.
                 val small = if (thumbnail && !tab.isPrivate) {
                     val w = 360
