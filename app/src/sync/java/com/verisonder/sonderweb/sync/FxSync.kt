@@ -323,7 +323,7 @@ object FxSync {
     }
 
     /** Renames this phone in your account. */
-    fun setDeviceName(name: String) {
+    fun renameDevice(name: String) {
         val clean = name.trim().ifEmpty { defaultDeviceName() }.take(64)
         deviceName = clean
         prefs.edit().putString("device_name", clean).apply()
@@ -334,7 +334,7 @@ object FxSync {
     }
 
     /** Saving and filling passwords on or off (signing in and syncing are left as they are). */
-    fun setFillPasswords(on: Boolean) {
+    fun changeFillPasswords(on: Boolean) {
         if (on && !enabled) turn(true)
         fillPasswords = on
         prefs.edit().putBoolean("fill_passwords", on).apply()
@@ -342,7 +342,7 @@ object FxSync {
     }
 
     /** Choose what to sync: passwords on or off (on this phone only; your other devices keep theirs). */
-    fun setSyncPasswords(on: Boolean) {
+    fun changeSyncPasswords(on: Boolean) {
         syncPasswords = on
         prefs.edit().putBoolean("sync_passwords", on).apply()
         if (on) sync(user = false)

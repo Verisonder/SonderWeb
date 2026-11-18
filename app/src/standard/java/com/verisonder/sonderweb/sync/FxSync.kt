@@ -24,13 +24,13 @@ object FxSync {
     val syncPasswords = false
     val fillPasswords = false
 
-    fun setFillPasswords(on: Boolean) = Unit
+    fun changeFillPasswords(on: Boolean) = Unit
 
     fun manageAccount(open: (String) -> Unit) = Unit
 
-    fun setDeviceName(name: String) = Unit
+    fun renameDevice(name: String) = Unit
 
-    fun setSyncPasswords(on: Boolean) = Unit
+    fun changeSyncPasswords(on: Boolean) = Unit
 
     fun init(context: Context) = Unit
 
