@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The home screen search widget: logo, "Search", voice search and search with a picture.
+<!-- The home screen search widget: logo, "Search", up to four of your apps, voice search and search with a picture.
      Colours, icons and the shadow are set per widget (SearchWidget.views). -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -69,10 +69,12 @@
                     android:tint="#1C1C1C" />
             </FrameLayout>
 
+            <!-- Takes the free space (and gives way to your apps when it's tight). -->
             <TextView
                 android:id="@+id/widget_label"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:text="@string/widget_search"
@@ -80,11 +82,56 @@
                 android:textSize="17sp"
                 android:textStyle="bold" />
 
-            <!-- Home screen widgets may only use a few view classes: a plain View isn't one. -->
+            <!-- Home screen widgets may only use a few view classes: a plain View isn't one.
+                 Pushes the buttons to the end when the label is hidden (next to nothing otherwise). -->
             <FrameLayout
                 android:layout_width="0dp"
                 android:layout_height="1dp"
-                android:layout_weight="1" />
+                android:layout_weight="0.001" />
+
+            <ImageView
+                android:id="@+id/widget_app1"
+                android:layout_width="40dp"
+                android:layout_height="match_parent"
+                android:paddingStart="6dp"
+                android:paddingTop="11dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="11dp"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/widget_app2"
+                android:layout_width="40dp"
+                android:layout_height="match_parent"
+                android:paddingStart="6dp"
+                android:paddingTop="11dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="11dp"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/widget_app3"
+                android:layout_width="40dp"
+                android:layout_height="match_parent"
+                android:paddingStart="6dp"
+                android:paddingTop="11dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="11dp"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/widget_app4"
+                android:layout_width="40dp"
+                android:layout_height="match_parent"
+                android:paddingStart="6dp"
+                android:paddingTop="11dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="11dp"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
 
             <ImageView
                 android:id="@+id/widget_voice"

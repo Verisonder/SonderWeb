@@ -8,6 +8,9 @@ import android.os.Bundle
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -49,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -91,6 +95,10 @@ class WidgetSettingsActivity : ComponentActivity() {
             WidgetLook.save(this, it, look)
             SearchWidget.update(this, it)
         }
+        // Icons you picked and then replaced or removed: thrown away.
+        val used = (SearchWidget.placed(this).toList() + widgetId).distinct()
+            .flatMap { WidgetLook.load(this, it).apps }.mapNotNull { it.icon }.toSet()
+        WidgetIcons.cleanUp(this, used)
         setResult(Activity.RESULT_OK, result())
         finish()
     }
@@ -104,6 +112,22 @@ private fun WidgetSettings(start: WidgetLook, onCancel: () -> Unit, onSave: (Wid
     val p = LocalPalette.current
     var look by remember { mutableStateOf(start) }
     var picking by remember { mutableStateOf<ColorTarget?>(null) }
+    val ctx = LocalContext.current
+    // Your apps: adding one, and choosing the icon of the one at an index (and from which pack).
+    var addingApp by remember { mutableStateOf(false) }
+    var iconFor by remember { mutableStateOf<Int?>(null) }
+    var packFor by remember { mutableStateOf<Pair<Int, IconPack>?>(null) }
+    var pictureFor by remember { mutableStateOf<Int?>(null) }
+    fun setIcon(index: Int, path: String?) {
+        look = look.copy(apps = look.apps.mapIndexed { i, a -> if (i == index) a.copy(icon = path) else a })
+    }
+    val choosePicture = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val i = pictureFor
+        pictureFor = null
+        if (uri != null && i != null) {
+            WidgetIcons.fromPicture(ctx, uri)?.let { WidgetIcons.keep(ctx, it) }?.let { setIcon(i, it) }
+        }
+    }
     BackHandler(onBack = onCancel)
 
     Column(Modifier.fillMaxSize().background(p.bg).statusBarsPadding()) {
@@ -162,6 +186,19 @@ private fun WidgetSettings(start: WidgetLook, onCancel: () -> Unit, onSave: (Wid
                 Toggle("Search with a picture", "Show the picture button", look.image) { look = look.copy(image = it) }
             }
 
+            GroupTitle("Apps")
+            Group {
+                look.apps.forEachIndexed { i, app ->
+                    WidgetAppRow(
+                        app,
+                        onIcon = { iconFor = i },
+                        onRemove = { look = look.copy(apps = look.apps.filterIndexed { j, _ -> j != i }) },
+                    )
+                }
+                if (look.apps.size < WidgetApp.MAX) AddWidgetAppRow { addingApp = true }
+            }
+            Hint("Up to ${WidgetApp.MAX} apps, next to the microphone. Tap one to give it an icon from an icon pack or a picture.")
+
             GroupTitle("Display")
             Group {
                 Toggle("Search label", "Show \"Search\" in the widget", look.label) { look = look.copy(label = it) }
@@ -204,6 +241,41 @@ private fun WidgetSettings(start: WidgetLook, onCancel: () -> Unit, onSave: (Wid
                     .clickable { onSave(look) },
                 contentAlignment = Alignment.Center,
             ) { Text("Save widget", color = p.onAccent, fontSize = 16.sp, fontWeight = FontWeight.Medium) }
+        }
+    }
+
+    if (addingApp) {
+        AppPickerDialog(onDismiss = { addingApp = false }) { app ->
+            addingApp = false
+            if (look.apps.size < WidgetApp.MAX) look = look.copy(apps = look.apps + WidgetApp(app.pkg, app.cls))
+        }
+    }
+    iconFor?.let { i ->
+        IconSourceDialog(
+            onDismiss = { iconFor = null },
+            onOwn = {
+                iconFor = null
+                setIcon(i, null)
+            },
+            onPack = { pack ->
+                iconFor = null
+                packFor = i to pack
+            },
+            onPicture = {
+                iconFor = null
+                pictureFor = i
+                runCatching {
+                    choosePicture.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }.onFailure { pictureFor = null }
+            },
+        )
+    }
+    packFor?.let { (i, pack) ->
+        look.apps.getOrNull(i)?.let { app ->
+            PackIconsDialog(pack, app, onDismiss = { packFor = null }) { d ->
+                packFor = null
+                WidgetIcons.keep(ctx, WidgetIcons.toBitmap(d))?.let { setIcon(i, it) }
+            }
         }
     }
 

@@ -27,6 +27,8 @@ data class WidgetLook(
     val bg: Int? = null,
     val text: Int? = null,
     val tint: Int? = null,
+    /** Up to [WidgetApp.MAX] apps, next to the microphone. */
+    val apps: List<WidgetApp> = emptyList(),
 ) {
     companion object {
         const val DARK = 0
@@ -53,6 +55,9 @@ data class WidgetLook(
                     bg = color("bg"),
                     text = color("text"),
                     tint = color("tint"),
+                    apps = j.optJSONArray("apps")?.let { a ->
+                        (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { WidgetApp.fromJson(it) } }
+                    }.orEmpty().take(WidgetApp.MAX),
                 )
             }.getOrDefault(WidgetLook())
         }
@@ -70,6 +75,7 @@ data class WidgetLook(
             look.bg?.let { j.put("bg", it.toLong() and 0xFFFFFFFFL) }
             look.text?.let { j.put("text", it.toLong() and 0xFFFFFFFFL) }
             look.tint?.let { j.put("tint", it.toLong() and 0xFFFFFFFFL) }
+            if (look.apps.isNotEmpty()) j.put("apps", org.json.JSONArray(look.apps.map { it.toJson() }))
             sp(context).edit().putString("look_$id", j.toString()).apply()
         }
 
@@ -124,11 +130,11 @@ class SearchWidget : AppWidgetProvider() {
 
         /** Redraws one widget with its saved look. */
         fun update(context: Context, id: Int) {
-            AppWidgetManager.getInstance(context).updateAppWidget(id, views(context, WidgetLook.load(context, id)))
+            AppWidgetManager.getInstance(context).updateAppWidget(id, views(context, WidgetLook.load(context, id), id = id))
         }
 
         /** The widget drawn with [look]. [clickable] is false for the preview on the settings screen. */
-        fun views(context: Context, look: WidgetLook, clickable: Boolean = true): RemoteViews {
+        fun views(context: Context, look: WidgetLook, clickable: Boolean = true, id: Int = 0): RemoteViews {
             val v = RemoteViews(context.packageName, R.layout.widget_search)
 
             // A theme colour: a fixed one, or (Follow phone, Material adaptive) a resource the home
@@ -190,6 +196,21 @@ class SearchWidget : AppWidgetProvider() {
                 v.setViewLayoutMargin(R.id.widget_voice, RemoteViews.MARGIN_END, if (look.image) 10f else 0f, TypedValue.COMPLEX_UNIT_DIP)
             }
 
+            // Your apps, in their own colours (not tinted), before the microphone.
+            val apps = look.apps.filter { WidgetIcons.installed(context, it) }
+            APP_VIEWS.forEachIndexed { i, view ->
+                val app = apps.getOrNull(i)
+                val bmp = app?.let { WidgetIcons.bitmap(context, it) }
+                if (app == null || bmp == null) {
+                    v.setViewVisibility(view, View.GONE)
+                } else {
+                    v.setViewVisibility(view, View.VISIBLE)
+                    v.setImageViewBitmap(view, bmp)
+                    v.setContentDescription(view, WidgetIcons.label(context, app))
+                    if (clickable) v.setOnClickPendingIntent(view, launch(context, app, 100 + id * WidgetApp.MAX + i))
+                }
+            }
+
             if (clickable) {
                 v.setOnClickPendingIntent(R.id.widget_pill, open(context, SEARCH, 1))
                 v.setOnClickPendingIntent(R.id.widget_voice, open(context, VOICE, 2))
@@ -199,6 +220,20 @@ class SearchWidget : AppWidgetProvider() {
             }
             return v
         }
+
+        private val APP_VIEWS = intArrayOf(R.id.widget_app1, R.id.widget_app2, R.id.widget_app3, R.id.widget_app4)
+
+        /** Opens one of your apps, as its home screen icon would. Each widget's buttons have their own code. */
+        private fun launch(context: Context, app: WidgetApp, code: Int): PendingIntent =
+            PendingIntent.getActivity(
+                context,
+                code,
+                Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_LAUNCHER)
+                    .setComponent(ComponentName(app.pkg, app.cls))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
 
         private fun open(context: Context, action: String, code: Int): PendingIntent =
             PendingIntent.getActivity(
@@ -212,7 +247,7 @@ class SearchWidget : AppWidgetProvider() {
     }
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        ids.forEach { manager.updateAppWidget(it, views(context, WidgetLook.load(context, it))) }
+        ids.forEach { manager.updateAppWidget(it, views(context, WidgetLook.load(context, it), id = it)) }
     }
 
     override fun onDeleted(context: Context, ids: IntArray) {
