@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Collections
@@ -178,6 +179,13 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                             Browser.host?.toast("Bookmarked")
                         }
                         bookmarked = !bookmarked
+                        close()
+                    }
+                }
+                // Firefox Sync (SonderWeb Sync, signed in): open this page on another of your devices.
+                if (web && !tab.isPrivate && com.verisonder.sonderweb.sync.FxSync.signedIn) {
+                    Item("Send to device", Icons.Outlined.Devices) {
+                        ui.sendTab = tab.title to tab.url
                         close()
                     }
                 }

@@ -29,6 +29,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.FilterNone
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Computer
+import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Public
@@ -63,6 +67,10 @@ fun TabsScreen(ui: UiState) {
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { ui.tabsPrivate = false } }
     var showInactive by remember { mutableStateOf(false) }
     BackHandler(enabled = showInactive) { showInactive = false }
+    // Firefox Sync: your other devices' open tabs (SonderWeb Sync only; empty otherwise).
+    var showRemote by remember { mutableStateOf(false) }
+    BackHandler(enabled = showRemote) { showRemote = false }
+    val remote = if (privateMode) emptyList() else com.verisonder.sonderweb.sync.FxSync.remoteDevices
     // Inactive tabs (Brave's idea) sit behind one row at the top instead of in the grid.
     val inactive = if (privateMode) emptyList() else Browser.inactiveTabs()
     // Empty new tabs are just the start page: not listed here.
@@ -81,6 +89,10 @@ fun TabsScreen(ui: UiState) {
 
     if (showInactive) {
         InactiveTabs(ui, inactive) { showInactive = false }
+        return
+    }
+    if (showRemote) {
+        RemoteTabs(ui, remote) { showRemote = false }
         return
     }
 
@@ -129,6 +141,11 @@ fun TabsScreen(ui: UiState) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
+                if (remote.isNotEmpty()) {
+                    item(key = "remote", span = { GridItemSpan(2) }) {
+                        RemoteRow(remote) { showRemote = true }
+                    }
+                }
                 if (inactive.isNotEmpty()) {
                     item(key = "inactive", span = { GridItemSpan(2) }) {
                         InactiveRow(inactive.size) { showInactive = true }
@@ -201,6 +218,100 @@ private fun InactiveRow(count: Int, onClick: () -> Unit) {
             Text("Unused or duplicate tabs", color = p.faint, fontSize = 12.sp)
         }
         Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = p.mute, modifier = Modifier.size(22.dp))
+    }
+}
+
+@Composable
+private fun RemoteRow(devices: List<com.verisonder.sonderweb.sync.RemoteDevice>, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    val shape = RoundedCornerShape(16.dp)
+    val count = devices.sumOf { it.tabs.size }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(p.card)
+            .border(1.dp, p.line, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.Devices, null, tint = p.mute, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text("From other devices", color = p.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                "$count tab" + (if (count == 1) "" else "s") + " · " + devices.joinToString(", ") { it.name },
+                color = p.faint,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = p.mute, modifier = Modifier.size(22.dp))
+    }
+}
+
+/** Your other devices' open tabs (Firefox Sync), by device: tap one to open it here. */
+@Composable
+private fun RemoteTabs(ui: UiState, devices: List<com.verisonder.sonderweb.sync.RemoteDevice>, onBack: () -> Unit) {
+    val p = LocalPalette.current
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp, top = 6.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(48.dp).clip(CircleShape).clickable(onClick = onBack),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back", tint = p.text, modifier = Modifier.size(22.dp))
+            }
+            Text("From other devices", color = p.text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Box(
+                Modifier.size(48.dp).clip(CircleShape).clickable { com.verisonder.sonderweb.sync.FxSync.sync() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Outlined.Sync, "Sync now", tint = p.mute, modifier = Modifier.size(22.dp))
+            }
+        }
+        LazyColumn(Modifier.weight(1f).padding(top = 4.dp)) {
+            devices.forEach { d ->
+                item(key = "d" + d.id) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            if (d.kind == "desktop") Icons.Outlined.Computer else Icons.Outlined.PhoneAndroid,
+                            null,
+                            tint = p.accent,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(d.name, color = p.accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    }
+                }
+                items(d.tabs.size, key = { "t" + d.id + ":" + it }) { i ->
+                    val t = d.tabs[i]
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                Browser.newTab(t.url, isPrivate = false)
+                                ui.panel = Panel.None
+                            }
+                            .padding(start = 20.dp, end = 16.dp, top = 9.dp, bottom = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(t.title, color = p.text, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(UrlText.host(t.url), color = p.faint, fontSize = 12.sp, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

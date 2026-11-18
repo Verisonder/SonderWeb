@@ -15,13 +15,20 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
 import mozilla.appservices.RustComponentsInitializer
 import mozilla.appservices.db_crypto.KeyManager
+import mozilla.appservices.autofill.Store as AutofillStore
+import mozilla.appservices.autofill.UpdatableAddressFields
+import mozilla.appservices.autofill.UpdatableCreditCardFields
+import mozilla.appservices.fxaclient.DeviceCapability
 import mozilla.appservices.fxaclient.DeviceConfig
+import mozilla.appservices.fxaclient.IncomingDeviceCommand
 import mozilla.appservices.fxaclient.FxaClient
 import mozilla.appservices.fxaclient.FxaConfig
 import mozilla.appservices.fxaclient.FxaEvent
 import mozilla.appservices.fxaclient.FxaServer
 import mozilla.appservices.fxaclient.FxaState
 import mozilla.appservices.logins.DatabaseLoginsStorage
+import mozilla.appservices.remotetabs.RemoteTabRecord
+import mozilla.appservices.remotetabs.TabsStore
 import mozilla.appservices.sync15.DeviceType
 import mozilla.appservices.syncmanager.DeviceSettings
 import mozilla.appservices.syncmanager.ServiceStatus
@@ -33,8 +40,9 @@ import mozilla.appservices.syncmanager.SyncReason
 import java.util.concurrent.Executors
 
 /**
- * Firefox Sync, an option (off until you turn it on): a Mozilla account, and the bookmarks,
- * history and passwords SonderWeb keeps, synced both ways with Firefox on your other devices.
+ * Firefox Sync, an option (off until you turn it on): a Mozilla account, and what SonderWeb
+ * keeps (bookmarks, history, open tabs, passwords, addresses, payment cards) synced both ways
+ * with Firefox on your other devices. Tabs can be sent between devices too.
  *
  * Everything that talks to Mozilla's libraries runs on one background thread, in order.
  * The account's sign-in state and the passwords database's key are kept encrypted
@@ -52,6 +60,12 @@ object FxSync {
     const val PASSWORDS = "passwords"
     const val BOOKMARKS = "bookmarks"
     const val HISTORY = "history"
+    const val TABS = "tabs"
+    const val ADDRESSES = "addresses"
+    const val CARDS = "creditcards"
+
+    /** How often to sync while SonderWeb is open. */
+    private const val EVERY = 15L * 60 * 1000
 
     /** The address the sign-in pages are on (the only site the sign-in channel talks to). */
     const val ACCOUNTS = "https://accounts.firefox.com"
@@ -106,6 +120,36 @@ object FxSync {
     var syncHistory by mutableStateOf(true)
         private set
 
+    var syncTabs by mutableStateOf(true)
+        private set
+
+    var syncAddresses by mutableStateOf(true)
+        private set
+
+    var syncCards by mutableStateOf(true)
+        private set
+
+    /** SonderWeb offers to save addresses and payment cards, and fills them in. */
+    var fillAddresses by mutableStateOf(true)
+        private set
+
+    var fillCards by mutableStateOf(true)
+        private set
+
+    var addressCount by mutableIntStateOf(0)
+        private set
+
+    var cardCount by mutableIntStateOf(0)
+        private set
+
+    /** Changes when bookmarks came in from your other devices (the bookmarks screen reloads). */
+    var bookmarksVersion by mutableIntStateOf(0)
+        private set
+
+    /** Your other devices and their open tabs, as of the last sync. */
+    var remoteDevices by mutableStateOf<List<RemoteDevice>>(emptyList())
+        private set
+
     var syncing by mutableStateOf(false)
         private set
 
@@ -129,6 +173,12 @@ object FxSync {
     private var account: FxaClient? = null
     private var manager: SyncManager? = null
     private var logins: DatabaseLoginsStorage? = null
+    private var tabsStore: TabsStore? = null
+    private var autofill: AutofillStore? = null
+    private var autofillKey: String? = null
+
+    /** A sync is waiting to run (another isn't queued behind it). */
+    private val queued = java.util.concurrent.atomic.AtomicBoolean(false)
     private var loginsKey: String? = null
 
     /** Called once at startup. Nothing of Mozilla's is loaded unless the option is on. */
@@ -144,6 +194,11 @@ object FxSync {
         fillPasswords = prefs.getBoolean("fill_passwords", true)
         syncBookmarks = prefs.getBoolean("sync_bookmarks", true)
         syncHistory = prefs.getBoolean("sync_history", true)
+        syncTabs = prefs.getBoolean("sync_tabs", true)
+        syncAddresses = prefs.getBoolean("sync_addresses", true)
+        syncCards = prefs.getBoolean("sync_cards", true)
+        fillAddresses = prefs.getBoolean("fill_addresses", true)
+        fillCards = prefs.getBoolean("fill_cards", true)
         avatar = runCatching { android.graphics.BitmapFactory.decodeFile(avatarFile().path) }.getOrNull()
         if (enabled) start(syncSoon = true)
     }
@@ -180,11 +235,18 @@ object FxSync {
             ready()
             openAccount()
             countPasswords()
+            countAutofill()
             places()
-            if (prefs.getBoolean("sync_bookmarks", true)) PlacesMirror.reconcileBookmarks()
+            showRemoteTabs()
             if (syncSoon && connected) {
-                kotlinx.coroutines.delay(5000)
-                syncNow(SyncReason.STARTUP)
+                main.postDelayed({
+                    sync(user = false)
+                    // Opened before the account was ready: the every-15-minutes syncs start now.
+                    if (visibleNow) {
+                        main.removeCallbacks(every)
+                        main.postDelayed(every, EVERY)
+                    }
+                }, 5000)
             }
         } catch (e: Throwable) {
             fail("Couldn't start Firefox Sync", e)
@@ -241,28 +303,66 @@ object FxSync {
         return PlacesMirror
     }
 
-    /** A change made in SonderWeb, copied for Firefox Sync (only while the option is on). */
+    /** A change made in SonderWeb that Firefox Sync must hear about right away (only while the option is on). */
     private fun mirror(block: PlacesMirror.() -> Unit) {
         if (!enabled) return
         scope.launch { runCatching { places().block() } }
     }
 
-    fun noteVisit(url: String, title: String?) = mirror { visited(url, title) }
+    fun noteHistoryRemoved(url: String) {
+        mirror { historyRemoved(url) }
+        syncSoon()
+    }
 
-    fun noteTitle(url: String, title: String) = mirror { titled(url, title) }
+    fun noteHistoryCleared() {
+        mirror { historyCleared() }
+        syncSoon()
+    }
 
-    fun noteHistoryRemoved(url: String) = mirror { historyRemoved(url) }
+    /** Bookmarks changed in SonderWeb: they go out at a sync a few seconds from now. */
+    fun noteBookmarksChanged() = syncSoon()
 
-    fun noteHistoryCleared() = mirror { historyCleared() }
+    // ---- When to sync ----
 
-    fun noteBookmarked(url: String, title: String) = mirror { bookmarked(url, title) }
+    /** SonderWeb is on screen (main thread). */
+    private var visibleNow = false
 
-    fun noteUnbookmarked(url: String) = mirror { unbookmarked(url) }
+    private val soon = Runnable { sync(user = false) }
+    private val every = object : Runnable {
+        override fun run() {
+            sync(user = false)
+            main.postDelayed(this, EVERY)
+        }
+    }
+
+    /** A sync shortly (changes made one after another go out together). */
+    fun syncSoon() {
+        if (!enabled || !signedIn) return
+        main.removeCallbacks(soon)
+        main.postDelayed(soon, 4000)
+    }
+
+    /**
+     * SonderWeb came to the front or left it. In front: tabs sent to this phone come in, it
+     * syncs if it's been a while, then every 15 minutes. Leaving: a sync, so your other devices
+     * get this phone's latest history and open tabs.
+     */
+    fun appVisible(visible: Boolean) {
+        visibleNow = visible
+        main.removeCallbacks(every)
+        if (!enabled || !signedIn) return
+        if (visible) {
+            if (System.currentTimeMillis() - lastSynced > 60_000L) sync(user = false) else pollCommands()
+            main.postDelayed(every, EVERY)
+        } else {
+            sync(user = false)
+        }
+    }
 
     private fun deviceConfig() = DeviceConfig(
         name = deviceName(),
         deviceType = DeviceType.MOBILE,
-        capabilities = emptyList(),
+        capabilities = listOf(DeviceCapability.SEND_TAB, DeviceCapability.CLOSE_TABS),
     )
 
     private fun defaultDeviceName() = "SonderWeb on " + Build.MODEL
@@ -296,6 +396,13 @@ object FxSync {
         connected = now
         val profile = if (now) runCatching { account?.getProfile(false) }.getOrNull() else null
         val mail = profile?.email
+        if (now && !prefs.getBoolean("caps_v1", false)) {
+            // Accounts signed in before tabs could be sent: this phone now takes them.
+            runCatching {
+                account?.ensureCapabilities(setOf(DeviceCapability.SEND_TAB, DeviceCapability.CLOSE_TABS))
+                prefs.edit().putBoolean("caps_v1", true).apply()
+            }
+        }
         persist()
         if (profile != null) {
             prefs.edit().putString("email", profile.email).putString("name", profile.displayName).apply()
@@ -399,11 +506,52 @@ object FxSync {
         if (on) sync(user = false)
     }
 
+    fun changeSyncTabs(on: Boolean) {
+        syncTabs = on
+        prefs.edit().putBoolean("sync_tabs", on).apply()
+        if (on) {
+            sync(user = false)
+        } else {
+            remoteDevices = emptyList()
+        }
+    }
+
+    fun changeSyncAddresses(on: Boolean) {
+        syncAddresses = on
+        prefs.edit().putBoolean("sync_addresses", on).apply()
+        if (on) sync(user = false)
+    }
+
+    fun changeSyncCards(on: Boolean) {
+        syncCards = on
+        prefs.edit().putBoolean("sync_cards", on).apply()
+        if (on) sync(user = false)
+    }
+
+    /** Saving and filling addresses on or off. */
+    fun changeFillAddresses(on: Boolean) {
+        if (on && !enabled) turn(true)
+        fillAddresses = on
+        prefs.edit().putBoolean("fill_addresses", on).apply()
+        com.verisonder.sonderweb.browser.Passwords.applyOption()
+    }
+
+    /** Saving and filling payment cards on or off. */
+    fun changeFillCards(on: Boolean) {
+        if (on && !enabled) turn(true)
+        fillCards = on
+        prefs.edit().putBoolean("fill_cards", on).apply()
+        com.verisonder.sonderweb.browser.Passwords.applyOption()
+    }
+
     /** The kinds chosen to sync. */
     private fun chosen(): List<String> = buildList {
-        if (prefs.getBoolean("sync_passwords", true)) add(PASSWORDS)
         if (prefs.getBoolean("sync_bookmarks", true)) add(BOOKMARKS)
         if (prefs.getBoolean("sync_history", true)) add(HISTORY)
+        if (prefs.getBoolean("sync_tabs", true)) add(TABS)
+        if (prefs.getBoolean("sync_passwords", true)) add(PASSWORDS)
+        if (prefs.getBoolean("sync_addresses", true)) add(ADDRESSES)
+        if (prefs.getBoolean("sync_cards", true)) add(CARDS)
     }
 
     /**
@@ -445,8 +593,10 @@ object FxSync {
                 ready()
                 openAccount()
                 val mail = settle(account!!.processEvent(FxaEvent.CompleteOAuthFlow(code, state)))
-                ui { done(mail) }
-                if (connected) syncNow(SyncReason.USER)
+                ui {
+                    done(mail)
+                    if (connected) sync(user = true)
+                }
             } catch (e: Throwable) {
                 fail("Couldn't finish signing in", e)
                 ui { done(null) }
@@ -479,21 +629,48 @@ object FxSync {
                     avatar = null
                     lastSynced = 0L
                     syncing = false
+                    remoteDevices = emptyList()
                 }
             }
         }
     }
 
-    /** Sync now (from Settings, after saving a password, at startup). */
+    /** Sync now (from Settings, after a change, at startup, every so often). Call on the main thread. */
     fun sync(user: Boolean = true) {
         if (!enabled || !signedIn) return
-        scope.launch { syncNow(if (user) SyncReason.USER else SyncReason.SCHEDULED) }
+        main.removeCallbacks(soon)
+        val tabs = localTabs()
+        if (!queued.compareAndSet(false, true)) return
+        scope.launch {
+            queued.set(false)
+            syncNow(if (user) SyncReason.USER else SyncReason.SCHEDULED, tabs)
+        }
     }
 
-    private fun syncNow(reason: SyncReason) {
+    /** This phone's open tabs (not private ones), for your other devices to see. */
+    private fun localTabs(): List<RemoteTabRecord> = runCatching {
+        com.verisonder.sonderweb.browser.Browser.tabs
+            .filter { !it.isPrivate }
+            .mapNotNull { t ->
+                val url = t.url.ifEmpty { t.pendingUrl ?: "" }
+                if (!url.startsWith("http://") && !url.startsWith("https://")) return@mapNotNull null
+                RemoteTabRecord(
+                    title = t.title.ifBlank { url },
+                    urlHistory = listOf(url),
+                    icon = null,
+                    lastUsed = t.lastUsed,
+                )
+            }
+            .sortedByDescending { it.lastUsed }
+    }.getOrDefault(emptyList())
+
+    private fun syncNow(reason: SyncReason, tabs: List<RemoteTabRecord>) {
         val client = account ?: return
         val engines = chosen()
-        if (engines.isEmpty()) return
+        if (engines.isEmpty()) {
+            pollCommands()
+            return
+        }
         ui {
             syncing = true
             problem = null
@@ -501,8 +678,15 @@ object FxSync {
         try {
             store()
             places()
-            // Anything that couldn't be copied over earlier goes in first.
-            if (BOOKMARKS in engines) PlacesMirror.reconcileBookmarks()
+            val keys = HashMap<String, String>()
+            if (ADDRESSES in engines || CARDS in engines) {
+                autofillStore()
+                autofillKey?.let { keys[CARDS] = it }
+            }
+            tabStore().setLocalTabs(tabs)
+            // What changed here goes in first.
+            if (HISTORY in engines) runCatching { PlacesMirror.pushHistory() }
+            if (BOOKMARKS in engines) runCatching { PlacesMirror.reconcileBookmarks() }
             val token = client.getAccessToken(SCOPE_SYNC)
             persist()
             val key = token.key ?: error("The account gave no sync key")
@@ -510,9 +694,9 @@ object FxSync {
                 reason = reason,
                 engines = SyncEngineSelection.Some(engines),
                 enabledChanges = emptyMap(),
-                // The passwords database encrypts with its own key (handed to it when it opens);
-                // the sync engine takes none and refuses one (bookmarks and history need none).
-                localEncryptionKeys = emptyMap(),
+                // Only payment cards take a key here (their numbers are encrypted with it on this
+                // phone); the passwords database has its own, handed to it when it opens.
+                localEncryptionKeys = keys.filterKeys { it in engines },
                 authInfo = SyncAuthInfo(
                     kid = key.kid,
                     fxaAccessToken = token.token,
@@ -529,25 +713,23 @@ object FxSync {
             val result = manager!!.sync(params)
             secrets.put("sync_state", result.persistedState)
             countPasswords()
+            countAutofill()
             // What came from your other devices, into SonderWeb's own lists.
             if (BOOKMARKS in engines && BOOKMARKS !in result.failures) {
-                runCatching { PlacesMirror.reconcileBookmarks() }
+                val came = runCatching { PlacesMirror.reconcileBookmarks() }.getOrDefault(false)
+                if (came) ui { bookmarksVersion++ }
             }
             if (HISTORY in engines && HISTORY !in result.failures) {
-                runCatching { PlacesMirror.importHistory() }
+                runCatching { PlacesMirror.pullHistory(app) }
             }
+            if (TABS in engines) showRemoteTabs()
+            pollCommands()
             when (result.status) {
                 ServiceStatus.OK -> {
                     val now = System.currentTimeMillis()
                     prefs.edit().putLong("last_synced", now).apply()
                     val failed = result.failures.entries.firstOrNull()?.let { (kind, why) ->
-                        val name = when (kind) {
-                            PASSWORDS -> "Passwords"
-                            BOOKMARKS -> "Bookmarks"
-                            HISTORY -> "History"
-                            else -> kind.replaceFirstChar { it.uppercase() }
-                        }
-                        "$name didn't sync: $why"
+                        "${kindName(kind)} didn't sync: $why"
                     }
                     ui {
                         lastSynced = now
@@ -577,6 +759,260 @@ object FxSync {
             }
         } catch (e: Throwable) {
             fail("Couldn't sync", e)
+        }
+    }
+
+    private fun kindName(kind: String) = when (kind) {
+        PASSWORDS -> "Passwords"
+        BOOKMARKS -> "Bookmarks"
+        HISTORY -> "History"
+        TABS -> "Open tabs"
+        ADDRESSES -> "Addresses"
+        CARDS -> "Payment cards"
+        else -> kind.replaceFirstChar { it.uppercase() }
+    }
+
+    // ---- Open tabs and sending tabs ----
+
+    private fun tabStore(): TabsStore {
+        tabsStore?.let { return it }
+        ready()
+        val path = app.getDatabasePath("tabs.sqlite")
+        path.parentFile?.mkdirs()
+        return TabsStore(path.absolutePath).also {
+            it.registerWithSyncManager()
+            tabsStore = it
+        }
+    }
+
+    /** Your other devices' open tabs, as the last sync brought them, onto the screens. */
+    private fun showRemoteTabs() {
+        if (!prefs.getBoolean("sync_tabs", true) || !connected) return
+        val all = runCatching { tabStore().getAll() }.getOrDefault(emptyList())
+        val devices = all
+            .map { c ->
+                RemoteDevice(
+                    c.clientId,
+                    c.clientName,
+                    c.deviceType.name.lowercase(),
+                    c.lastModified,
+                    c.remoteTabs
+                        .mapNotNull { t ->
+                            val url = t.urlHistory.firstOrNull() ?: return@mapNotNull null
+                            RemoteTabInfo(t.title.ifBlank { url }, url, t.lastUsed)
+                        }
+                        .sortedByDescending { it.lastUsed },
+                )
+            }
+            .filter { it.tabs.isNotEmpty() }
+            .sortedByDescending { it.lastModified }
+        ui { remoteDevices = devices }
+    }
+
+    /** The devices a tab can be sent to (handed to [done] on the main thread; empty if none or offline). */
+    fun loadSendTargets(done: (List<SendTarget>) -> Unit) {
+        if (!enabled || !signedIn) return done(emptyList())
+        scope.launch {
+            val list = runCatching {
+                account?.getDevices(true).orEmpty()
+                    .filter { !it.isCurrentDevice && DeviceCapability.SEND_TAB in it.capabilities }
+                    .map { SendTarget(it.id, it.displayName, it.deviceType.name.lowercase()) }
+            }.getOrDefault(emptyList())
+            ui { done(list) }
+        }
+    }
+
+    /** Sends a page to one of your devices; [done] gets whether it went. */
+    fun sendTab(target: SendTarget, title: String, url: String, done: (Boolean) -> Unit) {
+        scope.launch {
+            val ok = runCatching { account!!.sendSingleTab(target.id, title.ifBlank { url }, url) }.isSuccess
+            persist()
+            ui { done(ok) }
+        }
+    }
+
+    /** Tabs sent to this phone open; tabs your other devices closed here, close. */
+    private fun pollCommands() {
+        if (!connected) return
+        scope.launch {
+            val commands = runCatching { account?.pollDeviceCommands().orEmpty() }.getOrDefault(emptyArray())
+            persist()
+            for (c in commands) {
+                when (c) {
+                    is IncomingDeviceCommand.TabReceived -> {
+                        val entry = c.payload.entries.lastOrNull() ?: continue
+                        if (!entry.url.startsWith("http://") && !entry.url.startsWith("https://")) continue
+                        val from = c.sender?.displayName
+                        ui {
+                            com.verisonder.sonderweb.browser.Browser.newTab(entry.url, isPrivate = false)
+                            com.verisonder.sonderweb.browser.Browser.host?.toast(
+                                if (from.isNullOrBlank()) "Tab received" else "Tab from $from",
+                            )
+                        }
+                    }
+                    is IncomingDeviceCommand.TabsClosed -> {
+                        val urls = c.payload.urls.toSet()
+                        ui {
+                            val b = com.verisonder.sonderweb.browser.Browser
+                            b.tabs.filter { !it.isPrivate && it.url in urls }.forEach { b.close(it) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ---- Addresses and payment cards ----
+
+    private fun autofillStore(): AutofillStore {
+        autofill?.let { return it }
+        ready()
+        autofillKey = secrets.get("autofill_key") ?: mozilla.appservices.autofill.createAutofillKey().also {
+            secrets.put("autofill_key", it)
+        }
+        val path = app.getDatabasePath("autofill.sqlite")
+        path.parentFile?.mkdirs()
+        return AutofillStore(path.absolutePath).also {
+            it.registerWithSyncManager()
+            autofill = it
+        }
+    }
+
+    /** Runs [block] with the addresses and cards database and its key, on the sync thread. */
+    internal fun withAutofill(block: (AutofillStore, String) -> Unit) {
+        if (!enabled) return
+        scope.launch {
+            try {
+                val store = autofillStore()
+                block(store, autofillKey!!)
+            } catch (e: Throwable) {
+                fail("Addresses and cards", e)
+            }
+        }
+    }
+
+    private fun countAutofill() {
+        val a = runCatching { autofillStore().countAllAddresses().toInt() }.getOrDefault(0)
+        val c = runCatching { autofillStore().countAllCreditCards().toInt() }.getOrDefault(0)
+        ui {
+            addressCount = a
+            cardCount = c
+        }
+    }
+
+    internal fun autofillChanged() {
+        scope.launch { countAutofill() }
+        main.post { syncSoon() }
+    }
+
+    internal fun addressOf(a: mozilla.appservices.autofill.Address) = SavedAddress(
+        a.guid, a.name, a.organization, a.streetAddress, a.addressLevel3, a.addressLevel2, a.addressLevel1,
+        a.postalCode, a.country, a.tel, a.email,
+    )
+
+    internal fun fieldsOf(a: SavedAddress) = UpdatableAddressFields(
+        name = a.name,
+        organization = a.organization,
+        streetAddress = a.street,
+        addressLevel3 = a.suburb,
+        addressLevel2 = a.city,
+        addressLevel1 = a.region,
+        postalCode = a.postalCode,
+        country = a.country,
+        tel = a.tel,
+        email = a.email,
+    )
+
+    internal fun cardOf(c: mozilla.appservices.autofill.CreditCard) = SavedCard(
+        c.guid, c.ccName, c.ccNumberLast4, c.ccExpMonth.toInt(), c.ccExpYear.toInt(), c.ccType,
+    )
+
+    /** The card's fields, its number encrypted with [key] (only the last four digits kept as they are). */
+    internal fun cardFields(name: String, number: String, month: Int, year: Int, key: String): UpdatableCreditCardFields {
+        val digits = number.filter { it.isDigit() }
+        return UpdatableCreditCardFields(
+            ccName = name,
+            ccNumberEnc = mozilla.appservices.autofill.encryptString(key, digits),
+            ccNumberLast4 = digits.takeLast(4),
+            ccExpMonth = month.toLong(),
+            ccExpYear = (if (year in 0..99) 2000 + year else year).toLong(),
+            ccType = cardType(digits),
+        )
+    }
+
+    private fun cardType(n: String): String = when {
+        n.startsWith("4") -> "visa"
+        n.matches(Regex("^(5[1-5]|2[2-7]).*")) -> "mastercard"
+        n.startsWith("34") || n.startsWith("37") -> "amex"
+        n.startsWith("6011") || n.startsWith("65") -> "discover"
+        n.startsWith("35") -> "jcb"
+        n.startsWith("36") || n.startsWith("38") || n.startsWith("30") -> "diners"
+        n.startsWith("62") -> "unionpay"
+        n.startsWith("220") -> "mir"
+        else -> ""
+    }
+
+    fun listAddresses(done: (List<SavedAddress>) -> Unit) {
+        withAutofill { store, _ ->
+            val all = runCatching { store.getAllAddresses() }.getOrDefault(emptyList()).map { addressOf(it) }
+            ui { done(all.sortedBy { it.summary.lowercase() }) }
+        }
+    }
+
+    fun saveAddress(a: SavedAddress, done: () -> Unit = {}) {
+        withAutofill { store, _ ->
+            if (a.guid != null) store.updateAddress(a.guid, fieldsOf(a)) else store.addAddress(fieldsOf(a))
+            autofillChanged()
+            ui { done() }
+        }
+    }
+
+    fun deleteAddress(guid: String, done: () -> Unit = {}) {
+        withAutofill { store, _ ->
+            runCatching { store.deleteAddress(guid) }
+            autofillChanged()
+            ui { done() }
+        }
+    }
+
+    fun listCards(done: (List<SavedCard>) -> Unit) {
+        withAutofill { store, _ ->
+            val all = runCatching { store.getAllCreditCards() }.getOrDefault(emptyList()).map { cardOf(it) }
+            ui { done(all) }
+        }
+    }
+
+    /** Saves a card. [number] empty when editing: the saved number stays. */
+    fun saveCard(card: SavedCard, number: String, done: () -> Unit = {}) {
+        withAutofill { store, key ->
+            if (card.guid != null) {
+                val old = store.getCreditCard(card.guid)
+                val fields = if (number.isBlank()) {
+                    UpdatableCreditCardFields(
+                        ccName = card.name,
+                        ccNumberEnc = old.ccNumberEnc,
+                        ccNumberLast4 = old.ccNumberLast4,
+                        ccExpMonth = card.month.toLong(),
+                        ccExpYear = (if (card.year in 0..99) 2000 + card.year else card.year).toLong(),
+                        ccType = old.ccType,
+                    )
+                } else {
+                    cardFields(card.name, number, card.month, card.year, key)
+                }
+                store.updateCreditCard(card.guid, fields)
+            } else {
+                store.addCreditCard(cardFields(card.name, number, card.month, card.year, key))
+            }
+            autofillChanged()
+            ui { done() }
+        }
+    }
+
+    fun deleteCard(guid: String, done: () -> Unit = {}) {
+        withAutofill { store, _ ->
+            runCatching { store.deleteCreditCard(guid) }
+            autofillChanged()
+            ui { done() }
         }
     }
 

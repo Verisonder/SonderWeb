@@ -38,7 +38,7 @@ Nothing is sent to any SonderWeb server, because there isn't one.
 | **Really private tabs** | Pure black and kept apart from your history, bookmarks and shortcuts. Locked behind your fingerprint every time you go in, no screenshots, no tab previews, incognito keyboard, encrypted DNS (Quad9), nothing kept once closed. |
 | **The page gets the screen** | The bar floats, then shrinks into a small round button as you scroll, or slides away. Swipe the bar sideways to put it away, long-press the button to tuck it out of sight. The status bar is hidden unless you want it. |
 | **Quick gestures** | Hold the address and slide onto the + for a new tab. Hold the tabs button and slide onto any open tab to switch. Swipe the bar up, down or sideways to put it away. Pull down at the top of a page to reload. |
-| **Firefox Sync, if you want it** | In **SonderWeb Sync**, a second app built from the same code (the normal SonderWeb doesn't carry Mozilla's sync libraries at all). Off until you turn it on in Settings › Firefox Sync. Sign in with your Mozilla account and your bookmarks, history and passwords sync both ways with Firefox on your other devices (pick which in Choose what to sync); SonderWeb also saves the passwords you choose and fills them in. Everything is encrypted on the phone before it leaves it. Open tabs from other devices come later. |
+| **Firefox Sync, if you want it** | In **SonderWeb Sync**, a second app built from the same code (the normal SonderWeb doesn't carry Mozilla's sync libraries at all). Off until you turn it on in Settings › Firefox Sync. Sign in with your Mozilla account and your bookmarks (with their folders), history, open tabs, passwords, addresses and payment cards sync both ways with Firefox on your other devices (pick which in Choose what to sync). See your other devices' tabs in the tab switcher, and send a page to another device from the menu. SonderWeb also saves the passwords, addresses and cards you choose and fills them in. Everything is encrypted on the phone before it leaves it. |
 | **Works with your password manager** | Sign-in fields bring up Proton Pass, Bitwarden or whichever manager you use, and passkeys work too. |
 | **A start page** | The time, a greeting, the weather (Open-Meteo; only the place you pick is sent) and the shortcuts you add, with the sites' own icons. Star a site in the menu to pin it there; hold and drag a shortcut to move it. |
 | **!bangs and your search engine** | `!w Tangier`, `!yt lofi`, `!gh sonder` search a site directly. DuckDuckGo by default, restyled to match the browser; Brave, Startpage, Qwant, Ecosia, Kagi, Google, Bing or your own. |
@@ -65,7 +65,7 @@ app/src/main/java/com/verisonder/sonderweb/
   core/      address bar logic, !bangs, search engines (plain Kotlin, tested)
   data/      settings, history and bookmarks (SQLite), weather
   sync/      Firefox Sync's shared parts
-app/src/sync/       SonderWeb Sync only: Firefox Sync (Mozilla account, saved passwords, syncing bookmarks, history and passwords)
+app/src/sync/       SonderWeb Sync only: Firefox Sync (Mozilla account; syncing bookmarks, history, open tabs, passwords, addresses and cards)
 app/src/standard/   stand-ins, so the normal SonderWeb builds without Mozilla's sync libraries
   ui/        Jetpack Compose: bar, start page, tabs, menu, settings, shred animation
 app/src/main/assets/extensions/style/     the built-in DuckDuckGo look

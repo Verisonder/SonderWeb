@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,6 +23,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.InsertDriveFile
@@ -71,6 +76,7 @@ import androidx.compose.ui.unit.sp
 import com.verisonder.sonderweb.browser.Browser
 import com.verisonder.sonderweb.browser.Downloads
 import com.verisonder.sonderweb.core.UrlText
+import com.verisonder.sonderweb.data.Bookmark
 import com.verisonder.sonderweb.data.DownloadItem
 
 /** A full-screen list page: back arrow, title, optional search and a trailing action. */
@@ -135,6 +141,7 @@ private fun EntryRow(
     icon: ImageVector? = null,
     iconTint: androidx.compose.ui.graphics.Color? = null,
     site: String? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val p = LocalPalette.current
     // The site's own icon when there is one (same as the start page and tabs).
@@ -172,6 +179,7 @@ private fun EntryRow(
             Text(sub, color = p.faint, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (onRemove != null) IconButtonSmall(Icons.Outlined.Close, "Remove", tint = p.faint, onClick = onRemove)
+        trailing?.invoke()
     }
 }
 
@@ -233,29 +241,252 @@ fun HistoryScreen(ui: UiState) {
 fun BookmarksScreen(ui: UiState) {
     var q by remember { mutableStateOf("") }
     var version by remember { mutableIntStateOf(0) }
-    val items = remember(q, version) { Browser.db.bookmarks(q) }
+    // The folders opened, top level first (empty: the top level).
+    val path = remember { androidx.compose.runtime.mutableStateListOf<Bookmark>() }
+    val here = path.lastOrNull()
+    val items = remember(q, version, here?.id, com.verisonder.sonderweb.sync.FxSync.bookmarksVersion) {
+        if (q.isNotEmpty()) Browser.db.bookmarks(q) else Browser.db.bookmarksIn(here?.id ?: 0L)
+    }
+    var editing by remember { mutableStateOf<Bookmark?>(null) }
+    var newFolder by remember { mutableStateOf(false) }
+    var moving by remember { mutableStateOf<Bookmark?>(null) }
+    var deleting by remember { mutableStateOf<Bookmark?>(null) }
+    val back: () -> Unit = {
+        if (path.isNotEmpty()) {
+            path.removeAt(path.lastIndex)
+        } else {
+            ui.panel = Panel.None
+        }
+    }
+    androidx.activity.compose.BackHandler(enabled = path.isNotEmpty()) { back() }
     Column(Modifier.fillMaxSize()) {
-        PageHeader("Bookmarks", { ui.panel = Panel.None }, q, { q = it })
+        PageHeader(
+            here?.title?.ifBlank { "Folder" } ?: "Bookmarks",
+            back,
+            q,
+            { q = it },
+            Icons.Outlined.CreateNewFolder,
+            "New folder",
+        ) { newFolder = true }
         if (items.isEmpty()) {
-            Empty(if (q.isEmpty()) "Save pages from the menu (⋮ › Bookmark)" else "Nothing matches")
+            Empty(
+                when {
+                    q.isNotEmpty() -> "Nothing matches"
+                    here != null -> "This folder is empty"
+                    else -> "Save pages from the menu (⋮ › Bookmark)"
+                },
+            )
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
                 items(items, key = { it.id }) { b ->
-                    EntryRow(
-                        modifier = Modifier.animateItem(),
-                        UrlText.host(b.url).firstOrNull()?.uppercase() ?: "•",
-                        b.title.ifBlank { UrlText.host(b.url) },
-                        UrlText.editable(b.url),
-                        onClick = { open(ui, b.url) },
-                        site = UrlText.host(b.url),
-                        onRemove = {
-                            Browser.db.removeBookmark(b.url)
-                            version++
+                    BookmarkRow(
+                        b,
+                        Modifier.animateItem(),
+                        onClick = {
+                            if (b.folder) {
+                                path += b
+                                q = ""
+                            } else {
+                                open(ui, b.url)
+                            }
+                        },
+                        onEdit = { editing = b },
+                        onMove = { moving = b },
+                        onDelete = {
+                            if (b.folder) {
+                                deleting = b
+                            } else {
+                                Browser.db.deleteBookmark(b.id)
+                                version++
+                            }
                         },
                     )
                 }
             }
         }
+    }
+    editing?.let { b ->
+        BookmarkEditDialog(
+            if (b.folder) "Rename folder" else "Edit bookmark",
+            b.title,
+            if (b.folder) null else b.url,
+            { editing = null },
+        ) { title, url ->
+            Browser.db.editBookmark(b.id, title, url)
+            editing = null
+            version++
+        }
+    }
+    if (newFolder) {
+        BookmarkEditDialog("New folder", "", null, { newFolder = false }) { title, _ ->
+            Browser.db.addFolder(title, here?.id ?: 0L)
+            newFolder = false
+            version++
+        }
+    }
+    moving?.let { b ->
+        MoveBookmarkDialog(b, { moving = null }) { to ->
+            Browser.db.moveBookmark(b.id, to)
+            moving = null
+            version++
+        }
+    }
+    deleting?.let { b ->
+        ConfirmDialog("Delete \"${b.title.ifBlank { "Folder" }}\"?", "The folder and everything in it.", "Delete", { deleting = null }) {
+            Browser.db.deleteBookmark(b.id)
+            version++
+        }
+    }
+}
+
+/** A bookmark or folder, with a ⋮ menu (rename or edit, move, delete). */
+@Composable
+private fun BookmarkRow(
+    b: Bookmark,
+    modifier: Modifier,
+    onClick: () -> Unit,
+    onEdit: () -> Unit,
+    onMove: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val p = LocalPalette.current
+    val host = UrlText.host(b.url)
+    var menu by remember { mutableStateOf(false) }
+    Box(modifier) {
+        EntryRow(
+            Modifier,
+            host.firstOrNull()?.uppercase() ?: "•",
+            b.title.ifBlank { if (b.folder) "Folder" else host },
+            if (b.folder) "Folder" else UrlText.editable(b.url),
+            onClick = onClick,
+            onRemove = null,
+            icon = if (b.folder) Icons.Outlined.Folder else null,
+            iconTint = if (b.folder) p.accent else null,
+            site = if (b.folder) null else host,
+            trailing = if (b.fixed) null else {
+                {
+                    Box {
+                        IconButtonSmall(Icons.Outlined.MoreVert, "More", tint = p.faint) { menu = true }
+                        DropdownMenu(
+                            expanded = menu,
+                            onDismissRequest = { menu = false },
+                            containerColor = p.card,
+                            shape = RoundedCornerShape(14.dp),
+                        ) {
+                            MoreItem(if (b.folder) "Rename" else "Edit", Icons.Outlined.Edit) { menu = false; onEdit() }
+                            MoreItem("Move to…", Icons.Outlined.FolderOpen) { menu = false; onMove() }
+                            MoreItem("Delete", Icons.Outlined.Delete, danger = true) { menu = false; onDelete() }
+                        }
+                    }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun BookmarkEditDialog(
+    title: String,
+    name: String,
+    address: String?,
+    onDismiss: () -> Unit,
+    onSave: (String, String?) -> Unit,
+) {
+    val p = LocalPalette.current
+    var n by remember { mutableStateOf(name) }
+    var a by remember { mutableStateOf(address?.let { UrlText.editable(it) } ?: "") }
+    val url = remember(a) {
+        val t = a.trim()
+        when {
+            address == null -> null
+            t.isEmpty() -> null
+            UrlText.isWeb(t) -> t
+            else -> com.verisonder.sonderweb.core.AddressInput.hostTarget(t)
+        }
+    }
+    val ok = n.isNotBlank() && (address == null || url != null)
+    val colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+        focusedTextColor = p.text,
+        unfocusedTextColor = p.text,
+        focusedBorderColor = p.accent,
+        unfocusedBorderColor = p.line,
+        cursorColor = p.accent,
+        focusedLabelColor = p.accent,
+        unfocusedLabelColor = p.mute,
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = p.card,
+        title = { Text(title, color = p.text) },
+        text = {
+            Column {
+                androidx.compose.material3.OutlinedTextField(n, { n = it }, label = { Text("Name") }, singleLine = true, colors = colors)
+                if (address != null) {
+                    Spacer(Modifier.height(8.dp))
+                    androidx.compose.material3.OutlinedTextField(a, { a = it }, label = { Text("Address") }, singleLine = true, colors = colors)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton({ if (ok) onSave(n.trim(), url) }, enabled = ok) { Text("Save", color = if (ok) p.accent else p.faint) }
+        },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel", color = p.text) } },
+    )
+}
+
+@Composable
+private fun MoveBookmarkDialog(b: Bookmark, onDismiss: () -> Unit, onMove: (Long) -> Unit) {
+    val p = LocalPalette.current
+    val folders = remember(b.id) {
+        // Not into itself, nor into a folder inside it.
+        val all = Browser.db.folders()
+        val inside = HashSet<Long>().apply { add(b.id) }
+        var grew = true
+        while (grew) {
+            grew = false
+            all.forEach { (f, _) -> if (f.parent in inside && inside.add(f.id)) grew = true }
+        }
+        all.filter { (f, _) -> f.id !in inside }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = p.card,
+        title = { Text("Move to", color = p.text, fontSize = 18.sp) },
+        text = {
+            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                item {
+                    MoveTarget("Bookmarks (top level)", b.parent == 0L) { onMove(0L) }
+                }
+                items(folders, key = { it.first.id }) { (f, name) ->
+                    MoveTarget(name, b.parent == f.id) { onMove(f.id) }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onDismiss) { Text("Cancel", color = p.text) } },
+    )
+}
+
+@Composable
+private fun MoveTarget(name: String, current: Boolean, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(enabled = !current, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.Folder, null, tint = if (current) p.faint else p.accent, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(
+            name,
+            color = if (current) p.faint else p.text,
+            fontSize = 15.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

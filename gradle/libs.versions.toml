@@ -32,6 +32,8 @@ geckoview = { group = "org.mozilla.geckoview", name = "geckoview", version.ref =
 appservices-fxaclient = { group = "org.mozilla.appservices", name = "fxaclient", version.ref = "appservices" }
 appservices-logins = { group = "org.mozilla.appservices", name = "logins", version.ref = "appservices" }
 appservices-places = { group = "org.mozilla.appservices", name = "places", version.ref = "appservices" }
+appservices-tabs = { group = "org.mozilla.appservices", name = "tabs", version.ref = "appservices" }
+appservices-autofill = { group = "org.mozilla.appservices", name = "autofill", version.ref = "appservices" }
 appservices-syncmanager = { group = "org.mozilla.appservices", name = "syncmanager", version.ref = "appservices" }
 appservices-viaduct = { group = "org.mozilla.appservices", name = "viaduct", version.ref = "appservices" }
 appservices-init = { group = "org.mozilla.appservices", name = "init_rust_components", version.ref = "appservices" }

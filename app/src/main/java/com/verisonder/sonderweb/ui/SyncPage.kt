@@ -107,7 +107,7 @@ internal fun AccountCard(ui: UiState, onOpen: () -> Unit) {
                 )
             } else {
                 Text("Sign in", color = p.text, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-                Text("Sync your bookmarks, history and passwords with Firefox on your other devices.", color = p.faint, fontSize = 14.sp)
+                Text("Sync bookmarks, history, open tabs, passwords, addresses and cards with Firefox on your other devices.", color = p.faint, fontSize = 14.sp)
             }
         }
     }
@@ -137,13 +137,15 @@ private fun Avatar(picture: android.graphics.Bitmap?, size: Int) {
 internal fun SyncPage(ui: UiState) {
     var signingOut by remember { mutableStateOf(false) }
     var showPasswords by remember { mutableStateOf(false) }
+    var showAddresses by remember { mutableStateOf(false) }
+    var showCards by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
 
     if (!FxSync.signedIn) {
         AccountCard(ui) {}
         Hint(
-            "Your bookmarks, history and saved passwords come over from Firefox, and what you add here goes to your " +
-                "other devices. It's all encrypted on this phone first: Mozilla can't read it. SonderWeb Sync signs in as Firefox for Android.",
+            "Your bookmarks, history, open tabs, passwords, addresses and cards come over from Firefox, and what you " +
+                "add here goes to your other devices. It's all encrypted on this phone first: Mozilla can't read it. SonderWeb Sync signs in as Firefox for Android.",
         )
     } else {
         // Your account at the top, as on the main page.
@@ -187,7 +189,7 @@ internal fun SyncPage(ui: UiState) {
                 },
             ) { FxSync.sync() }
             ActionRow("Device name", FxSync.deviceName) { renaming = true }
-            ActionRow("Sign out", "Your bookmarks, history and passwords stay on this phone", danger = true) { signingOut = true }
+            ActionRow("Sign out", "Everything stays on this phone", danger = true) { signingOut = true }
         }
         FxSync.problem?.let { Hint(it) }
 
@@ -195,9 +197,14 @@ internal fun SyncPage(ui: UiState) {
         Group {
             Toggle("Bookmarks", null, FxSync.syncBookmarks) { FxSync.changeSyncBookmarks(it) }
             Toggle("History", null, FxSync.syncHistory) { FxSync.changeSyncHistory(it) }
+            Toggle("Open tabs", "See your other devices' tabs (Tabs › From other devices)", FxSync.syncTabs) {
+                FxSync.changeSyncTabs(it)
+            }
             Toggle("Passwords", null, FxSync.syncPasswords) { FxSync.changeSyncPasswords(it) }
+            Toggle("Addresses", null, FxSync.syncAddresses) { FxSync.changeSyncAddresses(it) }
+            Toggle("Payment cards", null, FxSync.syncCards) { FxSync.changeSyncCards(it) }
         }
-        Hint("Open tabs from your other devices come in a later version.")
+        Hint("SonderWeb syncs when you open and leave it, after changes, and every 15 minutes while it's open.")
     }
 
     GroupTitle("Passwords")
@@ -218,6 +225,31 @@ internal fun SyncPage(ui: UiState) {
             ) { showPasswords = true }
         }
     }
+
+    GroupTitle("Addresses")
+    Group {
+        Toggle(
+            "Save and fill addresses",
+            "Offers to save the addresses you type into forms, and fills them in",
+            FxSync.enabled && FxSync.fillAddresses,
+        ) { FxSync.changeFillAddresses(it) }
+        if (FxSync.enabled) {
+            ActionRow("Saved addresses", countText(FxSync.addressCount)) { showAddresses = true }
+        }
+    }
+
+    GroupTitle("Payment cards")
+    Group {
+        Toggle(
+            "Save and fill payment cards",
+            "Offers to save the cards you type into forms, and fills them in",
+            FxSync.enabled && FxSync.fillCards,
+        ) { FxSync.changeFillCards(it) }
+        if (FxSync.enabled) {
+            ActionRow("Saved cards", countText(FxSync.cardCount)) { showCards = true }
+        }
+    }
+    Hint("Which forms get filled is up to the engine: it recognises address and card forms by country.")
 
     if (renaming) {
         val p = LocalPalette.current
@@ -255,7 +287,7 @@ internal fun SyncPage(ui: UiState) {
             onDismissRequest = { signingOut = false },
             containerColor = p.card,
             title = { Text("Sign out?", color = p.text, fontSize = 18.sp) },
-            text = { Text("Syncing stops. Your bookmarks, history and saved passwords stay on this phone.", color = p.mute) },
+            text = { Text("Syncing stops. Your bookmarks, history, passwords, addresses and cards stay on this phone.", color = p.mute) },
             confirmButton = {
                 TextButton({
                     signingOut = false
@@ -266,6 +298,14 @@ internal fun SyncPage(ui: UiState) {
         )
     }
     if (showPasswords) PasswordsDialog { showPasswords = false }
+    if (showAddresses) AddressesDialog { showAddresses = false }
+    if (showCards) CardsDialog { showCards = false }
+}
+
+private fun countText(n: Int) = when (n) {
+    0 -> "None yet"
+    1 -> "1 saved"
+    else -> "$n saved"
 }
 
 @Composable
@@ -355,7 +395,7 @@ internal fun FirstSyncAsk(ui: UiState) {
         title = { Text("Sign in to Firefox Sync?", color = p.text, fontSize = 18.sp) },
         text = {
             Text(
-                "Use your Mozilla account to bring your bookmarks, history and saved passwords from Firefox, and keep " +
+                "Use your Mozilla account to bring your bookmarks, history, open tabs, passwords, addresses and cards from Firefox, and keep " +
                     "them in step on all your devices. It's all encrypted on this phone first: Mozilla can't read it.",
                 color = p.mute,
             )

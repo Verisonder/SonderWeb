@@ -304,6 +304,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
         com.verisonder.sonderweb.browser.Extensions.wake()
         // Pages that failed to load while you were away (no network in the background) load again.
         com.verisonder.sonderweb.browser.Retry.back()
+        // Firefox Sync: tabs sent to this phone, and a sync if the last one was a while ago.
+        com.verisonder.sonderweb.sync.FxSync.appVisible(true)
         // Loads just after coming back are watched: a page process frozen while you were away is restarted.
         com.verisonder.sonderweb.browser.Unstick.back()
         wake()
@@ -349,6 +351,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun onStop() {
         super.onStop()
         com.verisonder.sonderweb.browser.Retry.away()
+        // Firefox Sync: what changed while you were here (history, open tabs) goes out now.
+        com.verisonder.sonderweb.sync.FxSync.appVisible(false)
         // Whether the page was one plain colour when you left (then an empty-looking page on return
         // is left alone). Not known when leaving from the small window: what it showed was the
         // video filling it, often black.

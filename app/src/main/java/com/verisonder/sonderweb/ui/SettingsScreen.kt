@@ -109,7 +109,7 @@ private enum class Page(val title: String) {
 private val index: List<Pair<String, Page>> = (
     // Firefox Sync is in SonderWeb Sync only.
     if (BuildConfig.FIREFOX_SYNC) {
-        listOf("Firefox Sync" to Page.Sync, "Mozilla account" to Page.Sync, "Saved passwords" to Page.Sync, "Sync bookmarks and history" to Page.Sync)
+        listOf("Firefox Sync" to Page.Sync, "Mozilla account" to Page.Sync, "Saved passwords" to Page.Sync, "Sync bookmarks and history" to Page.Sync, "Saved addresses" to Page.Sync, "Saved cards" to Page.Sync, "Send tab to device" to Page.Sync)
     } else {
         emptyList()
     }

@@ -354,6 +354,102 @@ object Prompts {
             return r
         }
 
+        // ---- Saved addresses and payment cards (the Firefox Sync option) ----
+
+        override fun onAddressSave(
+            session: GeckoSession,
+            request: PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.AddressSaveOption>,
+        ): GeckoResult<PromptResponse>? {
+            if (!com.verisonder.sonderweb.sync.FxSync.fillAddresses) return GeckoResult.fromValue(request.dismiss())
+            val option = request.options.firstOrNull() ?: return GeckoResult.fromValue(request.dismiss())
+            val a = option.value
+            val update = !a.guid.isNullOrEmpty()
+            val name = a.name.ifBlank { listOf(a.givenName, a.familyName).filter { it.isNotBlank() }.joinToString(" ") }
+            val line = listOf(name, a.streetAddress.lineSequence().firstOrNull().orEmpty(), a.addressLevel2)
+                .filter { it.isNotBlank() }.joinToString(", ")
+            val r = GeckoResult<PromptResponse>()
+            track(
+                PromptUi.Ask(
+                    tab,
+                    if (update) "Update saved address?" else "Save address?",
+                    line.ifBlank { site(tab) } + "\nSaved in SonderWeb and synced with Firefox Sync.",
+                    if (update) "Update" else "Save",
+                    "Not now",
+                ) { ok -> r.complete(if (ok) request.confirm(option) else request.dismiss()) },
+                request,
+            )
+            return r
+        }
+
+        override fun onAddressSelect(
+            session: GeckoSession,
+            request: PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.AddressSelectOption>,
+        ): GeckoResult<PromptResponse>? {
+            val options = request.options
+            if (options.isEmpty()) return GeckoResult.fromValue(request.dismiss())
+            val rows = options.map { o ->
+                val v = o.value
+                val name = v.name.ifBlank { listOf(v.givenName, v.familyName).filter { it.isNotBlank() }.joinToString(" ") }
+                name.ifBlank { v.email.ifBlank { "Address" } } to
+                    listOf(v.streetAddress.lineSequence().firstOrNull().orEmpty(), v.addressLevel2, v.postalCode)
+                        .filter { it.isNotBlank() }.joinToString(", ")
+            }
+            val r = GeckoResult<PromptResponse>()
+            track(
+                PromptUi.PickLogin(tab, "Fill in an address", rows) { i ->
+                    r.complete(if (i != null && i in options.indices) request.confirm(options[i]) else request.dismiss())
+                },
+                request,
+            )
+            return r
+        }
+
+        override fun onCreditCardSave(
+            session: GeckoSession,
+            request: PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.CreditCardSaveOption>,
+        ): GeckoResult<PromptResponse>? {
+            if (!com.verisonder.sonderweb.sync.FxSync.fillCards) return GeckoResult.fromValue(request.dismiss())
+            val option = request.options.firstOrNull() ?: return GeckoResult.fromValue(request.dismiss())
+            val c = option.value
+            val update = !c.guid.isNullOrEmpty()
+            val r = GeckoResult<PromptResponse>()
+            track(
+                PromptUi.Ask(
+                    tab,
+                    if (update) "Update saved card?" else "Save card?",
+                    listOf("•••• " + c.number.filter { it.isDigit() }.takeLast(4), c.name)
+                        .filter { it.isNotBlank() }.joinToString(" · ") +
+                        "\nSaved in SonderWeb, encrypted, and synced with Firefox Sync.",
+                    if (update) "Update" else "Save",
+                    "Not now",
+                ) { ok -> r.complete(if (ok) request.confirm(option) else request.dismiss()) },
+                request,
+            )
+            return r
+        }
+
+        override fun onCreditCardSelect(
+            session: GeckoSession,
+            request: PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.CreditCardSelectOption>,
+        ): GeckoResult<PromptResponse>? {
+            val options = request.options
+            if (options.isEmpty()) return GeckoResult.fromValue(request.dismiss())
+            val rows = options.map { o ->
+                val v = o.value
+                ("•••• " + v.number.filter { it.isDigit() }.takeLast(4)) to
+                    listOf(v.name, if (v.expirationMonth.isNotBlank()) v.expirationMonth + "/" + v.expirationYear.takeLast(2) else "")
+                        .filter { it.isNotBlank() }.joinToString(" · ")
+            }
+            val r = GeckoResult<PromptResponse>()
+            track(
+                PromptUi.PickLogin(tab, "Fill in a card", rows) { i ->
+                    r.complete(if (i != null && i in options.indices) request.confirm(options[i]) else request.dismiss())
+                },
+                request,
+            )
+            return r
+        }
+
         override fun onSharePrompt(
             session: GeckoSession,
             prompt: PromptDelegate.SharePrompt,

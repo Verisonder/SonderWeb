@@ -1,23 +1,94 @@
 package com.verisonder.sonderweb.browser
 
 import com.verisonder.sonderweb.sync.FxSync
+import com.verisonder.sonderweb.sync.SavedAddress
+import com.verisonder.sonderweb.sync.SavedCard
 import mozilla.appservices.logins.Login
 import mozilla.appservices.logins.LoginEntry
 import org.mozilla.geckoview.Autocomplete
 import org.mozilla.geckoview.GeckoResult
 
 /**
- * The passwords SonderWeb saves itself (with the Firefox Sync option on): the engine asks here
- * for a site's saved sign-ins to fill in, and hands over the ones you choose to save. They live
- * in Firefox Sync's encrypted passwords database ([FxSync]) and sync with your account.
+ * The passwords, addresses and payment cards SonderWeb saves itself (with the Firefox Sync option
+ * on): the engine asks here for what to fill in, and hands over what you choose to save. They live
+ * in Firefox Sync's encrypted databases ([FxSync]) and sync with your account.
  */
 object Passwords {
 
-    /** The option on: the engine fills and offers to save sign-ins; off: it leaves them alone. */
+    /** The option on: the engine fills and offers to save what's turned on; off: it leaves forms alone. */
     fun applyOption() {
-        val on = FxSync.enabled && FxSync.fillPasswords
-        runCatching { Browser.runtime.settings.setLoginAutofillEnabled(on) }
-        Browser.runtime.autocompleteStorageDelegate = if (on) storage else null
+        val logins = FxSync.enabled && FxSync.fillPasswords
+        val any = FxSync.enabled && (FxSync.fillPasswords || FxSync.fillAddresses || FxSync.fillCards)
+        runCatching { Browser.runtime.settings.setLoginAutofillEnabled(logins) }
+        Browser.runtime.autocompleteStorageDelegate = if (any) storage else null
+    }
+
+    /** Answers the engine once, on the main thread: with what was found, or nothing after a few seconds. */
+    private fun <T> answerOnce(result: GeckoResult<Array<T>>, empty: Array<T>): (Array<T>) -> Unit {
+        var done = false
+        val answer: (Array<T>) -> Unit = { found ->
+            Browser.main.post {
+                if (!done) {
+                    done = true
+                    result.complete(found)
+                }
+            }
+        }
+        Browser.main.postDelayed({ answer(empty) }, 4000)
+        return answer
+    }
+
+    private fun fetchAddresses(): GeckoResult<Array<Autocomplete.Address>> {
+        val result = GeckoResult<Array<Autocomplete.Address>>()
+        if (!FxSync.fillAddresses) return GeckoResult.fromValue(emptyArray())
+        val answer = answerOnce(result, emptyArray())
+        FxSync.withAutofill { store, _ ->
+            answer(
+                runCatching {
+                    store.getAllAddresses().map { a ->
+                        Autocomplete.Address.Builder()
+                            .guid(a.guid)
+                            .name(a.name)
+                            .organization(a.organization)
+                            .streetAddress(a.streetAddress)
+                            .addressLevel3(a.addressLevel3)
+                            .addressLevel2(a.addressLevel2)
+                            .addressLevel1(a.addressLevel1)
+                            .postalCode(a.postalCode)
+                            .country(a.country)
+                            .tel(a.tel)
+                            .email(a.email)
+                            .build()
+                    }.toTypedArray()
+                }.getOrDefault(emptyArray()),
+            )
+        }
+        return result
+    }
+
+    private fun fetchCards(): GeckoResult<Array<Autocomplete.CreditCard>> {
+        val result = GeckoResult<Array<Autocomplete.CreditCard>>()
+        if (!FxSync.fillCards) return GeckoResult.fromValue(emptyArray())
+        val answer = answerOnce(result, emptyArray())
+        FxSync.withAutofill { store, key ->
+            answer(
+                runCatching {
+                    store.getAllCreditCards().mapNotNull { c ->
+                        // A card synced from a device whose key this phone doesn't have can't be read: left out.
+                        val number = runCatching { mozilla.appservices.autofill.decryptString(key, c.ccNumberEnc) }.getOrNull()
+                            ?: return@mapNotNull null
+                        Autocomplete.CreditCard.Builder()
+                            .guid(c.guid)
+                            .name(c.ccName)
+                            .number(number)
+                            .expirationMonth(c.ccExpMonth.toString())
+                            .expirationYear(c.ccExpYear.toString())
+                            .build()
+                    }.toTypedArray()
+                }.getOrDefault(emptyArray()),
+            )
+        }
+        return result
     }
 
     private fun Login.toGecko(): Autocomplete.LoginEntry = Autocomplete.LoginEntry.Builder()
@@ -76,6 +147,41 @@ object Passwords {
         override fun onLoginUsed(login: Autocomplete.LoginEntry, usedFields: Int) {
             val guid = login.guid ?: return
             FxSync.withStore { store -> runCatching { store.touch(guid) } }
+        }
+
+        override fun onAddressFetch(): GeckoResult<Array<Autocomplete.Address>> = fetchAddresses()
+
+        override fun onAddressSave(address: Autocomplete.Address) {
+            if (!FxSync.fillAddresses) return
+            val a = SavedAddress(
+                guid = address.guid?.takeIf { it.isNotEmpty() },
+                name = address.name.ifBlank {
+                    listOf(address.givenName, address.additionalName, address.familyName).filter { it.isNotBlank() }.joinToString(" ")
+                },
+                organization = address.organization,
+                street = address.streetAddress,
+                suburb = address.addressLevel3,
+                city = address.addressLevel2,
+                region = address.addressLevel1,
+                postalCode = address.postalCode,
+                country = address.country,
+                tel = address.tel,
+                email = address.email,
+            )
+            FxSync.saveAddress(a)
+        }
+
+        override fun onCreditCardFetch(): GeckoResult<Array<Autocomplete.CreditCard>> = fetchCards()
+
+        override fun onCreditCardSave(card: Autocomplete.CreditCard) {
+            if (!FxSync.fillCards) return
+            val c = SavedCard(
+                guid = card.guid?.takeIf { it.isNotEmpty() },
+                name = card.name,
+                month = card.expirationMonth.toIntOrNull() ?: 0,
+                year = card.expirationYear.toIntOrNull() ?: 0,
+            )
+            FxSync.saveCard(c, card.number)
         }
     }
 }

@@ -100,6 +100,9 @@ class UiState {
     /** "Shred site data" asked for this site, waiting for you to confirm. */
     var shred by mutableStateOf<String?>(null)
 
+    /** "Send to device" (Firefox Sync): the page (title, address) waiting for a device to be picked. */
+    var sendTab by mutableStateOf<Pair<String, String>?>(null)
+
     /** The page's picture going through the shredder, and its site. */
     var shredding by mutableStateOf<Pair<android.graphics.Bitmap, String>?>(null)
     var editing by mutableStateOf(false)
@@ -477,6 +480,7 @@ fun BrowserScreen(activity: MainActivity) {
             // SonderWeb Sync's first launch: sign in to Firefox Sync now?
             FirstSyncAsk(ui)
             com.verisonder.sonderweb.browser.Translate.ask?.let { TranslateDialog(it) }
+            ui.sendTab?.let { (title, url) -> SendTabDialog(title, url) { ui.sendTab = null } }
             ui.shred?.let { site ->
                 ConfirmDialog(
                     "Shred $site?",
