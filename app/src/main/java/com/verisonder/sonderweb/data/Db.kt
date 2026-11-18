@@ -176,7 +176,13 @@ class Db(context: Context) : SQLiteOpenHelper(context, "sonderweb.db", null, 2) 
     }
 
     /** Visits from your other devices (Firefox Sync): address, title, when. Kept: the latest. */
-    fun importVisits(visits: List<Triple<String, String?, Long>>) {
+    fun importVisits(visits: List<Triple<String, String?, Long>>) = addVisits(visits, synced = 1)
+
+    /**
+     * Visits added from elsewhere (the other SonderWeb app, or Firefox Sync when [synced] is 1):
+     * address, title, when. A page already in history keeps its latest visit.
+     */
+    fun addVisits(visits: List<Triple<String, String?, Long>>, synced: Int) {
         if (visits.isEmpty()) return
         val db = writableDatabase
         db.beginTransaction()
@@ -185,7 +191,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, "sonderweb.db", null, 2) 
                 val cv = ContentValues().apply {
                     put("url", url)
                     put("visited", at)
-                    put("synced", 1)
+                    put("synced", synced)
                     if (!title.isNullOrBlank()) put("title", title)
                 }
                 val n = db.update("history", cv, "url = ? AND visited < ?", arrayOf(url, at.toString()))

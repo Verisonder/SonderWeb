@@ -114,6 +114,8 @@ private val index: List<Pair<String, Page>> = (
         emptyList()
     }
 ) + listOf(
+    "Copy everything to " + com.verisonder.sonderweb.data.Transfer.otherName to Page.About,
+    "Copy settings, history and bookmarks to the other version" to Page.About,
     "Strict tracking protection" to Page.Privacy,
     "HTTPS only" to Page.Privacy,
     "Fingerprinting" to Page.Privacy,
@@ -977,8 +979,48 @@ private fun OpenOnLaunch() {
 
 @Composable
 private fun AboutPage(ui: UiState) {
+    val ctx = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val transfer = com.verisonder.sonderweb.data.Transfer
+    var copying by remember { mutableStateOf(false) }
     Spacer(Modifier.height(8.dp))
     Group { UpdateRow() }
+    Spacer(Modifier.height(12.dp))
+    // Everything to the other app (SonderWeb ↔ SonderWeb Sync); it asks before copying it in.
+    Group {
+        Action(
+            if (copying) "Packing everything…" else "Copy everything to ${transfer.otherName}",
+            "Settings, start page, history, bookmarks and open tabs. ${transfer.otherName} asks first; " +
+                "its history, bookmarks and tabs are kept, its settings are replaced.",
+        ) {
+            if (copying) return@Action
+            val activity = ctx as? android.app.Activity ?: return@Action
+            when {
+                !transfer.otherInstalled(ctx) -> Browser.host?.toast(
+                    "Install ${transfer.otherName} first (it's on the same GitHub releases page)",
+                )
+                !transfer.sameSigner(ctx) -> Browser.host?.toast(
+                    "That ${transfer.otherName} wasn't installed from SonderWeb's releases, so it can't take the copy",
+                )
+                else -> {
+                    copying = true
+                    Browser.saveTabs()
+                    scope.launch {
+                        val uri = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            runCatching { transfer.pack(ctx) }.getOrNull()
+                        }
+                        copying = false
+                        if (uri == null) {
+                            Browser.host?.toast("Couldn't pack everything up")
+                        } else {
+                            runCatching { transfer.send(activity, uri) }
+                                .onFailure { Browser.host?.toast("Couldn't open ${transfer.otherName}") }
+                        }
+                    }
+                }
+            }
+        }
+    }
     Spacer(Modifier.height(12.dp))
     Group {
         Action("SonderWeb " + BuildConfig.VERSION_NAME, "by Verisonder · Apache License 2.0") {}

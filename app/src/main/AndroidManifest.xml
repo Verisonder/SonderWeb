@@ -28,6 +28,13 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
 
+    <!-- Copying everything between SonderWeb and SonderWeb Sync: only apps signed with the same
+         key (the two SonderWeb apps) may hand over their data. -->
+    <permission
+        android:name="com.verisonder.sonderweb.permission.COPY_IN"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.verisonder.sonderweb.permission.COPY_IN" />
+
     <application
         android:name=".SonderWebApp"
         android:allowBackup="false"
@@ -124,6 +131,21 @@
             android:name=".browser.MediaActions"
             android:exported="false" />
 
+        <!-- The other SonderWeb app handing over everything (asks first). -->
+        <activity
+            android:name=".ui.TransferActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:permission="com.verisonder.sonderweb.permission.COPY_IN"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="com.verisonder.sonderweb.action.COPY_IN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/zip" />
+            </intent-filter>
+        </activity>
+
         <!-- The home screen search widget. -->
         <activity
             android:name=".ui.WidgetSettingsActivity"
@@ -164,6 +186,9 @@
     </application>
     <!-- To see which installed app (if any) can open a link, so you can be asked first. -->
     <queries>
+        <!-- The other SonderWeb app (SonderWeb / SonderWeb Sync), to copy everything to it. -->
+        <package android:name="com.verisonder.sonderweb" />
+        <package android:name="com.verisonder.sonderweb.sync" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />

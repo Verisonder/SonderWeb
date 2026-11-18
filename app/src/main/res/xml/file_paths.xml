@@ -6,4 +6,6 @@
     <cache-path name="updates" path="updates/" />
     <!-- A photo taken for an image search. -->
     <cache-path name="images" path="images/" />
+    <!-- Everything packed up for the other SonderWeb app to copy in. -->
+    <cache-path name="transfer" path="transfer/" />
 </paths>
