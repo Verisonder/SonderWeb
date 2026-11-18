@@ -302,6 +302,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
         super.onStart()
         ownScreen = false
         com.verisonder.sonderweb.browser.Extensions.wake()
+        // Pages that failed to load while you were away (no network in the background) load again.
+        com.verisonder.sonderweb.browser.Retry.back()
         wake()
     }
 
@@ -344,6 +346,7 @@ class MainActivity : ComponentActivity(), Browser.Host {
 
     override fun onStop() {
         super.onStop()
+        com.verisonder.sonderweb.browser.Retry.away()
         // Whether the page was one plain colour when you left (then an empty-looking page on return
         // is left alone). Not known when leaving from the small window: what it showed was the
         // video filling it, often black.

@@ -53,6 +53,13 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     /** You refreshed: once the page has loaded, make sure it really shows on screen. */
     var checkAfterReload = false
 
+    /** A page that failed only for want of a network, loaded again by itself (see [Retry]). */
+    var retryUrl: String? = null
+    var retries = 0
+
+    /** The last load failed (its error page is what finishes loading next). */
+    var loadFailed = false
+
     /** True until the page has drawn: meanwhile a cover in the page's colours hides the engine's
      *  empty view, so nothing flashes white. */
     var covered by mutableStateOf(true)

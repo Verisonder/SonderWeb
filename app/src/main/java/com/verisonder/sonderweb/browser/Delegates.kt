@@ -114,6 +114,7 @@ object Delegates {
             error: WebRequestError,
         ): GeckoResult<String>? {
             tab.loading = false
+            Retry.failed(tab, uri, error.code)
             return GeckoResult.fromValue(ErrorPage.html(uri, error))
         }
     }
@@ -133,6 +134,7 @@ object Delegates {
             tab.loading = false
             if (tab.startedPage) tab.covered = false
             tab.progress = 100
+            Retry.stopped(tab, success)
             if (tab.checkAfterReload) {
                 tab.checkAfterReload = false
                 // Refreshed and still empty: the screen surface is broken, not the page. A fresh
