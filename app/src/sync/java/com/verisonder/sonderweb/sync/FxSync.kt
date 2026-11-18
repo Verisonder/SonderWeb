@@ -33,8 +33,8 @@ import mozilla.appservices.syncmanager.SyncReason
 import java.util.concurrent.Executors
 
 /**
- * Firefox Sync, an option (off until you turn it on): a Mozilla account, and the passwords
- * SonderWeb saves, synced both ways with Firefox on your other devices.
+ * Firefox Sync, an option (off until you turn it on): a Mozilla account, and the bookmarks,
+ * history and passwords SonderWeb keeps, synced both ways with Firefox on your other devices.
  *
  * Everything that talks to Mozilla's libraries runs on one background thread, in order.
  * The account's sign-in state and the passwords database's key are kept encrypted
@@ -48,8 +48,10 @@ object FxSync {
     private const val SCOPE_PROFILE = "profile"
     const val SCOPE_SYNC = "https://identity.mozilla.com/apps/oldsync"
 
-    /** The passwords' name in Firefox Sync. */
+    /** The kinds' names in Firefox Sync. */
     const val PASSWORDS = "passwords"
+    const val BOOKMARKS = "bookmarks"
+    const val HISTORY = "history"
 
     /** The address the sign-in pages are on (the only site the sign-in channel talks to). */
     const val ACCOUNTS = "https://accounts.firefox.com"
@@ -94,8 +96,14 @@ object FxSync {
     var fillPasswords by mutableStateOf(true)
         private set
 
-    /** Choose what to sync: passwords (the only kind SonderWeb Sync syncs for now). */
+    /** Choose what to sync. */
     var syncPasswords by mutableStateOf(true)
+        private set
+
+    var syncBookmarks by mutableStateOf(true)
+        private set
+
+    var syncHistory by mutableStateOf(true)
         private set
 
     var syncing by mutableStateOf(false)
@@ -134,6 +142,8 @@ object FxSync {
         deviceName = prefs.getString("device_name", null) ?: defaultDeviceName()
         syncPasswords = prefs.getBoolean("sync_passwords", true)
         fillPasswords = prefs.getBoolean("fill_passwords", true)
+        syncBookmarks = prefs.getBoolean("sync_bookmarks", true)
+        syncHistory = prefs.getBoolean("sync_history", true)
         avatar = runCatching { android.graphics.BitmapFactory.decodeFile(avatarFile().path) }.getOrNull()
         if (enabled) start(syncSoon = true)
     }
@@ -170,6 +180,8 @@ object FxSync {
             ready()
             openAccount()
             countPasswords()
+            places()
+            if (prefs.getBoolean("sync_bookmarks", true)) PlacesMirror.reconcileBookmarks()
             if (syncSoon && connected) {
                 kotlinx.coroutines.delay(5000)
                 syncNow(SyncReason.STARTUP)
@@ -219,6 +231,33 @@ object FxSync {
             }
         }
     }
+
+    internal fun appContext(): Context = app
+
+    /** Bookmarks and history for syncing (opened once the option is on). */
+    private fun places(): PlacesMirror {
+        ready()
+        PlacesMirror.open(app)
+        return PlacesMirror
+    }
+
+    /** A change made in SonderWeb, copied for Firefox Sync (only while the option is on). */
+    private fun mirror(block: PlacesMirror.() -> Unit) {
+        if (!enabled) return
+        scope.launch { runCatching { places().block() } }
+    }
+
+    fun noteVisit(url: String, title: String?) = mirror { visited(url, title) }
+
+    fun noteTitle(url: String, title: String) = mirror { titled(url, title) }
+
+    fun noteHistoryRemoved(url: String) = mirror { historyRemoved(url) }
+
+    fun noteHistoryCleared() = mirror { historyCleared() }
+
+    fun noteBookmarked(url: String, title: String) = mirror { bookmarked(url, title) }
+
+    fun noteUnbookmarked(url: String) = mirror { unbookmarked(url) }
 
     private fun deviceConfig() = DeviceConfig(
         name = deviceName(),
@@ -348,6 +387,25 @@ object FxSync {
         if (on) sync(user = false)
     }
 
+    fun changeSyncBookmarks(on: Boolean) {
+        syncBookmarks = on
+        prefs.edit().putBoolean("sync_bookmarks", on).apply()
+        if (on) sync(user = false)
+    }
+
+    fun changeSyncHistory(on: Boolean) {
+        syncHistory = on
+        prefs.edit().putBoolean("sync_history", on).apply()
+        if (on) sync(user = false)
+    }
+
+    /** The kinds chosen to sync. */
+    private fun chosen(): List<String> = buildList {
+        if (prefs.getBoolean("sync_passwords", true)) add(PASSWORDS)
+        if (prefs.getBoolean("sync_bookmarks", true)) add(BOOKMARKS)
+        if (prefs.getBoolean("sync_history", true)) add(HISTORY)
+    }
+
     /**
      * Sign in: [open] gets the address of Mozilla's sign-in page, to load in a tab. The page then
      * hands SonderWeb the result through the sign-in channel ([finishSignIn]).
@@ -434,22 +492,26 @@ object FxSync {
 
     private fun syncNow(reason: SyncReason) {
         val client = account ?: return
-        if (!prefs.getBoolean("sync_passwords", true)) return
+        val engines = chosen()
+        if (engines.isEmpty()) return
         ui {
             syncing = true
             problem = null
         }
         try {
             store()
+            places()
+            // Anything that couldn't be copied over earlier goes in first.
+            if (BOOKMARKS in engines) PlacesMirror.reconcileBookmarks()
             val token = client.getAccessToken(SCOPE_SYNC)
             persist()
             val key = token.key ?: error("The account gave no sync key")
             val params = SyncParams(
                 reason = reason,
-                engines = SyncEngineSelection.Some(listOf(PASSWORDS)),
+                engines = SyncEngineSelection.Some(engines),
                 enabledChanges = emptyMap(),
                 // The passwords database encrypts with its own key (handed to it when it opens);
-                // the sync engine takes none and refuses one.
+                // the sync engine takes none and refuses one (bookmarks and history need none).
                 localEncryptionKeys = emptyMap(),
                 authInfo = SyncAuthInfo(
                     kid = key.kid,
@@ -467,15 +529,30 @@ object FxSync {
             val result = manager!!.sync(params)
             secrets.put("sync_state", result.persistedState)
             countPasswords()
+            // What came from your other devices, into SonderWeb's own lists.
+            if (BOOKMARKS in engines && BOOKMARKS !in result.failures) {
+                runCatching { PlacesMirror.reconcileBookmarks() }
+            }
+            if (HISTORY in engines && HISTORY !in result.failures) {
+                runCatching { PlacesMirror.importHistory() }
+            }
             when (result.status) {
                 ServiceStatus.OK -> {
                     val now = System.currentTimeMillis()
                     prefs.edit().putLong("last_synced", now).apply()
-                    val failed = result.failures[PASSWORDS]
+                    val failed = result.failures.entries.firstOrNull()?.let { (kind, why) ->
+                        val name = when (kind) {
+                            PASSWORDS -> "Passwords"
+                            BOOKMARKS -> "Bookmarks"
+                            HISTORY -> "History"
+                            else -> kind.replaceFirstChar { it.uppercase() }
+                        }
+                        "$name didn't sync: $why"
+                    }
                     ui {
                         lastSynced = now
                         syncing = false
-                        problem = failed?.let { "Passwords didn't sync: $it" }
+                        problem = failed
                     }
                 }
                 ServiceStatus.AUTH_ERROR -> {

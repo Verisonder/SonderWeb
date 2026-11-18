@@ -188,9 +188,10 @@ dependencies {
     implementation(libs.androidx.compose.icons)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.geckoview)
-    // SonderWeb Sync only: Firefox Sync (Mozilla account sign-in, saved passwords, syncing).
+    // SonderWeb Sync only: Firefox Sync (Mozilla account sign-in, saved passwords, syncing bookmarks, history, passwords).
     "syncImplementation"(libs.appservices.fxaclient)
     "syncImplementation"(libs.appservices.logins)
+    "syncImplementation"(libs.appservices.places)
     "syncImplementation"(libs.appservices.syncmanager)
     "syncImplementation"(libs.appservices.viaduct)
     "syncImplementation"(libs.appservices.init)

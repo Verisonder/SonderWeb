@@ -31,6 +31,7 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 geckoview = { group = "org.mozilla.geckoview", name = "geckoview", version.ref = "geckoview" }
 appservices-fxaclient = { group = "org.mozilla.appservices", name = "fxaclient", version.ref = "appservices" }
 appservices-logins = { group = "org.mozilla.appservices", name = "logins", version.ref = "appservices" }
+appservices-places = { group = "org.mozilla.appservices", name = "places", version.ref = "appservices" }
 appservices-syncmanager = { group = "org.mozilla.appservices", name = "syncmanager", version.ref = "appservices" }
 appservices-viaduct = { group = "org.mozilla.appservices", name = "viaduct", version.ref = "appservices" }
 appservices-init = { group = "org.mozilla.appservices", name = "init_rust_components", version.ref = "appservices" }

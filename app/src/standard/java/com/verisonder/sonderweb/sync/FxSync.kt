@@ -8,6 +8,8 @@ import android.content.Context
  */
 object FxSync {
     const val PASSWORDS = "passwords"
+    const val BOOKMARKS = "bookmarks"
+    const val HISTORY = "history"
     const val ACCOUNTS = "https://accounts.firefox.com"
 
     val enabled = false
@@ -22,6 +24,8 @@ object FxSync {
     val avatar: android.graphics.Bitmap? = null
     val deviceName = ""
     val syncPasswords = false
+    val syncBookmarks = false
+    val syncHistory = false
     val fillPasswords = false
 
     fun changeFillPasswords(on: Boolean) = Unit
@@ -31,6 +35,22 @@ object FxSync {
     fun renameDevice(name: String) = Unit
 
     fun changeSyncPasswords(on: Boolean) = Unit
+
+    fun changeSyncBookmarks(on: Boolean) = Unit
+
+    fun changeSyncHistory(on: Boolean) = Unit
+
+    fun noteVisit(url: String, title: String?) = Unit
+
+    fun noteTitle(url: String, title: String) = Unit
+
+    fun noteHistoryRemoved(url: String) = Unit
+
+    fun noteHistoryCleared() = Unit
+
+    fun noteBookmarked(url: String, title: String) = Unit
+
+    fun noteUnbookmarked(url: String) = Unit
 
     fun init(context: Context) = Unit
 

@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import com.verisonder.sonderweb.sync.FxSync
 
 data class HistoryItem(val id: Long, val url: String, val title: String, val visited: Long)
 data class Bookmark(val id: Long, val url: String, val title: String, val added: Long)
@@ -58,11 +59,34 @@ class Db(context: Context) : SQLiteOpenHelper(context, "sonderweb.db", null, 1) 
         val db = writableDatabase
         val n = db.update("history", cv, "url = ?", arrayOf(url))
         if (n == 0) db.insert("history", null, cv)
+        FxSync.noteVisit(url, title)
+    }
+
+    /** Visits from your other devices (Firefox Sync): address, title, when. Kept: the latest. */
+    fun importVisits(visits: List<Triple<String, String?, Long>>) {
+        if (visits.isEmpty()) return
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            for ((url, title, at) in visits) {
+                val cv = ContentValues().apply {
+                    put("url", url)
+                    put("visited", at)
+                    if (!title.isNullOrBlank()) put("title", title)
+                }
+                val n = db.update("history", cv, "url = ? AND visited < ?", arrayOf(url, at.toString()))
+                if (n == 0) db.insertWithOnConflict("history", null, cv, SQLiteDatabase.CONFLICT_IGNORE)
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
     }
 
     fun setTitle(url: String, title: String) {
         if (title.isBlank()) return
         writableDatabase.update("history", ContentValues().apply { put("title", title) }, "url = ?", arrayOf(url))
+        FxSync.noteTitle(url, title)
     }
 
     fun history(query: String = "", limit: Int = 500): List<HistoryItem> {
@@ -75,11 +99,15 @@ class Db(context: Context) : SQLiteOpenHelper(context, "sonderweb.db", null, 1) 
     }
 
     fun deleteHistory(id: Long) {
+        val url = readableDatabase.rawQuery("SELECT url FROM history WHERE id = ?", arrayOf(id.toString()))
+            .use { if (it.moveToFirst()) it.getString(0) else null }
         writableDatabase.delete("history", "id = ?", arrayOf(id.toString()))
+        if (url != null) FxSync.noteHistoryRemoved(url)
     }
 
     fun clearHistory() {
         writableDatabase.delete("history", null, null)
+        FxSync.noteHistoryCleared()
     }
 
     // ---- Bookmarks ----
@@ -87,17 +115,20 @@ class Db(context: Context) : SQLiteOpenHelper(context, "sonderweb.db", null, 1) 
     fun isBookmarked(url: String): Boolean =
         readableDatabase.rawQuery("SELECT 1 FROM bookmarks WHERE url = ?", arrayOf(url)).use { it.moveToFirst() }
 
-    fun addBookmark(url: String, title: String) {
+    /** [mirror]: false for changes that came from Firefox Sync (not to be sent back). */
+    fun addBookmark(url: String, title: String, added: Long = System.currentTimeMillis(), mirror: Boolean = true) {
         val cv = ContentValues().apply {
             put("url", url)
             put("title", title)
-            put("added", System.currentTimeMillis())
+            put("added", added)
         }
         writableDatabase.insertWithOnConflict("bookmarks", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+        if (mirror) FxSync.noteBookmarked(url, title)
     }
 
-    fun removeBookmark(url: String) {
+    fun removeBookmark(url: String, mirror: Boolean = true) {
         writableDatabase.delete("bookmarks", "url = ?", arrayOf(url))
+        if (mirror) FxSync.noteUnbookmarked(url)
     }
 
     fun bookmarks(query: String = ""): List<Bookmark> {

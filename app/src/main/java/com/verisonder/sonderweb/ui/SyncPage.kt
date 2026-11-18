@@ -107,7 +107,7 @@ internal fun AccountCard(ui: UiState, onOpen: () -> Unit) {
                 )
             } else {
                 Text("Sign in", color = p.text, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-                Text("Sync your passwords with Firefox on your other devices.", color = p.faint, fontSize = 14.sp)
+                Text("Sync your bookmarks, history and passwords with Firefox on your other devices.", color = p.faint, fontSize = 14.sp)
             }
         }
     }
@@ -142,8 +142,8 @@ internal fun SyncPage(ui: UiState) {
     if (!FxSync.signedIn) {
         AccountCard(ui) {}
         Hint(
-            "Your saved passwords come over from Firefox, and the ones you save here go to your other devices. " +
-                "They're encrypted on this phone first: Mozilla can't read them. SonderWeb Sync signs in as Firefox for Android.",
+            "Your bookmarks, history and saved passwords come over from Firefox, and what you add here goes to your " +
+                "other devices. It's all encrypted on this phone first: Mozilla can't read it. SonderWeb Sync signs in as Firefox for Android.",
         )
     } else {
         // Your account at the top, as on the main page.
@@ -187,15 +187,17 @@ internal fun SyncPage(ui: UiState) {
                 },
             ) { FxSync.sync() }
             ActionRow("Device name", FxSync.deviceName) { renaming = true }
-            ActionRow("Sign out", "Your saved passwords stay on this phone", danger = true) { signingOut = true }
+            ActionRow("Sign out", "Your bookmarks, history and passwords stay on this phone", danger = true) { signingOut = true }
         }
         FxSync.problem?.let { Hint(it) }
 
         GroupTitle("Choose what to sync")
         Group {
+            Toggle("Bookmarks", null, FxSync.syncBookmarks) { FxSync.changeSyncBookmarks(it) }
+            Toggle("History", null, FxSync.syncHistory) { FxSync.changeSyncHistory(it) }
             Toggle("Passwords", null, FxSync.syncPasswords) { FxSync.changeSyncPasswords(it) }
         }
-        Hint("Bookmarks, history and open tabs come in a later version.")
+        Hint("Open tabs from your other devices come in a later version.")
     }
 
     GroupTitle("Passwords")
@@ -253,7 +255,7 @@ internal fun SyncPage(ui: UiState) {
             onDismissRequest = { signingOut = false },
             containerColor = p.card,
             title = { Text("Sign out?", color = p.text, fontSize = 18.sp) },
-            text = { Text("Syncing stops. Your saved passwords stay on this phone.", color = p.mute) },
+            text = { Text("Syncing stops. Your bookmarks, history and saved passwords stay on this phone.", color = p.mute) },
             confirmButton = {
                 TextButton({
                     signingOut = false
@@ -353,8 +355,8 @@ internal fun FirstSyncAsk(ui: UiState) {
         title = { Text("Sign in to Firefox Sync?", color = p.text, fontSize = 18.sp) },
         text = {
             Text(
-                "Use your Mozilla account to bring your saved passwords from Firefox, and keep them in step " +
-                    "on all your devices. They're encrypted on this phone first: Mozilla can't read them.",
+                "Use your Mozilla account to bring your bookmarks, history and saved passwords from Firefox, and keep " +
+                    "them in step on all your devices. It's all encrypted on this phone first: Mozilla can't read it.",
                 color = p.mute,
             )
         },
