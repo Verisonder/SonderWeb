@@ -13,6 +13,8 @@ materialIcons = "1.7.8"
 # Firefox engine. Follows the Firefox release channel: bump the major with each Firefox release
 # (every 4 weeks). The exact build is resolved from maven.mozilla.org.
 geckoview = "159.+"
+# Mozilla's account and sync libraries (Firefox Sync), the build Firefox 159 for Android uses.
+appservices = "159.0.1"
 # Bundled uBlock Origin (Firefox build), downloaded at build time.
 ublock = "1.75.0"
 
@@ -27,6 +29,11 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 androidx-compose-icons = { group = "androidx.compose.material", name = "material-icons-extended", version.ref = "materialIcons" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 geckoview = { group = "org.mozilla.geckoview", name = "geckoview", version.ref = "geckoview" }
+appservices-fxaclient = { group = "org.mozilla.appservices", name = "fxaclient", version.ref = "appservices" }
+appservices-logins = { group = "org.mozilla.appservices", name = "logins", version.ref = "appservices" }
+appservices-syncmanager = { group = "org.mozilla.appservices", name = "syncmanager", version.ref = "appservices" }
+appservices-viaduct = { group = "org.mozilla.appservices", name = "viaduct", version.ref = "appservices" }
+appservices-init = { group = "org.mozilla.appservices", name = "init_rust_components", version.ref = "appservices" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

@@ -39,6 +39,7 @@ object Delegates {
         Translate.attach(tab)
         BackPeek.attach(tab)
         Pip.attach(tab)
+        FxaChannel.attach(tab)
         Extensions.attach(tab)
     }
 

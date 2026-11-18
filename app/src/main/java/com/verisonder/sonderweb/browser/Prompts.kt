@@ -51,6 +51,14 @@ sealed class PromptUi(val tab: Tab) {
         class Row(val choice: ChoicePrompt.Choice?, val label: String, val header: Boolean, val indent: Boolean)
     }
 
+    /** Which saved sign-in to fill in: (site or username, detail) per row; null: none. */
+    class PickLogin(
+        tab: Tab,
+        val title: String,
+        val rows: List<Pair<String, String>>,
+        val onResult: (Int?) -> Unit,
+    ) : PromptUi(tab)
+
     class PickColor(
         tab: Tab,
         val initial: String,
@@ -298,6 +306,50 @@ object Prompts {
                     "Cancel",
                 ) { ok -> r.complete(prompt.confirm(if (ok) AllowOrDeny.ALLOW else AllowOrDeny.DENY)) },
                 prompt,
+            )
+            return r
+        }
+
+        // ---- Saved passwords (the Firefox Sync option) ----
+
+        override fun onLoginSave(
+            session: GeckoSession,
+            request: PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSaveOption>,
+        ): GeckoResult<PromptResponse>? {
+            val option = request.options.firstOrNull() ?: return GeckoResult.fromValue(request.dismiss())
+            val login = option.value
+            val update = !login.guid.isNullOrEmpty()
+            val r = GeckoResult<PromptResponse>()
+            track(
+                PromptUi.Ask(
+                    tab,
+                    if (update) "Update saved password?" else "Save password?",
+                    listOf(login.username.ifBlank { null }, UrlText.host(login.origin).ifEmpty { site(tab) })
+                        .filterNotNull().joinToString(" · ") + "\nSaved in SonderWeb and synced with Firefox Sync.",
+                    if (update) "Update" else "Save",
+                    "Not now",
+                ) { ok -> r.complete(if (ok) request.confirm(option) else request.dismiss()) },
+                request,
+            )
+            return r
+        }
+
+        override fun onLoginSelect(
+            session: GeckoSession,
+            request: PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSelectOption>,
+        ): GeckoResult<PromptResponse>? {
+            val options = request.options
+            if (options.isEmpty()) return GeckoResult.fromValue(request.dismiss())
+            val rows = options.map { o ->
+                val v = o.value
+                v.username.ifBlank { "(no username)" } to UrlText.host(v.origin).ifEmpty { v.origin }
+            }
+            val r = GeckoResult<PromptResponse>()
+            track(
+                PromptUi.PickLogin(tab, "Sign in as", rows) { i ->
+                    r.complete(if (i != null && i in options.indices) request.confirm(options[i]) else request.dismiss())
+                },
+                request,
             )
             return r
         }

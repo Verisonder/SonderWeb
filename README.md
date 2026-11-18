@@ -12,7 +12,7 @@
 
 <p align="center">
   <b>A private, minimal web browser for Android.</b><br>
-  Firefox's engine underneath, uBlock Origin built in, the whole screen for the page. No account, no telemetry.
+  Firefox's engine underneath, uBlock Origin built in, the whole screen for the page. No account needed, no telemetry.
 </p>
 
 <p align="center">
@@ -38,6 +38,7 @@ Nothing is sent to any SonderWeb server, because there isn't one.
 | **Really private tabs** | Pure black and kept apart from your history, bookmarks and shortcuts. Locked behind your fingerprint every time you go in, no screenshots, no tab previews, incognito keyboard, encrypted DNS (Quad9), nothing kept once closed. |
 | **The page gets the screen** | The bar floats, then shrinks into a small round button as you scroll, or slides away. Swipe the bar sideways to put it away, long-press the button to tuck it out of sight. The status bar is hidden unless you want it. |
 | **Quick gestures** | Hold the address and slide onto the + for a new tab. Hold the tabs button and slide onto any open tab to switch. Swipe the bar up, down or sideways to put it away. Pull down at the top of a page to reload. |
+| **Firefox Sync, if you want it** | Off until you turn it on in Settings › Firefox Sync. Sign in with your Mozilla account and SonderWeb saves the passwords you choose, fills them in, and syncs them both ways with Firefox on your other devices. They're encrypted on the phone before they leave it. Passwords only, for now. |
 | **Works with your password manager** | Sign-in fields bring up Proton Pass, Bitwarden or whichever manager you use, and passkeys work too. |
 | **A start page** | The time, a greeting, the weather (Open-Meteo; only the place you pick is sent) and the shortcuts you add, with the sites' own icons. Star a site in the menu to pin it there; hold and drag a shortcut to move it. |
 | **!bangs and your search engine** | `!w Tangier`, `!yt lofi`, `!gh sonder` search a site directly. DuckDuckGo by default, restyled to match the browser; Brave, Startpage, Qwant, Ecosia, Kagi, Google, Bing or your own. |
@@ -63,13 +64,15 @@ app/src/main/java/com/verisonder/sonderweb/
   browser/   the engine, tabs, extensions, downloads, private-tab locking, shredding
   core/      address bar logic, !bangs, search engines (plain Kotlin, tested)
   data/      settings, history and bookmarks (SQLite), weather
+  sync/      Firefox Sync (optional): Mozilla account sign-in, saved passwords, syncing
   ui/        Jetpack Compose: bar, start page, tabs, menu, settings, shred animation
 app/src/main/assets/extensions/style/     the built-in DuckDuckGo look
 app/src/main/assets/extensions/shields/   WebRTC protection, de-AMP, tracking-redirect skipping
+app/src/main/assets/extensions/fxa/       the sign-in channel for Firefox Sync
 app/ublock-look/                          the look added to uBlock Origin's panel
 ```
 
-Kotlin and Jetpack Compose on GeckoView. The build downloads GeckoView from Mozilla's Maven repository and the signed uBlock Origin release named in `gradle/libs.versions.toml`, and ships it as a built-in extension.
+Kotlin and Jetpack Compose on GeckoView. Firefox Sync uses Mozilla's own account and sync libraries (application-services). The build downloads GeckoView and those libraries from Mozilla's Maven repository and the signed uBlock Origin release named in `gradle/libs.versions.toml`, and ships it as a built-in extension.
 
 ### Building
 
@@ -81,7 +84,7 @@ gradle assembleDebug
 
 ## Privacy
 
-No account, no analytics, no crash reports, no SonderWeb servers. The only requests SonderWeb makes on its own are the weather for the place you choose (Open-Meteo), site icons for your shortcuts and tabs (from the site itself, or DuckDuckGo's icon service), and a look at this repository's latest release to tell you about updates (GitHub). Everything else is the pages you open.
+No account needed, no analytics, no crash reports, no SonderWeb servers. The only requests SonderWeb makes on its own are the weather for the place you choose (Open-Meteo), site icons for your shortcuts and tabs (from the site itself, or DuckDuckGo's icon service), and a look at this repository's latest release to tell you about updates (GitHub). If you turn on Firefox Sync, SonderWeb also talks to Mozilla's account and sync servers, signing in as Firefox for Android; your passwords are encrypted on the phone first, so Mozilla can't read them. Everything else is the pages you open.
 
 ## Using SonderWeb
 

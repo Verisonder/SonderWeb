@@ -121,6 +121,10 @@ object Browser {
         AddonsSite.install(runtime)
         Shields.install(runtime)
         Pip.install(runtime)
+        FxaChannel.install(runtime)
+        // Firefox Sync, if you turned it on (nothing of it loads otherwise).
+        com.verisonder.sonderweb.sync.FxSync.init(app)
+        Passwords.applyOption()
         restoreTabs()
     }
 
