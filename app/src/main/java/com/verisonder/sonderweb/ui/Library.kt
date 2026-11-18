@@ -363,8 +363,9 @@ private fun BookmarkRow(
             icon = if (b.folder) Icons.Outlined.Folder else null,
             iconTint = if (b.folder) p.accent else null,
             site = if (b.folder) null else host,
-            trailing = if (b.fixed) null else {
-                {
+            // Firefox's own folders can't be renamed, moved or deleted: no menu.
+            trailing = {
+                if (!b.fixed) {
                     Box {
                         IconButtonSmall(Icons.Outlined.MoreVert, "More", tint = p.faint) { menu = true }
                         DropdownMenu(
@@ -373,9 +374,18 @@ private fun BookmarkRow(
                             containerColor = p.card,
                             shape = RoundedCornerShape(14.dp),
                         ) {
-                            MoreItem(if (b.folder) "Rename" else "Edit", Icons.Outlined.Edit) { menu = false; onEdit() }
-                            MoreItem("Move to…", Icons.Outlined.FolderOpen) { menu = false; onMove() }
-                            MoreItem("Delete", Icons.Outlined.Delete, danger = true) { menu = false; onDelete() }
+                            MoreItem(if (b.folder) "Rename" else "Edit", Icons.Outlined.Edit) {
+                                menu = false
+                                onEdit()
+                            }
+                            MoreItem("Move to…", Icons.Outlined.FolderOpen) {
+                                menu = false
+                                onMove()
+                            }
+                            MoreItem("Delete", Icons.Outlined.Delete, danger = true) {
+                                menu = false
+                                onDelete()
+                            }
                         }
                     }
                 }
