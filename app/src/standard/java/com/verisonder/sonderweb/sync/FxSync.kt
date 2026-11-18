@@ -21,7 +21,7 @@ object FxSync {
 
     fun init(context: Context) = Unit
 
-    fun setEnabled(on: Boolean) = Unit
+    fun turn(on: Boolean) = Unit
 
     fun signIn(open: (String) -> Unit) = Unit
 

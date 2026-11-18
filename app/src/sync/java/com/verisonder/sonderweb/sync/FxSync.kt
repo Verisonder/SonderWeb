@@ -115,7 +115,7 @@ object FxSync {
     }
 
     /** Turns the option on or off. Off: signed out; the saved passwords stay on the phone. */
-    fun setEnabled(on: Boolean) {
+    fun turn(on: Boolean) {
         if (on == enabled) return
         enabled = on
         prefs.edit().putBoolean("enabled", on).apply()
