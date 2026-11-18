@@ -132,7 +132,7 @@ fun BrowserScreen(activity: MainActivity) {
             ui.panel = Panel.Downloads
         }
     }
-    // The search widget was tapped: the search opens, on a fresh tab, over whatever was showing.
+    // The search widget was tapped: the search opens over the tab you were in.
     LaunchedEffect(activity.openSearch) {
         if (activity.openSearch) {
             activity.openSearch = false

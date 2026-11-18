@@ -382,7 +382,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
                 launchCheck = false
                 when (intent.action) {
                     SearchWidget.SEARCH -> {
-                        freshTab()
+                        // Opens over the tab you were in (a new tab only when there is none).
+                        if (Browser.current == null) freshTab()
                         openSearch = true
                     }
                     SearchWidget.HOME -> {
