@@ -193,7 +193,7 @@ internal fun SyncPage(ui: UiState) {
 
         GroupTitle("Choose what to sync")
         Group {
-            Toggle("Passwords", null, FxSync.syncPasswords) { FxSync.setSyncPasswords(it) }
+            Toggle("Passwords", null, FxSync.syncPasswords) { FxSync.changeSyncPasswords(it) }
         }
         Hint("Bookmarks, history and open tabs come in a later version.")
     }
@@ -204,7 +204,7 @@ internal fun SyncPage(ui: UiState) {
             "Save and fill passwords",
             "Offers to save the passwords you sign in with, and fills them in",
             FxSync.enabled && FxSync.fillPasswords,
-        ) { FxSync.setFillPasswords(it) }
+        ) { FxSync.changeFillPasswords(it) }
         if (FxSync.enabled) {
             ActionRow(
                 "Saved passwords",
@@ -241,7 +241,7 @@ internal fun SyncPage(ui: UiState) {
             confirmButton = {
                 TextButton({
                     renaming = false
-                    FxSync.setDeviceName(name)
+                    FxSync.renameDevice(name)
                 }) { Text("Save", color = p.accent) }
             },
             dismissButton = { TextButton({ renaming = false }) { Text("Cancel", color = p.text) } },
