@@ -115,9 +115,9 @@ class Prefs(context: Context) {
         get() = sp.getLong("left_at", 0L)
         set(v) = sp.edit().putLong("left_at", v).apply()
 
-    /** Address bar at the top (like Chromium) or at the bottom. */
+    /** Address bar at the top (like Chromium) or at the bottom (the default). */
     var barOnTop: Boolean
-        get() = sp.getBoolean("bar_top", true)
+        get() = sp.getBoolean("bar_top", false)
         set(v) = sp.edit().putBoolean("bar_top", v).apply()
 
     /** Floating rounded bar (true) or docked to the screen edge (false). */
