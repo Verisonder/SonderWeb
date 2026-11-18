@@ -621,13 +621,15 @@ private fun Modifier.holdForNewTab(
 /** The held part of the gesture: the list pops out, slide onto a tab and let go to switch to it. */
 private suspend fun AwaitPointerEventScope.pickTab(picker: TabPicker, haptics: HapticFeedback) {
     val cur = Browser.current
-    // Empty new tabs aren't worth switching to: only tabs with a site in them. Not the one
-    // you're on either.
-    val same = Browser.tabs.filter { it.isPrivate == (cur?.isPrivate ?: false) && !it.isBlank && it !== cur }
-    // Centre the list around where the current tab sits.
-    val at = Browser.tabs.indexOf(cur).let { i -> same.indexOfLast { Browser.tabs.indexOf(it) <= i } }.coerceAtLeast(0)
-    val from = (at - PICKER_MAX / 2).coerceIn(0, (same.size - PICKER_MAX).coerceAtLeast(0))
-    picker.tabs = same.drop(from).take(PICKER_MAX)
+    // Your latest tabs, like the tab list shows them: only tabs with a site in them (no empty new
+    // tabs), not inactive ones (unused for weeks, older copies), and not the one you're on.
+    val inactive = Browser.inactiveTabs().toSet()
+    val recent = Browser.tabs
+        .filter { it.isPrivate == (cur?.isPrivate ?: false) && !it.isBlank && it !== cur && it !in inactive }
+        .sortedByDescending { it.lastUsed }
+        .take(PICKER_MAX)
+    // The most recent one nearest your finger: at the bottom when the list opens upwards.
+    picker.tabs = if (picker.top) recent else recent.reversed()
     picker.hover = -1
     picker.open = true
     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
