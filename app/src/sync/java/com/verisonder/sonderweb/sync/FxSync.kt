@@ -114,6 +114,13 @@ object FxSync {
         if (enabled) start(syncSoon = true)
     }
 
+    /** SonderWeb Sync's first launch: whether to ask if you want to sign in (asked once). */
+    fun shouldAskFirst(): Boolean = !prefs.getBoolean("asked", false) && !enabled
+
+    fun askedFirst() {
+        prefs.edit().putBoolean("asked", true).apply()
+    }
+
     /** Turns the option on or off. Off: signed out; the saved passwords stay on the phone. */
     fun turn(on: Boolean) {
         if (on == enabled) return

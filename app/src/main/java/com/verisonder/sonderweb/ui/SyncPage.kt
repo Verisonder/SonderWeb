@@ -192,3 +192,43 @@ private fun PasswordsDialog(onClose: () -> Unit) {
         confirmButton = { TextButton(onClick = onClose) { Text("Done", color = p.accent) } },
     )
 }
+
+/**
+ * SonderWeb Sync, the first time it opens: asks whether to sign in to Firefox Sync. Asked once;
+ * "Not now" leaves it off (Settings › Firefox Sync turns it on any time).
+ */
+@Composable
+internal fun FirstSyncAsk(ui: UiState) {
+    var show by remember { mutableStateOf(FxSync.shouldAskFirst()) }
+    if (!show) return
+    val p = LocalPalette.current
+    fun done() {
+        show = false
+        FxSync.askedFirst()
+    }
+    AlertDialog(
+        onDismissRequest = { done() },
+        containerColor = p.card,
+        title = { Text("Sign in to Firefox Sync?", color = p.text, fontSize = 18.sp) },
+        text = {
+            Text(
+                "Use your Mozilla account to bring your saved passwords from Firefox, and keep them in step " +
+                    "on all your devices. They're encrypted on this phone first: Mozilla can't read them.",
+                color = p.mute,
+            )
+        },
+        confirmButton = {
+            TextButton({
+                done()
+                FxSync.turn(true)
+                FxSync.signIn { url ->
+                    ui.panel = Panel.None
+                    Browser.newTab(url, isPrivate = false)
+                }
+            }) { Text("Sign in", color = p.accent) }
+        },
+        dismissButton = {
+            TextButton({ done() }) { Text("Not now", color = p.text) }
+        },
+    )
+}
