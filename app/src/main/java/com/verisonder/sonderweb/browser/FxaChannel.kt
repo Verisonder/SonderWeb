@@ -45,7 +45,7 @@ object FxaChannel {
                                 if (!FxSync.enabled) return
                                 if (!port.sender.url.startsWith(FxSync.ACCOUNTS + "/")) return
                                 val json = message as? JSONObject ?: return
-                                runCatching { handle(json, port) }
+                                runCatching { handle(tab, json, port) }
                             }
                         },
                     )
@@ -55,7 +55,7 @@ object FxaChannel {
         )
     }
 
-    private fun handle(json: JSONObject, port: WebExtension.Port) {
+    private fun handle(tab: Tab, json: JSONObject, port: WebExtension.Port) {
         val payload = json.optJSONObject("message") ?: return
         val command = payload.optString("command")
         val id = payload.optString("messageId", "")
@@ -86,7 +86,20 @@ object FxaChannel {
             "fxaccounts:oauth_login" -> {
                 val code = data?.optString("code").orEmpty()
                 val state = data?.optString("state").orEmpty()
-                if (code.isNotEmpty() && state.isNotEmpty()) FxSync.finishSignIn(code, state)
+                if (code.isNotEmpty() && state.isNotEmpty()) {
+                    FxSync.finishSignIn(code, state) { email ->
+                        // Signed in: the sign-in page has nothing more to show (Firefox closes it
+                        // too), so its tab closes and you're told.
+                        if (email != null) {
+                            if (tab in Browser.tabs) Browser.close(tab)
+                            Browser.host?.toast(
+                                if (email.isNotEmpty()) "Signed in to Firefox Sync as $email" else "Signed in to Firefox Sync",
+                            )
+                        } else {
+                            Browser.host?.toast("Couldn't finish signing in to Firefox Sync")
+                        }
+                    }
+                }
             }
             "fxaccounts:logout", "fxaccounts:delete" -> FxSync.signOut()
         }

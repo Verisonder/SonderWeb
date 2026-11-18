@@ -215,8 +215,8 @@ object FxSync {
         secrets.put("account", json)
     }
 
-    /** The account's new state, onto the screens. */
-    private fun settle(state: FxaState) {
+    /** The account's new state, onto the screens. Returns the email when signed in. */
+    private fun settle(state: FxaState): String? {
         val now = state is FxaState.Connected
         val issues = state is FxaState.AuthIssues
         connected = now
@@ -227,8 +227,9 @@ object FxSync {
             signedIn = now || issues
             needsSignIn = issues
             if (mail != null) email = mail
-            if (!connected && !issues) email = null
+            if (!now && !issues) email = null
         }
+        return if (now) mail ?: prefs.getString("email", null) ?: "" else null
     }
 
     /**
@@ -260,16 +261,21 @@ object FxSync {
         }
     }
 
-    /** The sign-in page finished: the code to finish signing in with. */
-    fun finishSignIn(code: String, state: String) {
+    /**
+     * The sign-in page finished: the code to finish signing in with. [done] gets the account's
+     * email once signed in (empty if it isn't known), or null if it didn't work.
+     */
+    fun finishSignIn(code: String, state: String, done: (String?) -> Unit) {
         scope.launch {
             try {
                 ready()
                 openAccount()
-                settle(account!!.processEvent(FxaEvent.CompleteOAuthFlow(code, state)))
+                val mail = settle(account!!.processEvent(FxaEvent.CompleteOAuthFlow(code, state)))
+                ui { done(mail) }
                 if (connected) syncNow(SyncReason.USER)
             } catch (e: Throwable) {
                 fail("Couldn't finish signing in", e)
+                ui { done(null) }
             }
         }
     }
