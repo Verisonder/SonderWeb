@@ -504,12 +504,27 @@ object Browser {
      * surface it draws into can go blank, and reloading alone then just loads into nothing.
      */
     fun refresh(tab: Tab) {
-        if (!tab.ready || !tab.session.isOpen) return
+        if (!tab.ready) return
+        // The page's process is gone: open it again (that loads the address too).
+        if (!tab.session.isOpen) {
+            Delegates.recover(tab)
+            return
+        }
         val view = host?.geckoViewFor(tab)
         if (view != null && view.session === tab.session) {
             view.releaseSession()
             view.setSession(tab.session)
+        } else if (current === tab && mini !== tab) {
+            // The tab on screen isn't in the engine view at all (it lost it to another view):
+            // reloading alone would leave the screen empty.
+            host?.mainView()?.let { main ->
+                runCatching {
+                    main.releaseSession()
+                    main.setSession(tab.session)
+                }
+            }
         }
+        tab.checkAfterReload = true
         tab.session.setActive(true)
         tab.session.reload()
     }
@@ -590,6 +605,9 @@ object Browser {
     interface Host {
         /** The engine view, when it is currently showing [tab]. */
         fun geckoViewFor(tab: Tab): org.mozilla.geckoview.GeckoView?
+
+        /** The main engine view, whatever it shows. */
+        fun mainView(): org.mozilla.geckoview.GeckoView?
         /** Opens another app; false when it can't be started. */
         fun launch(intent: android.content.Intent): Boolean
         fun share(text: String, title: String?)

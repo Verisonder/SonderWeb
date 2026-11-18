@@ -211,6 +211,17 @@ private fun MiniView(tab: Tab, main: GeckoView) {
         delay(150)
         Pip.fill(tab, true)
     }
+    // The page's process died and its session was opened again: the window must be handed it
+    // again, or it stays empty.
+    val reopened = tab.reopened
+    LaunchedEffect(tab, reopened) {
+        if (reopened == 0 || !attached || !tab.session.isOpen) return@LaunchedEffect
+        runCatching {
+            view.releaseSession()
+            view.setSession(tab.session)
+            tab.session.setActive(true)
+        }
+    }
     DisposableEffect(tab) {
         onDispose {
             Pip.fill(tab, false)

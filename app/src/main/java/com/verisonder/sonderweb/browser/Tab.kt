@@ -46,6 +46,13 @@ class Tab(val id: Long, val isPrivate: Boolean) {
      *  taken after coming back can't tell (a broken surface looks like a plain page). */
     var flatWhenLeft: Boolean? = null
 
+    /** Counts the times the page's process died and the session was opened again; a view showing
+     *  the page must be handed it again, or it stays empty. */
+    var reopened by mutableIntStateOf(0)
+
+    /** You refreshed: once the page has loaded, make sure it really shows on screen. */
+    var checkAfterReload = false
+
     /** True until the page has drawn: meanwhile a cover in the page's colours hides the engine's
      *  empty view, so nothing flashes white. */
     var covered by mutableStateOf(true)

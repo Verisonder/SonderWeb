@@ -133,6 +133,14 @@ object Delegates {
             tab.loading = false
             if (tab.startedPage) tab.covered = false
             tab.progress = 100
+            if (tab.checkAfterReload) {
+                tab.checkAfterReload = false
+                // Refreshed and still empty: the screen surface is broken, not the page. A fresh
+                // surface, never another reload.
+                Browser.main.postDelayed({
+                    if (Browser.current === tab) checkPainted(tab, attempt = 1, lastAttempt = 1, afterReload = true)
+                }, 600)
+            }
             if (success && !tab.isPrivate && Browser.prefs.saveHistory && UrlText.isWeb(tab.url)) {
                 Browser.db.visit(tab.url, tab.title)
             }
@@ -210,11 +218,23 @@ object Delegates {
         }
     }
 
-    /** The page's process died: reopen the session on the same address. */
-    private fun recover(tab: Tab) {
+    /**
+     * The page's process died: reopen the session on the same address. Closing the session took
+     * its drawing surface away for good, so the view showing it is handed the session again;
+     * otherwise the page loads but never shows (and a refresh doesn't help).
+     */
+    fun recover(tab: Tab) {
         val url = tab.url
+        val view = Browser.host?.geckoViewFor(tab)
         if (tab.session.isOpen) tab.session.close()
         tab.session.open(Browser.runtime)
+        if (view != null && view.session === tab.session) {
+            runCatching {
+                view.releaseSession()
+                view.setSession(tab.session)
+            }
+        }
+        tab.reopened++
         tab.loading = false
         if (UrlText.isWeb(url)) {
             if (Browser.current === tab) tab.session.loadUri(url) else tab.pendingUrl = url
@@ -310,9 +330,9 @@ object Delegates {
      * Back in the app: if a page that had something on it now shows one flat colour, the engine
      * lost its drawing while you were away (it stays empty until a refresh), so it's reloaded.
      */
-    fun checkPainted(tab: Tab, attempt: Int = 0) {
+    fun checkPainted(tab: Tab, attempt: Int = 0, lastAttempt: Int = 2, afterReload: Boolean = false) {
         // A page that really is one plain colour is left alone.
-        if (tab.covered || tab.flatWhenLeft == true || !UrlText.isWeb(tab.url)) return
+        if (tab.covered || (!afterReload && tab.flatWhenLeft == true) || !UrlText.isWeb(tab.url)) return
         val view = Browser.host?.geckoViewFor(tab) ?: return
         // Still empty (or the engine can't even take a picture of it). The page itself is usually
         // fine (a refresh doesn't help): it's the screen surface it draws into that went blank.
@@ -327,19 +347,25 @@ object Delegates {
                             view.setSession(tab.session)
                         }
                         1 -> {
+                            // The surface view itself must be hidden for a frame or two for Android
+                            // to throw its surface away and make a new one (hiding the parent isn't enough).
+                            val surface = (0 until view.childCount).map { view.getChildAt(it) }
+                                .firstOrNull { it is android.view.SurfaceView } ?: view
                             tab.session.setActive(false)
-                            view.visibility = android.view.View.INVISIBLE
-                            view.post {
-                                view.visibility = android.view.View.VISIBLE
+                            surface.visibility = android.view.View.INVISIBLE
+                            view.postDelayed({
+                                surface.visibility = android.view.View.VISIBLE
                                 tab.session.setActive(true)
-                            }
+                            }, 80)
                         }
                         else -> {
                             tab.lastFlat = null
                             Browser.refresh(tab)
                         }
                     }
-                    if (attempt < 2) view.postDelayed({ if (Browser.current === tab) checkPainted(tab, attempt + 1) }, 900)
+                    if (attempt < lastAttempt) {
+                        view.postDelayed({ if (Browser.current === tab) checkPainted(tab, attempt + 1, lastAttempt, afterReload) }, 900)
+                    }
                 }
             }
         }

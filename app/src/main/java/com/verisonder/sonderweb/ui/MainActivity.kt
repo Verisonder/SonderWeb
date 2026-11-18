@@ -421,6 +421,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun geckoViewFor(tab: Tab): GeckoView? =
         if (::geckoView.isInitialized && geckoView.session === tab.session) geckoView else null
 
+    override fun mainView(): GeckoView? = if (::geckoView.isInitialized) geckoView else null
+
     override fun launch(intent: Intent): Boolean = try {
         startActivity(intent)
         ownScreen = true
