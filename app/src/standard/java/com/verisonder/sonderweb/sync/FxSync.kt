@@ -21,6 +21,10 @@ object FxSync {
 
     fun init(context: Context) = Unit
 
+    fun shouldAskFirst() = false
+
+    fun askedFirst() = Unit
+
     fun turn(on: Boolean) = Unit
 
     fun signIn(open: (String) -> Unit) = Unit

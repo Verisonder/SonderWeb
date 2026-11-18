@@ -474,6 +474,8 @@ fun BrowserScreen(activity: MainActivity) {
             Prompts.queue.firstOrNull { it.tab === tab }?.let { PromptDialog(it) }
             com.verisonder.sonderweb.browser.Extensions.pending?.let { InstallDialog(it) }
             com.verisonder.sonderweb.browser.AppLinks.ask?.let { OpenAppDialog(it) }
+            // SonderWeb Sync's first launch: sign in to Firefox Sync now?
+            FirstSyncAsk(ui)
             com.verisonder.sonderweb.browser.Translate.ask?.let { TranslateDialog(it) }
             ui.shred?.let { site ->
                 ConfirmDialog(
