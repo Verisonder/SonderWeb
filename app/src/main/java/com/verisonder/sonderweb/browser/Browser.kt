@@ -525,6 +525,7 @@ object Browser {
             }
         }
         tab.checkAfterReload = true
+        Unstick.refreshed(tab)
         tab.session.setActive(true)
         tab.session.reload()
     }

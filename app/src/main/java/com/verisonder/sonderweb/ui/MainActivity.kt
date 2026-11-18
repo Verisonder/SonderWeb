@@ -304,6 +304,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
         com.verisonder.sonderweb.browser.Extensions.wake()
         // Pages that failed to load while you were away (no network in the background) load again.
         com.verisonder.sonderweb.browser.Retry.back()
+        // Loads just after coming back are watched: a page process frozen while you were away is restarted.
+        com.verisonder.sonderweb.browser.Unstick.back()
         wake()
     }
 

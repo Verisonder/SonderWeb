@@ -149,6 +149,7 @@ object Delegates {
             tab.atTop = true
             tab.progress = 5
             tab.url = url
+            Unstick.started(tab)
         }
 
         override fun onPageStop(session: GeckoSession, success: Boolean) {
@@ -156,6 +157,7 @@ object Delegates {
             if (tab.startedPage) tab.covered = false
             tab.progress = 100
             Retry.stopped(tab, success)
+            Unstick.stopped(tab, success)
             if (tab.checkAfterReload) {
                 tab.checkAfterReload = false
                 // Refreshed and still empty: the screen surface is broken, not the page. A fresh
@@ -174,6 +176,7 @@ object Delegates {
 
         override fun onProgressChange(session: GeckoSession, progress: Int) {
             tab.progress = progress
+            Unstick.progressed(tab, progress)
         }
 
         override fun onSecurityChange(session: GeckoSession, securityInfo: ProgressDelegate.SecurityInformation) {

@@ -60,6 +60,12 @@ class Tab(val id: Long, val isPrivate: Boolean) {
     /** The last load failed (its error page is what finishes loading next). */
     var loadFailed = false
 
+    /** Watching a load that may be stuck (see [Unstick]): which check, which stage, after a refresh. */
+    var watchToken = 0
+    var watchStage = 0
+    var watchRefresh = false
+    var watchMoved = false
+
     /** True until the page has drawn: meanwhile a cover in the page's colours hides the engine's
      *  empty view, so nothing flashes white. */
     var covered by mutableStateOf(true)
