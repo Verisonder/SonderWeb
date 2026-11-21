@@ -209,23 +209,25 @@ private fun BarBody(ui: UiState, tab: Tab?, top: Boolean) {
                         IconButtonSmall(Icons.Outlined.Home, "Home", size = 44, tint = p.mute) { Browser.goHome(tab) }
                     }
                     val pop = remember { NewTabPop() }
-                    // The profile ring reaches 2 dp from the field; the tabs square sits 12 dp from it:
-                    // the field moves over 10 dp so both sides have the same gap.
+                    // 12 dp on both sides of the field: the profile ring reaches 2 dp from it (Home's
+                    // icon 12 dp), and the narrower tabs button's square sits 8 dp past its 4 dp margin.
                     val gap = if (com.verisonder.sonderweb.data.Profiles.enabled) 10.dp else 0.dp
-                    Box(Modifier.weight(1f).padding(start = gap)) {
+                    Box(Modifier.weight(1f).padding(start = gap, end = 4.dp)) {
                         Omnibox(ui, tab, Modifier.fillMaxWidth(), pop, top)
                         NewTabBubble(pop, top)
                     }
                 }
+                // The tabs square and the ⋮ sit closer together, with even room around them.
                 TabCountButton(
                     Browser.countFor(tab?.isPrivate ?: false),
                     top = top,
+                    width = if (tab == null || tab.isBlank) 44.dp else 36.dp,
                 ) {
                     tab?.let { Delegates.capture(it) }
                     ui.panel = Panel.Tabs
                 }
                 Box {
-                    IconButtonSmall(Icons.Outlined.MoreVert, "Menu", size = 44, tint = p.mute) { ui.menu = true }
+                    IconButtonSmall(Icons.Outlined.MoreVert, "Menu", size = if (tab == null || tab.isBlank) 44 else 40, tint = p.mute) { ui.menu = true }
                     if (com.verisonder.sonderweb.data.AppUpdate.available != null) UpdateDot(Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp))
                     if (tab != null) BrowserMenu(ui, tab, top)
                 }
@@ -413,7 +415,7 @@ private fun ShieldButton(tab: Tab) {
  * switch to it, all in one movement.
  */
 @Composable
-fun TabCountButton(count: Int, top: Boolean, onClick: () -> Unit) {
+fun TabCountButton(count: Int, top: Boolean, width: androidx.compose.ui.unit.Dp = 44.dp, onClick: () -> Unit) {
     val p = LocalPalette.current
     val haptics = LocalHapticFeedback.current
     val tap by rememberUpdatedState(onClick)
@@ -421,7 +423,7 @@ fun TabCountButton(count: Int, top: Boolean, onClick: () -> Unit) {
 
     Box(
         Modifier
-            .size(44.dp)
+            .size(width = width, height = 44.dp)
             .clip(CircleShape)
             .onSizeChanged { picker.anchorH = it.height.toFloat() }
             .pointerInput(picker) {
