@@ -244,6 +244,7 @@ object Browser {
             waitUntilOpen(tab)
         }
         if (select) select(tab)
+        if (url.isNullOrBlank() && open) dropSpareBlanks(tab)
         saveTabs()
         return tab
     }
@@ -346,6 +347,20 @@ object Browser {
         val blank = tabs.lastOrNull { !it.isPrivate && it.isBlank }
         if (blank != null) select(blank) else newTab(null, isPrivate = false)
     }
+
+    /**
+     * A new empty tab replaces the other empty ones (same kind, not in front, nothing to go back
+     * or forward to). They aren't listed, so they shouldn't pile up behind the tab count.
+     */
+    private fun dropSpareBlanks(keep: Tab) {
+        tabs.filter {
+            it !== keep && it !== current && it !== mini && it.isPrivate == keep.isPrivate &&
+                it.isBlank && !it.canGoBack && !it.canGoForward
+        }.forEach { close(it) }
+    }
+
+    /** How many tabs the tabs button shows: the ones the tab list shows (empty tabs aren't). */
+    fun countFor(isPrivate: Boolean): Int = tabs.count { it.isPrivate == isPrivate && !it.isBlank }
 
     fun closeAll(isPrivate: Boolean) {
         tabs.filter { it.isPrivate == isPrivate }.forEach { close(it) }

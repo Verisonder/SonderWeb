@@ -247,14 +247,25 @@ object Prompts {
             val r = GeckoResult<PromptResponse>()
             val multiple = prompt.type == PromptDelegate.FilePrompt.Type.MULTIPLE
             val mimes = prompt.mimeTypes?.filter { it.contains('/') }?.toTypedArray() ?: emptyArray()
-            host.pickFiles(mimes, multiple) { uris ->
-                r.complete(
-                    when {
-                        uris.isEmpty() -> prompt.dismiss()
-                        multiple -> prompt.confirm(Browser.app, uris.toTypedArray())
-                        else -> prompt.confirm(Browser.app, uris.first())
-                    },
-                )
+            host.pickFiles(mimes, multiple) { picked ->
+                if (picked.isEmpty()) {
+                    r.complete(prompt.dismiss())
+                    return@pickFiles
+                }
+                // The engine reads files by path, not through Android's content:// addresses,
+                // so each picked file is copied into the cache first (as Firefox does).
+                Thread {
+                    val uris = PickedFiles.copy(Browser.app, picked)
+                    Browser.main.post {
+                        r.complete(
+                            when {
+                                uris.isEmpty() -> prompt.dismiss()
+                                multiple -> prompt.confirm(Browser.app, uris.toTypedArray())
+                                else -> prompt.confirm(Browser.app, uris.first())
+                            },
+                        )
+                    }
+                }.start()
             }
             return r
         }

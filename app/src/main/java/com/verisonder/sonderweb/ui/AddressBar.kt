@@ -208,7 +208,7 @@ private fun BarBody(ui: UiState, tab: Tab?, top: Boolean) {
                     }
                 }
                 TabCountButton(
-                    Browser.tabs.count { it.isPrivate == (tab?.isPrivate ?: false) },
+                    Browser.countFor(tab?.isPrivate ?: false),
                     top = top,
                 ) {
                     tab?.let { Delegates.capture(it) }
@@ -242,7 +242,7 @@ fun StartControls(ui: UiState, tab: Tab, modifier: Modifier) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TabCountButton(
-            Browser.tabs.count { it.isPrivate == tab.isPrivate },
+            Browser.countFor(tab.isPrivate),
             top = false,
         ) { ui.panel = Panel.Tabs }
         Box {
