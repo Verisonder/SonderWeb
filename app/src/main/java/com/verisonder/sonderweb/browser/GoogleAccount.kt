@@ -54,7 +54,8 @@ object GoogleAccount {
         if (!Profiles.enabled || tab !in Browser.tabs) return
         val p = Profiles.list.firstOrNull { it.id == tab.profile } ?: return
         when {
-            email.isEmpty() -> if (picture.isNotEmpty() && p.account.isEmpty()) Profiles.googlePicture(p.id, picture)
+            // Only a picture (no email found): it's the profile's own account unless it keeps others.
+            email.isEmpty() -> if (picture.isNotEmpty() && p.kept.isEmpty()) Profiles.googlePicture(p.id, picture)
             p.account.isEmpty() || p.account == email -> {
                 Profiles.setAccount(p.id, email)
                 if (picture.isNotEmpty()) Profiles.googlePicture(p.id, picture)
