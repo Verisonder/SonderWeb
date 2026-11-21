@@ -58,6 +58,7 @@ object GoogleAccount {
             email.isEmpty() -> if (picture.isNotEmpty() && p.kept.isEmpty()) Profiles.googlePicture(p.id, picture)
             p.account.isEmpty() || p.account == email -> {
                 Profiles.setAccount(p.id, email)
+                Profiles.accountName(p.id, name)
                 if (picture.isNotEmpty()) Profiles.googlePicture(p.id, picture)
             }
             email in p.kept -> Unit
@@ -90,7 +91,7 @@ object GoogleAccount {
 
     /** A new profile for this Google account, and its sign-in page there. */
     private fun moveTo(email: String, name: String) {
-        val made = Profiles.add(name.ifBlank { email.substringBefore('@') }, Profiles.nextColor())
+        val made = Profiles.add(name.ifBlank { email.substringBefore('@') }, Profiles.nextColor(), named = false)
         Profiles.setAccount(made.id, email)
         Browser.switchProfile(made.id)
         // Google's sign-in, with the email filled in, in the new profile.

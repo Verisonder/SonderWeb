@@ -27,6 +27,8 @@ data class Profile(
     val account: String = "",
     /** Other Google accounts you chose to keep in it (not asked about again). */
     val kept: List<String> = emptyList(),
+    /** You named it yourself (otherwise it takes its Google account's name). */
+    val named: Boolean = false,
 )
 
 /** The profiles, which one is in use, and their pictures. */
@@ -72,7 +74,7 @@ object Profiles {
             for (i in 0 until a.length()) {
                 val o = a.getJSONObject(i)
                 val kept = o.optJSONArray("k")?.let { k -> List(k.length()) { k.optString(it) } } ?: emptyList()
-                list += Profile(o.getString("id"), o.optString("name"), o.optInt("color", colors[0]), o.optString("g"), o.optString("a"), kept)
+                list += Profile(o.getString("id"), o.optString("name"), o.optInt("color", colors[0]), o.optString("g"), o.optString("a"), kept, o.optBoolean("n"))
             }
         }
         if (list.none { it.id.isEmpty() }) list.add(0, Profile("", "Personal", colors[0]))
@@ -86,7 +88,7 @@ object Profiles {
         list.forEach {
             a.put(
                 JSONObject().put("id", it.id).put("name", it.name).put("color", it.color).put("g", it.google)
-                    .put("a", it.account).put("k", JSONArray(it.kept)),
+                    .put("a", it.account).put("k", JSONArray(it.kept)).put("n", it.named),
             )
         }
         prefs.profiles = a.toString()
@@ -114,9 +116,9 @@ object Profiles {
         prefs.scope = id
     }
 
-    fun add(name: String, color: Int): Profile {
+    fun add(name: String, color: Int, named: Boolean = name.isNotBlank()): Profile {
         val id = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
-        val p = Profile(id, name.trim().ifEmpty { "Profile ${list.size + 1}" }, color)
+        val p = Profile(id, name.trim().ifEmpty { "Profile ${list.size + 1}" }, color, named = named)
         list += p
         save()
         return p
@@ -125,7 +127,8 @@ object Profiles {
     fun edit(id: String, name: String, color: Int) {
         val i = list.indexOfFirst { it.id == id }
         if (i < 0) return
-        list[i] = list[i].copy(name = name.trim().ifEmpty { list[i].name }, color = color)
+        val n = name.trim().ifEmpty { list[i].name }
+        list[i] = list[i].copy(name = n, color = color, named = list[i].named || n != list[i].name)
         save()
     }
 
@@ -136,6 +139,14 @@ object Profiles {
         val i = list.indexOfFirst { it.id == id }
         if (i < 0 || list[i].account == email) return
         list[i] = list[i].copy(account = email)
+        save()
+    }
+
+    /** The profile takes its Google account's name, unless you named it yourself. */
+    fun accountName(id: String, name: String) {
+        val i = list.indexOfFirst { it.id == id }
+        if (i < 0 || name.isBlank() || list[i].named || list[i].name == name) return
+        list[i] = list[i].copy(name = name.take(32))
         save()
     }
 
