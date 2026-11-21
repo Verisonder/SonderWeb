@@ -136,7 +136,7 @@ fun PrivateAvatar(size: Dp, modifier: Modifier = Modifier) {
     }
 }
 
-/** In the bar, where Home was: tap for the start page, hold to switch profiles. */
+/** In the bar, where Home was: tap to switch profiles, hold for the start page. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ProfileHomeButton(ui: UiState, tab: Tab) {
@@ -155,9 +155,9 @@ fun ProfileHomeButton(ui: UiState, tab: Tab) {
             .combinedClickable(
                 onLongClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    ui.profiles = true
+                    Browser.goHome(tab)
                 },
-                onClick = { Browser.goHome(tab) },
+                onClick = { ui.profiles = true },
             ),
         contentAlignment = Alignment.Center,
     ) {
@@ -458,7 +458,7 @@ internal fun ProfilesPage() {
             Text("Add profile", color = p.text, fontSize = 16.sp)
         }
     }
-    Hint("Switch by holding the profile picture in the bar, or tapping it on the start page.")
+    Hint("Switch by tapping the profile picture in the bar or on the start page. Hold it in the bar for the start page.")
 
     val prefs = Browser.prefs
     var google by remember { mutableStateOf(prefs.profileGooglePictures) }

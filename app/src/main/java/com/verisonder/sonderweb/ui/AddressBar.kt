@@ -203,7 +203,7 @@ private fun BarBody(ui: UiState, tab: Tab?, top: Boolean) {
                     Spacer(Modifier.weight(1f))
                 } else {
                     if (com.verisonder.sonderweb.data.Profiles.enabled) {
-                        // Your profile's picture: tap for the start page, hold to switch profiles.
+                        // Your profile's picture: tap to switch profiles, hold for the start page.
                         ProfileHomeButton(ui, tab)
                     } else {
                         IconButtonSmall(Icons.Outlined.Home, "Home", size = 44, tint = p.mute) { Browser.goHome(tab) }
