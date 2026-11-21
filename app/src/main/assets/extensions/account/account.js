@@ -3,30 +3,39 @@
 // different account signs in). Nothing leaves the phone.
 (function () {
   if (window !== window.top) return;
-  const pictureOf = /^https:\/\/lh\d\.googleusercontent\.com\/a-?\//;
+  // Account pictures: lh3.googleusercontent.com/a/…, /a-/… and, in Google's own header, /ogw/….
+  const pictureOf = /^https:\/\/lh\d\.googleusercontent\.com\//;
   const emailOf = /[^\s()<>"]+@[^\s()<>"]+\.[a-z]{2,}/i;
+  // The account button: its link (any language) or its English label.
   const links = [
-    'a[aria-label^="Google Account"]',
-    'a[aria-label*="Google Account"]',
     'a[href*="SignOutOptions"]',
+    'a[aria-label*="Google Account"]',
   ];
+
+  function srcOf(img) {
+    if (!img) return "";
+    const s = img.currentSrc || img.getAttribute("src") || img.getAttribute("data-src") || "";
+    if (pictureOf.test(s)) return s;
+    const set = (img.getAttribute("srcset") || "").split(",").map((x) => x.trim().split(/\s+/)[0]);
+    return set.find((x) => pictureOf.test(x)) || "";
+  }
   let sent = "";
 
   function find() {
     for (const sel of links) {
       for (const a of document.querySelectorAll(sel)) {
         const label = a.getAttribute("aria-label") || "";
-        const img = a.querySelector("img");
-        const src = img ? (img.currentSrc || img.src || "") : "";
+        const src = srcOf(a.querySelector("img"));
         const email = (label.match(emailOf) || [""])[0];
         if (!email && !pictureOf.test(src)) continue;
-        const name = label.replace(/^.*?Google Account:\s*/i, "").replace(/\(.*$/s, "").trim();
-        return { picture: pictureOf.test(src) ? src : "", email: email.toLowerCase(), name };
+        // "Google Account: Name (email)", in any language: the part between the colon and the email.
+        const name = label.replace(/\(.*$/s, "").replace(/^.*[:：]\s*/s, "").trim();
+        return { picture: src, email: email.toLowerCase(), name };
       }
     }
-    for (const img of document.querySelectorAll('img[src*="googleusercontent.com/a"]')) {
-      const src = img.currentSrc || img.src || "";
-      if (pictureOf.test(src)) return { picture: src, email: "", name: "" };
+    for (const img of document.querySelectorAll('img[src*="googleusercontent.com/a"], img[src*="googleusercontent.com/ogw/"]')) {
+      const src = srcOf(img);
+      if (src) return { picture: src, email: "", name: "" };
     }
     return null;
   }

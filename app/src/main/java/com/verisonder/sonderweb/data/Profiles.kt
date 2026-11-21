@@ -192,8 +192,9 @@ object Profiles {
         if (!enabled || !prefs.profileGooglePictures) return
         val p = list.firstOrNull { it.id == id } ?: return
         if (!url.startsWith("https://") || !Regex("^https://lh\\d\\.googleusercontent\\.com/").containsMatchIn(url)) return
-        // Ask for it at 256 px (the address ends in its size, like "=s32-c").
-        val big = if ('=' in url.substringAfterLast('/')) url.substringBeforeLast('=') + "=s256-c" else "$url=s256-c"
+        // Ask for it at 256 px: the address ends in its size and options, like "=s32-c-mo".
+        val sized = Regex("=s\\d+")
+        val big = if (sized.containsMatchIn(url)) sized.replace(url, "=s256") else "$url=s256-c"
         if (p.google == big && googleFile(id).exists()) return
         Thread {
             val ok = runCatching {

@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "SonderWeb account picture",
-  "version": "1.1",
+  "version": "1.2",
   "description": "Tells the browser the picture of the Google account signed in, for the profile's picture.",
   "browser_specific_settings": { "gecko": { "id": "account@sonderweb" } },
   "permissions": ["nativeMessaging", "nativeMessagingFromContent", "geckoViewAddons"],
