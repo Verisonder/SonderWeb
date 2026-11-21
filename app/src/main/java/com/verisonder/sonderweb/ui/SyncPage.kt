@@ -50,6 +50,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verisonder.sonderweb.browser.Browser
+import com.verisonder.sonderweb.browser.Vpn
+import org.mozilla.geckoview.IPProtectionController.ProxyState
 import com.verisonder.sonderweb.sync.FxSync
 import com.verisonder.sonderweb.sync.SavedPassword
 
@@ -193,6 +195,8 @@ internal fun SyncPage(ui: UiState) {
         }
         FxSync.problem?.let { Hint(it) }
 
+        VpnGroup(ui)
+
         GroupTitle("Choose what to sync")
         Group {
             Toggle("Bookmarks", null, FxSync.syncBookmarks) { FxSync.changeSyncBookmarks(it) }
@@ -300,6 +304,76 @@ internal fun SyncPage(ui: UiState) {
     if (showPasswords) PasswordsDialog { showPasswords = false }
     if (showAddresses) AddressesDialog { showAddresses = false }
     if (showCards) CardsDialog { showCards = false }
+}
+
+/** Firefox's free built-in VPN: on/off, where to come out, data left, the address bar mark. */
+@Composable
+private fun VpnGroup(ui: UiState) {
+    val ctx = LocalContext.current
+    var picking by remember { mutableStateOf(false) }
+    LaunchedEffect(FxSync.vpnAllowed) { Vpn.refresh() }
+
+    GroupTitle("VPN")
+    Group {
+        if (!FxSync.vpnAllowed) {
+            ActionRow("Set up the VPN", "Sign in again once to let SonderWeb use your account's VPN") { startSignIn(ui) }
+        } else {
+            val place = Vpn.country?.let { Vpn.name(it) } ?: "Recommended location"
+            Toggle(
+                "VPN",
+                when {
+                    Vpn.busy -> "Turning on…"
+                    Vpn.on -> "On · $place"
+                    Vpn.wanted && Vpn.state == ProxyState.PAUSED -> "Paused: this month's data is used up"
+                    else -> "Hides your IP address from the sites you visit"
+                },
+                Vpn.wanted,
+            ) { Vpn.turn(it) }
+            ActionRow("Location", place) { picking = true }
+            if (Vpn.allowance > 0) {
+                val left = android.text.format.Formatter.formatShortFileSize(ctx, Vpn.remaining.coerceAtLeast(0))
+                val all = android.text.format.Formatter.formatShortFileSize(ctx, Vpn.allowance)
+                ActionRow("Data this month", "$left of $all left" + (Vpn.resetsAt?.let { " · resets " + Vpn.day(it) } ?: ""))
+            }
+            Toggle("Show in the address bar", "A small key next to the site while the VPN is on", Vpn.showInBar) {
+                Vpn.changeShowInBar(it)
+            }
+        }
+    }
+    Vpn.problem?.let { Hint(it) }
+    Hint(
+        "Firefox's free built-in VPN, with your Mozilla account. It covers SonderWeb's tabs (private ones too), not other apps. " +
+            "Mozilla decides the regions it's offered in and the monthly data.",
+    )
+
+    if (picking) {
+        val p = LocalPalette.current
+        AlertDialog(
+            onDismissRequest = { picking = false },
+            containerColor = p.card,
+            title = { Text("VPN location", color = p.text, fontSize = 18.sp) },
+            text = {
+                LazyColumn(Modifier.heightIn(max = 440.dp).clip(RoundedCornerShape(14.dp))) {
+                    item {
+                        Choice("Recommended", Vpn.country == null, "The fastest place for you") {
+                            Vpn.changeCountry(null)
+                            picking = false
+                        }
+                    }
+                    items(Vpn.countries.filter { it.available || it.code == Vpn.country }, key = { it.code }) { c ->
+                        Choice(Vpn.name(c.code), Vpn.country == c.code) {
+                            Vpn.changeCountry(c.code)
+                            picking = false
+                        }
+                    }
+                    if (Vpn.countries.isEmpty()) {
+                        item { Text("Loading the places…", color = p.faint, modifier = Modifier.padding(16.dp)) }
+                    }
+                }
+            },
+            confirmButton = { TextButton({ picking = false }) { Text("Done", color = p.accent) } },
+        )
+    }
 }
 
 private fun countText(n: Int) = when (n) {

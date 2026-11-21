@@ -55,6 +55,7 @@ object FxSync {
     private const val REDIRECT = "urn:ietf:wg:oauth:2.0:oob:oauth-redirect-webchannel"
     private const val SCOPE_PROFILE = "profile"
     const val SCOPE_SYNC = "https://identity.mozilla.com/apps/oldsync"
+    private const val SCOPE_VPN = "https://identity.mozilla.com/apps/vpn"
 
     /** The kinds' names in Firefox Sync. */
     const val PASSWORDS = "passwords"
@@ -162,6 +163,11 @@ object FxSync {
 
     /** How many passwords are saved. */
     var passwordCount by mutableIntStateOf(0)
+
+    /** Signed in, and the account gave SonderWeb the VPN permission (accounts signed in before
+     *  the VPN existed here don't have it: they sign in again once). */
+    var vpnAllowed by mutableStateOf(false)
+        private set
         private set
 
     // ---- Worker-thread state ----
@@ -396,6 +402,7 @@ object FxSync {
         connected = now
         val profile = if (now) runCatching { account?.getProfile(false) }.getOrNull() else null
         val mail = profile?.email
+        val vpn = now && runCatching { account?.hasScope(SCOPE_VPN) }.getOrNull() == true
         if (now && !prefs.getBoolean("caps_v1", false)) {
             // Accounts signed in before tabs could be sent: this phone now takes them.
             runCatching {
@@ -411,6 +418,7 @@ object FxSync {
         ui {
             signedIn = now || issues
             needsSignIn = issues
+            vpnAllowed = vpn
             if (profile != null) {
                 email = profile.email
                 displayName = profile.displayName
@@ -568,7 +576,7 @@ object FxSync {
                 val state = account!!.processEvent(
                     FxaEvent.BeginOAuthFlow(
                         service = "sync",
-                        scopes = listOf(SCOPE_PROFILE, SCOPE_SYNC),
+                        scopes = listOf(SCOPE_PROFILE, SCOPE_SYNC, SCOPE_VPN),
                         entrypoint = "preferences",
                     ),
                 )
@@ -624,6 +632,7 @@ object FxSync {
                 ui {
                     signedIn = false
                     needsSignIn = false
+                    vpnAllowed = false
                     email = null
                     displayName = null
                     avatar = null
@@ -632,6 +641,26 @@ object FxSync {
                     remoteDevices = emptyList()
                 }
             }
+        }
+    }
+
+    /** Its own thread, so the VPN never waits behind a long sync. */
+    private val vpnWorker = Executors.newSingleThreadExecutor { r -> Thread(r, "fxvpn").apply { isDaemon = true } }
+
+    /**
+     * A Mozilla account token for Firefox's built-in VPN, or null (signed out, no permission, no
+     * network). [done] runs on the main thread. The account keeps it cached until it expires.
+     */
+    fun vpnToken(done: (String?) -> Unit) {
+        val client = account
+        if (client == null || !connected) {
+            done(null)
+            return
+        }
+        vpnWorker.execute {
+            val token = runCatching { client.getAccessToken(SCOPE_VPN).token }.getOrNull()
+            scope.launch { persist() }
+            ui { done(token?.takeIf { it.isNotEmpty() }) }
         }
     }
 

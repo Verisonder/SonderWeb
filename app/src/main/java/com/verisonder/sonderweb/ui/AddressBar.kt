@@ -74,6 +74,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Search
@@ -104,6 +105,7 @@ import com.verisonder.sonderweb.browser.Browser
 import com.verisonder.sonderweb.browser.Delegates
 import com.verisonder.sonderweb.browser.Tab
 import com.verisonder.sonderweb.browser.Ublock
+import com.verisonder.sonderweb.browser.Vpn
 import com.verisonder.sonderweb.core.UrlText
 
 fun startEditing(ui: UiState, tab: Tab?) {
@@ -352,6 +354,11 @@ private fun Omnibox(ui: UiState, tab: Tab?, modifier: Modifier, pop: NewTabPop? 
             else -> Icons.Outlined.Info
         }
         Icon(icon, null, tint = p.faint, modifier = Modifier.size(16.dp))
+        // SonderWeb Sync's VPN, while it's on (if you keep the mark).
+        if (Vpn.on && Vpn.showInBar) {
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.Outlined.VpnKey, "VPN on", tint = p.accent, modifier = Modifier.size(16.dp))
+        }
         Spacer(Modifier.width(10.dp))
         val host = UrlText.host(tab?.url)
         Text(

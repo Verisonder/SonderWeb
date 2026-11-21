@@ -126,6 +126,7 @@ object Browser {
             FxaChannel.install(runtime)
             com.verisonder.sonderweb.sync.FxSync.init(app)
             Passwords.applyOption()
+            Vpn.install(app, runtime)
         }
         restoreTabs()
     }

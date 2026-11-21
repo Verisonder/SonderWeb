@@ -39,6 +39,9 @@ object FxSync {
     val bookmarksVersion = 0
     val remoteDevices: List<RemoteDevice> = emptyList()
     val fillPasswords = false
+    val vpnAllowed = false
+
+    fun vpnToken(done: (String?) -> Unit) = done(null)
 
     fun changeFillPasswords(on: Boolean) = Unit
 
