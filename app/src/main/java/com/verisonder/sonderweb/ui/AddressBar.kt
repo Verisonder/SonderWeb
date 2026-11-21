@@ -209,7 +209,10 @@ private fun BarBody(ui: UiState, tab: Tab?, top: Boolean) {
                         IconButtonSmall(Icons.Outlined.Home, "Home", size = 44, tint = p.mute) { Browser.goHome(tab) }
                     }
                     val pop = remember { NewTabPop() }
-                    Box(Modifier.weight(1f)) {
+                    // The profile ring reaches 2 dp from the field; the tabs square sits 12 dp from it:
+                    // the field moves over 10 dp so both sides have the same gap.
+                    val gap = if (com.verisonder.sonderweb.data.Profiles.enabled) 10.dp else 0.dp
+                    Box(Modifier.weight(1f).padding(start = gap)) {
                         Omnibox(ui, tab, Modifier.fillMaxWidth(), pop, top)
                         NewTabBubble(pop, top)
                     }
