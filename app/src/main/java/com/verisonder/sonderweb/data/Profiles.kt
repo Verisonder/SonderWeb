@@ -17,7 +17,17 @@ import java.io.File
  * One profile: its own sign-ins and site data, open tabs, history, bookmarks and start page
  * shortcuts. The first profile ([id] "") is what SonderWeb always had.
  */
-data class Profile(val id: String, val name: String, val color: Int, val google: String = "")
+data class Profile(
+    val id: String,
+    val name: String,
+    val color: Int,
+    /** Its Google account picture's address. */
+    val google: String = "",
+    /** The Google account it's for (the first one signed in on it). */
+    val account: String = "",
+    /** Other Google accounts you chose to keep in it (not asked about again). */
+    val kept: List<String> = emptyList(),
+)
 
 /** The profiles, which one is in use, and their pictures. */
 object Profiles {
@@ -61,7 +71,8 @@ object Profiles {
             val a = JSONArray(p.profiles ?: "[]")
             for (i in 0 until a.length()) {
                 val o = a.getJSONObject(i)
-                list += Profile(o.getString("id"), o.optString("name"), o.optInt("color", colors[0]), o.optString("g"))
+                val kept = o.optJSONArray("k")?.let { k -> List(k.length()) { k.optString(it) } } ?: emptyList()
+                list += Profile(o.getString("id"), o.optString("name"), o.optInt("color", colors[0]), o.optString("g"), o.optString("a"), kept)
             }
         }
         if (list.none { it.id.isEmpty() }) list.add(0, Profile("", "Personal", colors[0]))
@@ -72,7 +83,12 @@ object Profiles {
 
     private fun save() {
         val a = JSONArray()
-        list.forEach { a.put(JSONObject().put("id", it.id).put("name", it.name).put("color", it.color).put("g", it.google)) }
+        list.forEach {
+            a.put(
+                JSONObject().put("id", it.id).put("name", it.name).put("color", it.color).put("g", it.google)
+                    .put("a", it.account).put("k", JSONArray(it.kept)),
+            )
+        }
         prefs.profiles = a.toString()
     }
 
@@ -112,6 +128,30 @@ object Profiles {
         list[i] = list[i].copy(name = name.trim().ifEmpty { list[i].name }, color = color)
         save()
     }
+
+    // ---- Google accounts ----
+
+    /** This profile is for this Google account (its first). */
+    fun setAccount(id: String, email: String) {
+        val i = list.indexOfFirst { it.id == id }
+        if (i < 0 || list[i].account == email) return
+        list[i] = list[i].copy(account = email)
+        save()
+    }
+
+    /** Another Google account stays in this profile (you said so; not asked again). */
+    fun keep(id: String, email: String) {
+        val i = list.indexOfFirst { it.id == id }
+        if (i < 0 || email in list[i].kept) return
+        list[i] = list[i].copy(kept = list[i].kept + email)
+        save()
+    }
+
+    /** The profile that's for this Google account, if any. */
+    fun withAccount(email: String): Profile? = list.firstOrNull { it.account == email }
+
+    /** A colour not used yet (or the next one round). */
+    fun nextColor(): Int = colors.firstOrNull { c -> list.none { it.color == c } } ?: colors[list.size % colors.size]
 
     /** Removes a profile from the list (its data is cleared by Browser.deleteProfile). */
     internal fun remove(id: String) {

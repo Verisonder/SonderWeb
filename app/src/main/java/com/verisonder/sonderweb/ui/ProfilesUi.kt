@@ -437,7 +437,8 @@ internal fun ProfilesPage() {
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
                     Text(pr.name, color = p.text, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (pr.id == Profiles.current) Text("In use", color = p.faint, fontSize = 13.sp)
+                    val sub = listOfNotNull(pr.account.ifEmpty { null }, if (pr.id == Profiles.current) "In use" else null)
+                    if (sub.isNotEmpty()) Text(sub.joinToString(" · "), color = p.faint, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
