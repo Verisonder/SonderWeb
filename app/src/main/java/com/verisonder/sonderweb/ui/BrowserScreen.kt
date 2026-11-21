@@ -114,6 +114,12 @@ class UiState {
 
     /** The tab switcher is showing the Private list. */
     var tabsPrivate by mutableStateOf(false)
+
+    /** The profile list is open (from the profile picture). */
+    var profiles by mutableStateOf(false)
+
+    /** Settings opens at this page (its name), once. */
+    var settingsPage by mutableStateOf<String?>(null)
 }
 
 @Composable
@@ -416,6 +422,18 @@ fun BrowserScreen(activity: MainActivity) {
                     // The margin sits inside the animated layer so the shadow is never cut off.
                     tab?.let { Scaled(remember(ui.themeVersion) { Browser.prefs.barSize / 100f }) { StartControls(ui, it, Modifier.padding(12.dp)) } }
                 }
+                // Bottom left: the profile picture (tap to switch profiles).
+                AnimatedVisibility(
+                    visible = startPage && !activity.fullView,
+                    enter = fadeIn(tween(180)) + scaleIn(spring(dampingRatio = 0.75f, stiffness = 500f), initialScale = 0.85f),
+                    exit = fadeOut(tween(120)) + scaleOut(tween(140), targetScale = 0.9f),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .navigationBarsPadding()
+                        .padding(2.dp),
+                ) {
+                    Scaled(remember(ui.themeVersion) { Browser.prefs.barSize / 100f }) { StartProfileButton(ui, Modifier.padding(12.dp)) }
+                }
                 AnimatedVisibility(
                     visible = !startPage && !activity.fullView,
                     enter = fadeIn(tween(180)),
@@ -481,6 +499,7 @@ fun BrowserScreen(activity: MainActivity) {
             FirstSyncAsk(ui)
             com.verisonder.sonderweb.browser.Translate.ask?.let { TranslateDialog(it) }
             ui.sendTab?.let { (title, url) -> SendTabDialog(title, url) { ui.sendTab = null } }
+            ProfileSwitcher(ui, barTop)
             ui.shred?.let { site ->
                 ConfirmDialog(
                     "Shred $site?",

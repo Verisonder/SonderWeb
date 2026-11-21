@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import com.verisonder.sonderweb.core.AddressInput
 import com.verisonder.sonderweb.core.UrlText
 import com.verisonder.sonderweb.data.Db
+import com.verisonder.sonderweb.data.Profiles
 import com.verisonder.sonderweb.data.Prefs
 import org.mozilla.geckoview.ContentBlocking
 import org.mozilla.geckoview.GeckoRuntime
@@ -27,8 +28,18 @@ object Browser {
         private set
     lateinit var prefs: Prefs
         private set
+    /** The history and bookmarks of the profile in use. */
     lateinit var db: Db
         private set
+
+    /** The first profile's: Firefox Sync follows it, and it keeps the downloads list. */
+    lateinit var mainDb: Db
+        private set
+
+    private val dbs = HashMap<String, Db>()
+
+    private fun dbOf(profile: String): Db =
+        if (profile.isEmpty()) mainDb else dbs.getOrPut(profile) { Db(app, Profiles.dbName(profile)) }
     lateinit var runtime: GeckoRuntime
         private set
 
@@ -74,8 +85,10 @@ object Browser {
         started = true
         app = context.applicationContext
         prefs = Prefs(app)
-        db = Db(app)
-        db.interruptRunning()
+        mainDb = Db(app)
+        mainDb.interruptRunning()
+        Profiles.load(app, prefs)
+        db = dbOf(Profiles.current)
         privateScreenshots = prefs.privateScreenshots
         privateLocked = prefs.privateLock
 
@@ -224,7 +237,7 @@ object Browser {
         open: Boolean = true,
         lazy: Boolean = false,
     ): Tab {
-        val tab = Tab(nextId++, isPrivate)
+        val tab = Tab(nextId++, isPrivate, if (isPrivate) null else Profiles.contextId(Profiles.current))
         tab.openerId = opener?.id
         Delegates.attach(tab)
         val at = opener?.let { tabs.indexOf(it) }?.takeIf { it >= 0 }?.plus(1) ?: tabs.size
@@ -574,20 +587,23 @@ object Browser {
         }
     }
 
-    private fun restoreTabs() {
-        val urls = if (prefs.restoreTabs) prefs.savedTabs else emptyList()
+    /** [fresh]: the app is starting (not switching profiles). */
+    private fun restoreTabs(fresh: Boolean = true) {
+        val urls = if (prefs.restoreTabs || !fresh) prefs.savedTabs else emptyList()
         if (urls.isEmpty()) {
             newTab(null, isPrivate = false)
             return
         }
         val index = prefs.savedTabIndex.coerceIn(0, urls.size - 1)
         // Opening on the start page: the old tabs come back without loading the last site.
-        val startPage = startPageDue(fresh = true)
+        val startPage = fresh && startPageDue(fresh = true)
         val colors = prefs.savedTabColors
         val titles = prefs.savedTabTitles
         val used = prefs.savedTabUsed
+        val back = ArrayList<Tab>(urls.size)
         urls.forEachIndexed { i, url ->
             val tab = newTab(url, isPrivate = false, select = false, lazy = true)
+            back += tab
             colors.getOrNull(i)?.let { (top, bottom) ->
                 tab.edgeTop = top
                 tab.edgeBottom = bottom
@@ -602,13 +618,58 @@ object Browser {
                 }
             }
         }
-        com.verisonder.sonderweb.data.Thumbs.keepOnly(app, urls)
-        com.verisonder.sonderweb.data.Thumbs.dropOld(app)
+        if (fresh) {
+            // Pictures of every profile's tabs are kept, not only this one's.
+            val all = urls + Profiles.list.filter { it.id != Profiles.current }.flatMap { prefs.savedTabsOf(it.id) }
+            com.verisonder.sonderweb.data.Thumbs.keepOnly(app, all)
+            com.verisonder.sonderweb.data.Thumbs.dropOld(app)
+        }
         if (startPage) {
             newTab(null, isPrivate = false)
             return
         }
-        select(tabs[index])
+        select(back[index])
+    }
+
+    // ---- Profiles ----
+
+    /**
+     * Switches to another profile: this one's tabs are saved and put away, the other's come back
+     * (its own sign-ins, history, bookmarks and shortcuts). Private tabs stay as they are.
+     */
+    fun switchProfile(id: String) {
+        if (id == Profiles.current || Profiles.list.none { it.id == id }) return
+        saveTabs()
+        mini?.let { closeMini(it) }
+        mini = null
+        miniStopped = null
+        val leaving = tabs.filter { !it.isPrivate }
+        if (current?.isPrivate != true) current = null
+        leaving.forEach { putAway(it) }
+        Profiles.use(id)
+        db = dbOf(id)
+        restoreTabs(fresh = false)
+    }
+
+    /** Takes a tab out without the rest of closing (no new tab, no saving). */
+    private fun putAway(tab: Tab) {
+        tabs.remove(tab)
+        Prompts.queue.removeAll { it.tab === tab }
+        Bar.forget(tab)
+        BackPeek.forget(tab)
+        Pip.forget(tab)
+        if (tab.session.isOpen) tab.session.close()
+    }
+
+    /** Deletes a profile (not the first): its sign-ins, site data, tabs, history and bookmarks. */
+    fun deleteProfile(id: String) {
+        if (id.isEmpty()) return
+        if (Profiles.current == id) switchProfile("")
+        Profiles.contextId(id)?.let { runCatching { runtime.storageController.clearDataForSessionContext(it) } }
+        dbs.remove(id)?.close()
+        app.deleteDatabase(Profiles.dbName(id))
+        prefs.forgetProfile(id)
+        Profiles.remove(id)
     }
 
     // ---- Clearing ----
@@ -619,8 +680,8 @@ object Browser {
 
     /** Every trace of browsing: history, downloads list, cookies, cache and site data. */
     fun clearEverything(done: () -> Unit) {
-        db.clearHistory()
-        db.clearDownloads()
+        Profiles.list.forEach { dbOf(it.id).clearHistory() }
+        mainDb.clearDownloads()
         clearData(StorageController.ClearFlags.ALL, done)
     }
 

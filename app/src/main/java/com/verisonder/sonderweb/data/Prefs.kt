@@ -9,6 +9,40 @@ import org.json.JSONObject
 class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("sonderweb", Context.MODE_PRIVATE)
 
+    /**
+     * The profile whose open tabs and start page shortcuts are read and written ("" = the first
+     * profile, which keeps the plain keys it always had). Set by [com.verisonder.sonderweb.data.Profiles].
+     */
+    var scope = ""
+
+    private fun k(key: String) = if (scope.isEmpty()) key else "$key@$scope"
+
+    /** The open tabs saved for another profile (to keep their pictures). */
+    fun savedTabsOf(profile: String): List<String> {
+        val raw = sp.getString(if (profile.isEmpty()) "tabs" else "tabs@$profile", null) ?: return emptyList()
+        return runCatching {
+            val a = JSONArray(raw)
+            List(a.length()) { a.getString(it) }
+        }.getOrDefault(emptyList())
+    }
+
+    /** A deleted profile's open tabs and shortcuts. */
+    fun forgetProfile(profile: String) {
+        if (profile.isEmpty()) return
+        val e = sp.edit()
+        listOf("tabs", "tab_titles", "tab_colors", "tab_used", "tab_index", "shortcuts").forEach { e.remove("$it@$profile") }
+        e.apply()
+    }
+
+    /** The profiles (JSON) and which one is in use. */
+    var profiles: String?
+        get() = sp.getString("profiles", null)
+        set(v) = sp.edit().putString("profiles", v).apply()
+
+    var profile: String
+        get() = sp.getString("profile", "") ?: ""
+        set(v) = sp.edit().putString("profile", v).apply()
+
     var searchEngineId: String
         get() = sp.getString("engine", SearchEngines.DEFAULT_ID) ?: SearchEngines.DEFAULT_ID
         set(v) = sp.edit().putString("engine", v).apply()
@@ -221,29 +255,29 @@ class Prefs(context: Context) {
     /** Addresses of the normal (not private) tabs, to reopen next launch. */
     var savedTabs: List<String>
         get() {
-            val raw = sp.getString("tabs", null) ?: return emptyList()
+            val raw = sp.getString(k("tabs"), null) ?: return emptyList()
             return runCatching {
                 val a = JSONArray(raw)
                 List(a.length()) { a.getString(it) }
             }.getOrDefault(emptyList())
         }
-        set(v) = sp.edit().putString("tabs", JSONArray(v).toString()).apply()
+        set(v) = sp.edit().putString(k("tabs"), JSONArray(v).toString()).apply()
 
     /** Each saved tab's page title, in the order of [savedTabs]. */
     var savedTabTitles: List<String>
         get() {
-            val raw = sp.getString("tab_titles", null) ?: return emptyList()
+            val raw = sp.getString(k("tab_titles"), null) ?: return emptyList()
             return runCatching {
                 val a = JSONArray(raw)
                 List(a.length()) { a.optString(it) }
             }.getOrDefault(emptyList())
         }
-        set(v) = sp.edit().putString("tab_titles", JSONArray(v).toString()).apply()
+        set(v) = sp.edit().putString(k("tab_titles"), JSONArray(v).toString()).apply()
 
     /** Each saved tab's page colours (top, bottom; null = unknown), in the order of [savedTabs]. */
     var savedTabColors: List<Pair<Int?, Int?>>
         get() {
-            val raw = sp.getString("tab_colors", null) ?: return emptyList()
+            val raw = sp.getString(k("tab_colors"), null) ?: return emptyList()
             return runCatching {
                 val a = JSONArray(raw)
                 List(a.length()) { i ->
@@ -259,23 +293,23 @@ class Prefs(context: Context) {
             v.forEach { (top, bottom) ->
                 a.put(JSONArray().put(top ?: JSONObject.NULL).put(bottom ?: JSONObject.NULL))
             }
-            sp.edit().putString("tab_colors", a.toString()).apply()
+            sp.edit().putString(k("tab_colors"), a.toString()).apply()
         }
 
     /** When each saved tab was last used (ms), in the order of [savedTabs]. */
     var savedTabUsed: List<Long>
         get() {
-            val raw = sp.getString("tab_used", null) ?: return emptyList()
+            val raw = sp.getString(k("tab_used"), null) ?: return emptyList()
             return runCatching {
                 val a = JSONArray(raw)
                 List(a.length()) { a.optLong(it) }
             }.getOrDefault(emptyList())
         }
-        set(v) = sp.edit().putString("tab_used", JSONArray(v).toString()).apply()
+        set(v) = sp.edit().putString(k("tab_used"), JSONArray(v).toString()).apply()
 
     var savedTabIndex: Int
-        get() = sp.getInt("tab_index", 0)
-        set(v) = sp.edit().putInt("tab_index", v).apply()
+        get() = sp.getInt(k("tab_index"), 0)
+        set(v) = sp.edit().putInt(k("tab_index"), v).apply()
 
     // ---- Start page ----
 
@@ -316,7 +350,7 @@ class Prefs(context: Context) {
     /** Start page shortcuts. None until you add some. */
     var shortcuts: List<Shortcut>
         get() {
-            val raw = sp.getString("shortcuts", null) ?: return defaultShortcuts
+            val raw = sp.getString(k("shortcuts"), null) ?: return defaultShortcuts
             return runCatching {
                 val a = JSONArray(raw)
                 List(a.length()) { i ->
@@ -328,7 +362,7 @@ class Prefs(context: Context) {
         set(v) {
             val a = JSONArray()
             v.forEach { a.put(JSONObject().put("u", it.url).put("t", it.title)) }
-            sp.edit().putString("shortcuts", a.toString()).apply()
+            sp.edit().putString(k("shortcuts"), a.toString()).apply()
         }
 
     companion object {

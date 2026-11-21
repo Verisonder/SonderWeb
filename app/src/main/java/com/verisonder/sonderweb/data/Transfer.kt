@@ -44,6 +44,9 @@ object Transfer {
     /** Settings that aren't copied: open tabs are added to (not replaced), the rest belongs to this app. */
     private val NOT_COPIED = setOf("tabs", "tab_titles", "tab_colors", "tab_used", "tab_index")
 
+    /** Profiles stay in their own app: only the first profile is copied. */
+    private fun ownProfileKey(key: String) = '@' in key || key == "profiles" || key == "profile"
+
     fun otherInstalled(context: Context): Boolean = runCatching {
         context.packageManager.getPackageInfo(otherPackage, 0)
         true
@@ -95,12 +98,12 @@ object Transfer {
                 is Set<*> -> JSONObject().put("ss", JSONArray(value.map { it.toString() }))
                 else -> null
             }
-            if (v != null) prefs.put(key, v)
+            if (v != null && !ownProfileKey(key)) prefs.put(key, v)
         }
         out.put("prefs", prefs)
         out.put("squircle", AppIcon.isSquircle(context))
 
-        val db = Browser.db
+        val db = Browser.mainDb
         out.put(
             "history",
             JSONArray().apply {
@@ -120,7 +123,8 @@ object Transfer {
                 }
             },
         )
-        val p = Browser.prefs
+        // The first profile's tabs (a fresh Prefs reads its keys, whichever profile is in use).
+        val p = Prefs(context)
         out.put(
             "tabs",
             JSONArray().apply {
@@ -180,7 +184,7 @@ object Transfer {
 
         // Settings: this app's are replaced by the other's (its open tabs are kept, see below).
         val sp = context.getSharedPreferences("sonderweb", Context.MODE_PRIVATE)
-        val keep = NOT_COPIED.associateWith { sp.all[it] }
+        val keep = sp.all.filterKeys { it in NOT_COPIED || ownProfileKey(it) }
         val e = sp.edit().clear()
         keep.forEach { (k, v) ->
             when (v) {
@@ -192,7 +196,7 @@ object Transfer {
         }
         j.optJSONObject("prefs")?.let { prefs ->
             prefs.keys().forEach { k ->
-                if (k in NOT_COPIED) return@forEach
+                if (k in NOT_COPIED || ownProfileKey(k)) return@forEach
                 val v = prefs.getJSONObject(k)
                 when {
                     v.has("s") -> e.putString(k, v.getString("s"))

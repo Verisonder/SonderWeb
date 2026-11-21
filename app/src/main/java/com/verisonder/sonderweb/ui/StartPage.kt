@@ -281,7 +281,7 @@ private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser
     val weather = Weather.now.takeIf { prefs.weatherOn }
 
     var version by remember { mutableIntStateOf(0) }
-    val shortcuts = remember(version, ui.themeVersion) { prefs.shortcuts }
+    val shortcuts = remember(version, ui.themeVersion, com.verisonder.sonderweb.data.Profiles.current) { prefs.shortcuts }
     var editing by remember { mutableStateOf<Int?>(null) } // index, or -1 for a new one
 
     // Everything sits in the middle of the screen, a little below centre; it scrolls if it doesn't fit.

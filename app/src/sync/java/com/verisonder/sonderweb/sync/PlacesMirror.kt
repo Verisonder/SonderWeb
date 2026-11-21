@@ -59,7 +59,7 @@ internal object PlacesMirror {
     /** Hands Firefox Sync the visits it doesn't have yet. */
     fun pushHistory() {
         val w = writer() ?: return
-        val db = Browser.db
+        val db = Browser.mainDb
         while (true) {
             val rows = db.unsyncedHistory()
             if (rows.isEmpty()) return
@@ -87,7 +87,7 @@ internal object PlacesMirror {
     fun pullHistory(context: Context) {
         val reader = api?.openReader() ?: return
         val prefs = context.getSharedPreferences("fxsync", Context.MODE_PRIVATE)
-        val db = Browser.db
+        val db = Browser.mainDb
         try {
             val since = prefs.getLong("history_imported", 0L)
             // A week of overlap: synced visits can arrive later than they happened.
@@ -180,7 +180,7 @@ internal object PlacesMirror {
      */
     fun reconcileBookmarks(): Boolean {
         val w = writer() ?: return false
-        val db = Browser.db
+        val db = Browser.mainDb
         val last = readLast()
         var changedHere = false
 

@@ -678,6 +678,21 @@ object FxSync {
 
     /** This phone's open tabs (not private ones), for your other devices to see. */
     private fun localTabs(): List<RemoteTabRecord> = runCatching {
+        // Firefox Sync follows the first profile: in another one, its saved tabs are sent.
+        if (com.verisonder.sonderweb.data.Profiles.current.isNotEmpty()) {
+            val p = com.verisonder.sonderweb.data.Prefs(app)
+            val titles = p.savedTabTitles
+            val used = p.savedTabUsed
+            return@runCatching p.savedTabs.mapIndexedNotNull { i, url ->
+                if (!url.startsWith("http://") && !url.startsWith("https://")) return@mapIndexedNotNull null
+                RemoteTabRecord(
+                    title = titles.getOrNull(i)?.ifBlank { null } ?: url,
+                    urlHistory = listOf(url),
+                    icon = null,
+                    lastUsed = used.getOrNull(i) ?: 0L,
+                )
+            }.sortedByDescending { it.lastUsed }
+        }
         com.verisonder.sonderweb.browser.Browser.tabs
             .filter { !it.isPrivate }
             .mapNotNull { t ->

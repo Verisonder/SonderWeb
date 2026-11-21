@@ -71,7 +71,6 @@ import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import org.mozilla.geckoview.GeckoSession
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.VpnKey
@@ -202,7 +201,8 @@ private fun BarBody(ui: UiState, tab: Tab?, top: Boolean) {
                     // The start page has its own search box: here only tabs and the menu.
                     Spacer(Modifier.weight(1f))
                 } else {
-                    IconButtonSmall(Icons.Outlined.Home, "Home", size = 44, tint = p.mute) { Browser.goHome(tab) }
+                    // Your profile's picture: tap for the start page, hold to switch profiles.
+                    ProfileHomeButton(ui, tab)
                     val pop = remember { NewTabPop() }
                     Box(Modifier.weight(1f)) {
                         Omnibox(ui, tab, Modifier.fillMaxWidth(), pop, top)

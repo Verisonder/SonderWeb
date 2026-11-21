@@ -44,6 +44,7 @@ import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.ManageAccounts
 import androidx.compose.material.icons.outlined.Tab
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.AlertDialog
@@ -102,6 +103,7 @@ private enum class Page(val title: String) {
     Search("Search engine"),
     Look("Appearance"),
     Tabs("Tabs"),
+    Profiles("Profiles"),
     About("About SonderWeb"),
 }
 
@@ -160,6 +162,9 @@ private val index: List<Pair<String, Page>> = (
     "Version" to Page.About,
     "Status bar" to Page.Look,
     "Reopen tabs" to Page.Tabs,
+    "Profiles" to Page.Profiles,
+    "Accounts" to Page.Profiles,
+    "Profile picture" to Page.Profiles,
     "Clock position" to Page.Start,
     "Start page layout" to Page.Start,
     "Start page background" to Page.Start,
@@ -173,7 +178,12 @@ private val index: List<Pair<String, Page>> = (
 @Composable
 fun SettingsScreen(ui: UiState) {
     val p = LocalPalette.current
-    var page by remember { mutableStateOf<Page?>(null) }
+    // Opened at a page (the profile list's "Manage profiles"), or at the list.
+    var page by remember {
+        val start = ui.settingsPage?.let { name -> Page.entries.firstOrNull { it.name == name } }
+        ui.settingsPage = null
+        mutableStateOf(start)
+    }
     var query by remember { mutableStateOf("") }
     var clearing by remember { mutableStateOf(false) }
     val close = { ui.panel = Panel.None }
@@ -229,6 +239,7 @@ fun SettingsScreen(ui: UiState) {
                 Page.Search -> SearchPage()
                 Page.Look -> LookPage(ui)
                 Page.Tabs -> TabsPage()
+                Page.Profiles -> ProfilesPage()
                 Page.About -> AboutPage(ui)
             }
         }
@@ -311,6 +322,7 @@ private fun MainPage(
         NavRow(Icons.Outlined.Search, "Search engine", Browser.prefs.engine().name, first = true) { onOpen(Page.Search) }
         NavRow(Icons.Outlined.Palette, "Appearance", null) { onOpen(Page.Look) }
         NavRow(Icons.Outlined.Tab, "Tabs", null) { onOpen(Page.Tabs) }
+        NavRow(Icons.Outlined.ManageAccounts, "Profiles", com.verisonder.sonderweb.data.Profiles.active.name) { onOpen(Page.Profiles) }
         val isDefault = (ctx as? MainActivity)?.defaultBrowser() == true
         NavRow(
             Icons.AutoMirrored.Outlined.OpenInNew,
@@ -367,6 +379,7 @@ private fun iconFor(page: Page): ImageVector = when (page) {
     Page.Search -> Icons.Outlined.Search
     Page.Look -> Icons.Outlined.Palette
     Page.Tabs -> Icons.Outlined.Tab
+    Page.Profiles -> Icons.Outlined.ManageAccounts
     Page.About -> Icons.Outlined.Info
 }
 
@@ -1443,7 +1456,7 @@ private fun ClearDataDialog(onDone: () -> Unit) {
         confirmButton = {
             TextButton({
                 if (hist) Browser.db.clearHistory()
-                if (downloads) Browser.db.clearDownloads()
+                if (downloads) Browser.mainDb.clearDownloads()
                 var flags = 0L
                 if (cookies) {
                     flags = flags or StorageController.ClearFlags.COOKIES or StorageController.ClearFlags.DOM_STORAGES or

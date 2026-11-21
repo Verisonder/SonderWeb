@@ -121,7 +121,7 @@ object Downloads {
     }
 
     private fun write(body: InputStream, name: String, mime: String, url: String, length: Long, isPrivate: Boolean) {
-        val id = if (isPrivate) -1L else Browser.db.addDownload(name, url, mime)
+        val id = if (isPrivate) -1L else Browser.mainDb.addDownload(name, url, mime)
         // Identifies it for Cancel and its notification.
         val key = if (id >= 0) id else nextPrivate--
         if (id >= 0) {
@@ -192,7 +192,7 @@ object Downloads {
                     else -> DownloadItem.FAILED
                 }
                 if (id >= 0) {
-                    Browser.db.finishDownload(id, if (ok) uri?.toString() else null, size, state)
+                    Browser.mainDb.finishDownload(id, if (ok) uri?.toString() else null, size, state)
                     live.remove(id)
                     changes++
                 }
@@ -274,7 +274,7 @@ object Downloads {
 
     /** Off the list; the file stays on the phone. */
     fun remove(item: DownloadItem) {
-        Browser.db.deleteDownload(item.id)
+        Browser.mainDb.deleteDownload(item.id)
         changes++
     }
 
@@ -288,7 +288,7 @@ object Downloads {
     }
 
     fun clear() {
-        Browser.db.clearDownloads()
+        Browser.mainDb.clearDownloads()
         changes++
     }
 }

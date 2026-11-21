@@ -502,7 +502,7 @@ private fun MoveTarget(name: String, current: Boolean, onClick: () -> Unit) {
 
 @Composable
 fun DownloadsScreen(ui: UiState) {
-    val items = remember(Downloads.changes) { Browser.db.downloads() }
+    val items = remember(Downloads.changes) { Browser.mainDb.downloads() }
     Column(Modifier.fillMaxSize()) {
         PageHeader(
             "Downloads",

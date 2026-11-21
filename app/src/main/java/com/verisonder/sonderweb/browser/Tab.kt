@@ -9,10 +9,12 @@ import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoSessionSettings
 
 /** One tab. Its fields are Compose state, so the UI follows the page as it loads. */
-class Tab(val id: Long, val isPrivate: Boolean) {
+class Tab(val id: Long, val isPrivate: Boolean, val contextId: String? = null) {
     val session: GeckoSession = GeckoSession(
         GeckoSessionSettings.Builder()
             .usePrivateMode(isPrivate)
+            // A profile's own sign-ins and site data (null: the first profile's).
+            .contextId(contextId)
             .useTrackingProtection(true)
             .userAgentMode(GeckoSessionSettings.USER_AGENT_MODE_MOBILE)
             .viewportMode(GeckoSessionSettings.VIEWPORT_MODE_MOBILE)

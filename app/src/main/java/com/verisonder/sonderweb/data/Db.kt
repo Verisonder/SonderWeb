@@ -42,8 +42,14 @@ data class DownloadItem(
     }
 }
 
-/** History, bookmarks and downloads. Private tabs never write here. */
-class Db(context: Context) : SQLiteOpenHelper(context, "sonderweb.db", null, 2) {
+/**
+ * History, bookmarks and downloads. Private tabs never write here. Each profile has its own
+ * file ([name]); only the first profile's ("sonderweb.db") is synced and holds the downloads.
+ */
+class Db(context: Context, name: String = "sonderweb.db") : SQLiteOpenHelper(context, name, null, 2) {
+
+    /** The first profile's: the one Firefox Sync (SonderWeb Sync) follows. */
+    private val synced = name == "sonderweb.db"
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -120,12 +126,12 @@ class Db(context: Context) : SQLiteOpenHelper(context, "sonderweb.db", null, 2) 
         val url = readableDatabase.rawQuery("SELECT url FROM history WHERE id = ?", arrayOf(id.toString()))
             .use { if (it.moveToFirst()) it.getString(0) else null }
         writableDatabase.delete("history", "id = ?", arrayOf(id.toString()))
-        if (url != null) FxSync.noteHistoryRemoved(url)
+        if (url != null && synced) FxSync.noteHistoryRemoved(url)
     }
 
     fun clearHistory() {
         writableDatabase.delete("history", null, null)
-        FxSync.noteHistoryCleared()
+        if (synced) FxSync.noteHistoryCleared()
     }
 
     // History and Firefox Sync (SonderWeb Sync): 0 not given to it yet, 1 given, 2 it refused.
@@ -232,13 +238,13 @@ class Db(context: Context) : SQLiteOpenHelper(context, "sonderweb.db", null, 2) 
             put("parent", parent)
         }
         writableDatabase.insert("bookmarks", null, cv)
-        FxSync.noteBookmarksChanged()
+        if (synced) FxSync.noteBookmarksChanged()
     }
 
     /** Un-bookmarks a page (wherever it's filed). */
     fun removeBookmark(url: String) {
         writableDatabase.delete("bookmarks", "url = ? AND folder = 0", arrayOf(url))
-        FxSync.noteBookmarksChanged()
+        if (synced) FxSync.noteBookmarksChanged()
     }
 
     /** Every saved page (no folders), for searching and suggestions. */
@@ -277,7 +283,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, "sonderweb.db", null, 2) 
             put("folder", 1)
         }
         val id = writableDatabase.insert("bookmarks", null, cv)
-        FxSync.noteBookmarksChanged()
+        if (synced) FxSync.noteBookmarksChanged()
         return id
     }
 
@@ -288,7 +294,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, "sonderweb.db", null, 2) 
             if (url != null) put("url", url)
         }
         writableDatabase.update("bookmarks", cv, "id = ? AND fixed = 0", arrayOf(id.toString()))
-        FxSync.noteBookmarksChanged()
+        if (synced) FxSync.noteBookmarksChanged()
     }
 
     /** Moves a bookmark or folder into another folder (never into itself or its own folders). */
@@ -304,7 +310,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, "sonderweb.db", null, 2) 
             put("position", 0)
         }
         writableDatabase.update("bookmarks", cv, "id = ? AND fixed = 0", arrayOf(id.toString()))
-        FxSync.noteBookmarksChanged()
+        if (synced) FxSync.noteBookmarksChanged()
     }
 
     /** Deletes a bookmark, or a folder and everything in it. */
@@ -317,7 +323,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, "sonderweb.db", null, 2) 
         } finally {
             db.endTransaction()
         }
-        FxSync.noteBookmarksChanged()
+        if (synced) FxSync.noteBookmarksChanged()
     }
 
     private fun deleteTree(db: SQLiteDatabase, id: Long) {
