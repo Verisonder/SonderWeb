@@ -98,6 +98,9 @@ object Prompts {
 
     private fun site(tab: Tab) = UrlText.host(tab.url).ifEmpty { "This page" }
 
+    private fun savesPasswords() =
+        com.verisonder.sonderweb.sync.FxSync.enabled && com.verisonder.sonderweb.sync.FxSync.fillPasswords
+
     fun delegate(tab: Tab) = object : PromptDelegate {
 
         override fun onAlertPrompt(
@@ -327,6 +330,8 @@ object Prompts {
             session: GeckoSession,
             request: PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSaveOption>,
         ): GeckoResult<PromptResponse>? {
+            // Only SonderWeb Sync saves passwords, and only with "Save and fill passwords" on.
+            if (!savesPasswords()) return GeckoResult.fromValue(request.dismiss())
             val option = request.options.firstOrNull() ?: return GeckoResult.fromValue(request.dismiss())
             val login = option.value
             val update = !login.guid.isNullOrEmpty()
@@ -350,7 +355,7 @@ object Prompts {
             request: PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSelectOption>,
         ): GeckoResult<PromptResponse>? {
             val options = request.options
-            if (options.isEmpty()) return GeckoResult.fromValue(request.dismiss())
+            if (options.isEmpty() || !savesPasswords()) return GeckoResult.fromValue(request.dismiss())
             val rows = options.map { o ->
                 val v = o.value
                 v.username.ifBlank { "(no username)" } to UrlText.host(v.origin).ifEmpty { v.origin }
