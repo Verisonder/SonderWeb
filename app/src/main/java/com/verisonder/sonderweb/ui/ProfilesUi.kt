@@ -143,8 +143,11 @@ fun ProfileHomeButton(ui: UiState, tab: Tab) {
     val haptics = LocalHapticFeedback.current
     val p = LocalPalette.current
     // A grey ring in the address field's colour, as tall as the field (40 dp), so the two line up.
+    // 4 dp more on the left: the ring then sits as far from the bar's side (4 + 2 + 4 = 10 dp) as
+    // from its top (the 2 dp loading line + 8 dp).
     Box(
         Modifier
+            .padding(start = 4.dp)
             .size(44.dp)
             .padding(2.dp)
             .clip(CircleShape)
