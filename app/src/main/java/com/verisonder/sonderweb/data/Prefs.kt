@@ -61,6 +61,11 @@ class Prefs(context: Context) {
         e.apply()
     }
 
+    /** Profiles are turned on (off: SonderWeb as it always was, one profile). */
+    var profilesOn: Boolean
+        get() = sp.getBoolean("profiles_on", false)
+        set(v) = sp.edit().putBoolean("profiles_on", v).apply()
+
     /** The profiles (JSON) and which one is in use. */
     var profiles: String?
         get() = sp.getString("profiles", null)

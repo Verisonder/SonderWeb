@@ -719,6 +719,12 @@ object Browser {
         }
     }
 
+    /** Settings › Profiles › Use profiles. Off: back to the first profile (the others are kept). */
+    fun turnProfiles(on: Boolean) {
+        if (!on) switchProfile("")
+        Profiles.turn(on)
+    }
+
     /** Takes a tab out without the rest of closing (no new tab, no saving). */
     private fun putAway(tab: Tab) {
         tabs.remove(tab)

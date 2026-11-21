@@ -422,9 +422,9 @@ fun BrowserScreen(activity: MainActivity) {
                     // The margin sits inside the animated layer so the shadow is never cut off.
                     tab?.let { Scaled(remember(ui.themeVersion) { Browser.prefs.barSize / 100f }) { StartControls(ui, it, Modifier.padding(12.dp)) } }
                 }
-                // Bottom left: the profile picture (tap to switch profiles).
+                // Bottom left: the profile picture (tap to switch profiles), when profiles are on.
                 AnimatedVisibility(
-                    visible = startPage && !activity.fullView,
+                    visible = startPage && !activity.fullView && com.verisonder.sonderweb.data.Profiles.enabled,
                     enter = fadeIn(tween(180)) + scaleIn(spring(dampingRatio = 0.75f, stiffness = 500f), initialScale = 0.85f),
                     exit = fadeOut(tween(120)) + scaleOut(tween(140), targetScale = 0.9f),
                     modifier = Modifier

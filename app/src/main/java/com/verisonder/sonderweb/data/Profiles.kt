@@ -26,6 +26,10 @@ object Profiles {
 
     val list = mutableStateListOf<Profile>()
 
+    /** Profiles are turned on (Settings › Profiles). Off: only the first profile, no profile button. */
+    var enabled by mutableStateOf(false)
+        private set
+
     /** The profile in use. */
     var current by mutableStateOf("")
         private set
@@ -61,7 +65,8 @@ object Profiles {
             }
         }
         if (list.none { it.id.isEmpty() }) list.add(0, Profile("", "Personal", colors[0]))
-        current = p.profile.takeIf { id -> list.any { it.id == id } } ?: ""
+        enabled = p.profilesOn
+        current = if (enabled) p.profile.takeIf { id -> list.any { it.id == id } } ?: "" else ""
         p.scope = current
     }
 
@@ -80,6 +85,11 @@ object Profiles {
 
     /** The database file holding a profile's history and bookmarks. */
     fun dbName(id: String): String = if (id.isEmpty()) "sonderweb.db" else "sonderweb-$id.db"
+
+    internal fun turn(on: Boolean) {
+        enabled = on
+        prefs.profilesOn = on
+    }
 
     /** Becomes the profile in use (the browser swaps the tabs; see Browser.switchProfile). */
     internal fun use(id: String) {

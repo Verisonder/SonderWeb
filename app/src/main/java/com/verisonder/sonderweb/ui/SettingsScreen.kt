@@ -322,7 +322,11 @@ private fun MainPage(
         NavRow(Icons.Outlined.Search, "Search engine", Browser.prefs.engine().name, first = true) { onOpen(Page.Search) }
         NavRow(Icons.Outlined.Palette, "Appearance", null) { onOpen(Page.Look) }
         NavRow(Icons.Outlined.Tab, "Tabs", null) { onOpen(Page.Tabs) }
-        NavRow(Icons.Outlined.ManageAccounts, "Profiles", com.verisonder.sonderweb.data.Profiles.active.name) { onOpen(Page.Profiles) }
+        NavRow(
+            Icons.Outlined.ManageAccounts,
+            "Profiles",
+            if (com.verisonder.sonderweb.data.Profiles.enabled) com.verisonder.sonderweb.data.Profiles.active.name else "Off",
+        ) { onOpen(Page.Profiles) }
         val isDefault = (ctx as? MainActivity)?.defaultBrowser() == true
         NavRow(
             Icons.AutoMirrored.Outlined.OpenInNew,

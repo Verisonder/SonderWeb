@@ -349,6 +349,22 @@ internal fun ProfilesPage() {
     var editing by remember { mutableStateOf<Profile?>(null) }
     var adding by remember { mutableStateOf(false) }
     Group {
+        Toggle(
+            "Use profiles",
+            "Separate sign-ins (and tabs, history, bookmarks) for different accounts",
+            Profiles.enabled,
+        ) { Browser.turnProfiles(it) }
+    }
+    if (!Profiles.enabled) {
+        Hint(
+            "Off, SonderWeb works as one browser, as always. On, a profile picture replaces Home in the bar and sits " +
+                "bottom left on the start page: switch profiles from there. Turning it off goes back to the first " +
+                "profile; the others are kept for next time.",
+        )
+        return
+    }
+    GroupTitle("Your profiles")
+    Group {
         Profiles.list.forEach { pr ->
             Row(
                 Modifier
