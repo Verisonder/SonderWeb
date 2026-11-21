@@ -163,11 +163,11 @@ object FxSync {
 
     /** How many passwords are saved. */
     var passwordCount by mutableIntStateOf(0)
+        private set
 
     /** Signed in, and the account gave SonderWeb the VPN permission (accounts signed in before
      *  the VPN existed here don't have it: they sign in again once). */
     var vpnAllowed by mutableStateOf(false)
-        private set
         private set
 
     // ---- Worker-thread state ----
