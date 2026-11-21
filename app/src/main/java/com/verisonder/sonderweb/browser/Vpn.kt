@@ -210,6 +210,67 @@ object Vpn {
         if (!(error == "activation-canceled" && !wanted)) problem = message(error)
         wanted = false
         prefs.edit().putBoolean("on", false).apply()
+        // The engine passes on only a label: ask Mozilla's service ourselves for the real answer.
+        if (error !in KNOWN) explain(problem)
+    }
+
+    /** Failures that already say what happened; anything else gets Mozilla's own answer. */
+    private val KNOWN = setOf(
+        "vpn-unavailable", "region_unavailable", "quota-exhausted", "quota_exceeded", "login_needed",
+        "unauthorized", "not_entitled", "network-error", "network_error", "timeout-error", "activation-canceled",
+    )
+
+    private const val GUARDIAN = "https://vpn.mozilla.org/api/v1/fpn/activate"
+
+    /**
+     * Sends the same sign-up request the engine sent, with the account's token, and shows the
+     * status and Mozilla's message instead of the engine's label (if nothing newer replaced it).
+     */
+    private fun explain(shown: String?) {
+        FxSync.vpnToken { token ->
+            if (token == null) return@vpnToken
+            Thread {
+                val answer = runCatching {
+                    val c = java.net.URL(GUARDIAN).openConnection() as java.net.HttpURLConnection
+                    c.requestMethod = "POST"
+                    c.connectTimeout = 15_000
+                    c.readTimeout = 15_000
+                    c.setRequestProperty("Authorization", "Bearer $token")
+                    c.setRequestProperty("Content-Type", "application/json")
+                    c.doOutput = true
+                    c.outputStream.use { it.write(ByteArray(0)) }
+                    val code = c.responseCode
+                    val body = (if (code >= 400) c.errorStream else c.inputStream)
+                        ?.use { it.readBytes().decodeToString().take(4000) }.orEmpty()
+                    c.disconnect()
+                    code to said(body)
+                }
+                Browser.main.post {
+                    if (problem != shown) return@post
+                    answer.onSuccess { (code, text) ->
+                        problem = when {
+                            code in 200..299 -> "Mozilla's VPN service accepted the account just now: try turning it on again"
+                            text.isEmpty() -> "Mozilla's VPN service refused (error $code)"
+                            else -> "Mozilla's VPN service refused (error $code): $text"
+                        }
+                    }
+                    answer.onFailure { e ->
+                        problem = "Couldn't reach Mozilla's VPN service" + (e.message?.let { " ($it)" } ?: "")
+                    }
+                }
+            }.start()
+        }
+    }
+
+    /** The readable part of an answer: a JSON message if there is one, else the text without tags. */
+    private fun said(body: String): String {
+        val json = runCatching { org.json.JSONObject(body) }.getOrNull()
+        val fromJson = json?.let { j ->
+            listOf("message", "error_description", "detail", "error", "code")
+                .firstNotNullOfOrNull { k -> j.optString(k).takeIf { it.isNotBlank() && it != "null" } }
+        }
+        val text = fromJson ?: body.replace(Regex("<[^>]*>"), " ")
+        return text.replace(Regex("\\s+"), " ").trim().take(200)
     }
 
     private fun errorOf(e: Throwable?): String? = when (e) {
@@ -240,6 +301,7 @@ object Vpn {
         "serverlist-unavailable" -> "Couldn't get the list of VPN locations"
         "connection-failed" -> "Couldn't connect to the VPN server"
         "activation-canceled" -> "Turning on was stopped"
+        "server_error", "catastrophic-error" -> "Mozilla's VPN service had a problem"
         else -> "The VPN couldn't turn on" + (error?.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: "")
     }
 
