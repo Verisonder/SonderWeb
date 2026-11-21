@@ -93,6 +93,49 @@ fun ProfileAvatar(profile: Profile, size: Dp, modifier: Modifier = Modifier) {
     }
 }
 
+/** In private tabs, in place of the profile's picture: a hat and glasses on the private purple. */
+@Composable
+fun PrivateAvatar(size: Dp, modifier: Modifier = Modifier) {
+    val p = LocalPalette.current
+    val ink = Color(0xFF1B1530)
+    Box(
+        modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(p.privateAccent),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.foundation.Canvas(Modifier.size(size * 0.66f)) {
+            val u = this.size.width / 24f
+            // The hat: a crown narrowing to the top, and a brim.
+            val crown = androidx.compose.ui.graphics.Path().apply {
+                moveTo(7.6f * u, 3.6f * u)
+                lineTo(16.4f * u, 3.6f * u)
+                lineTo(18.2f * u, 9.8f * u)
+                lineTo(5.8f * u, 9.8f * u)
+                close()
+            }
+            drawPath(crown, ink)
+            drawRoundRect(
+                ink,
+                topLeft = androidx.compose.ui.geometry.Offset(2.2f * u, 9.6f * u),
+                size = androidx.compose.ui.geometry.Size(19.6f * u, 2.2f * u),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.1f * u),
+            )
+            // The glasses: two round lenses and a bridge.
+            val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.9f * u)
+            drawCircle(ink, radius = 3.1f * u, center = androidx.compose.ui.geometry.Offset(7.4f * u, 16.8f * u), style = stroke)
+            drawCircle(ink, radius = 3.1f * u, center = androidx.compose.ui.geometry.Offset(16.6f * u, 16.8f * u), style = stroke)
+            drawLine(
+                ink,
+                androidx.compose.ui.geometry.Offset(10.4f * u, 16.2f * u),
+                androidx.compose.ui.geometry.Offset(13.6f * u, 16.2f * u),
+                strokeWidth = 1.9f * u,
+            )
+        }
+    }
+}
+
 /** In the bar, where Home was: tap for the start page, hold to switch profiles. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -115,7 +158,7 @@ fun ProfileHomeButton(ui: UiState, tab: Tab) {
             ),
         contentAlignment = Alignment.Center,
     ) {
-        ProfileAvatar(Profiles.active, 30.dp)
+        if (tab.isPrivate) PrivateAvatar(30.dp) else ProfileAvatar(Profiles.active, 30.dp)
     }
 }
 
@@ -132,7 +175,7 @@ fun StartProfileButton(ui: UiState, modifier: Modifier) {
             .size(44.dp),
         contentAlignment = Alignment.Center,
     ) {
-        ProfileAvatar(Profiles.active, 32.dp)
+        if (Browser.current?.isPrivate == true) PrivateAvatar(32.dp) else ProfileAvatar(Profiles.active, 32.dp)
     }
 }
 
