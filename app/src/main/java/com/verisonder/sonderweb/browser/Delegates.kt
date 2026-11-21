@@ -168,7 +168,7 @@ object Delegates {
                 }, 600)
             }
             if (success && !tab.isPrivate && Browser.prefs.saveHistory && UrlText.isWeb(tab.url)) {
-                Browser.db.visit(tab.url, tab.title)
+                Browser.historyOf(tab).visit(tab.url, tab.title)
             }
             capture(tab)
             // Pages often finish drawing their header just after loading.
@@ -200,7 +200,7 @@ object Delegates {
         override fun onTitleChange(session: GeckoSession, title: String?) {
             tab.title = title ?: ""
             if (!tab.isPrivate && Browser.prefs.saveHistory && UrlText.isWeb(tab.url) && !title.isNullOrBlank()) {
-                Browser.db.setTitle(tab.url, title)
+                Browser.historyOf(tab).setTitle(tab.url, title)
             }
         }
 

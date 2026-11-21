@@ -237,7 +237,7 @@ private fun SheetSuggestions(ui: UiState, tab: Tab, enter: () -> Float) {
             tab.isPrivate -> emptyList()
             // Each site once: its latest (or best-matching) page, not every page of it.
             text.isBlank() -> Browser.db.history("", 200).distinctBy { UrlText.host(it.url) }.take(5).map { it.url to it.title }
-            else -> Browser.db.suggest(text, 30).distinctBy { UrlText.host(it.first) }.take(6)
+            else -> Browser.suggest(text, 30).distinctBy { UrlText.host(it.first) }.take(6)
         }
     }
     val bangHints = remember(text) {
@@ -274,7 +274,7 @@ private fun SheetSuggestions(ui: UiState, tab: Tab, enter: () -> Float) {
         }
     }
     rows.forEach { (url, title) ->
-        val bookmarked = remember(url) { Browser.db.isBookmarked(url) }
+        val bookmarked = remember(url) { Browser.marks.isBookmarked(url) }
         SheetRow(
             title.ifBlank { UrlText.host(url) },
             row++,

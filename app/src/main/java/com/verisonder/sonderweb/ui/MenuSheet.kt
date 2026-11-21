@@ -73,7 +73,7 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
     val p = LocalPalette.current
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val web = UrlText.isWeb(tab.url)
-    var bookmarked by remember(tab.url, ui.menu) { mutableStateOf(web && Browser.db.isBookmarked(tab.url)) }
+    var bookmarked by remember(tab.url, ui.menu) { mutableStateOf(web && Browser.marks.isBookmarked(tab.url)) }
     val host = UrlText.host(tab.url)
     var pinned by remember(tab.url, ui.menu) {
         mutableStateOf(web && Browser.prefs.shortcuts.any { UrlText.host(it.url) == host })
@@ -172,10 +172,10 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                         if (bookmarked) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
                     ) {
                         if (bookmarked) {
-                            Browser.db.removeBookmark(tab.url)
+                            Browser.marks.removeBookmark(tab.url)
                             Browser.host?.toast("Bookmark removed")
                         } else {
-                            Browser.db.addBookmark(tab.url, tab.title)
+                            Browser.marks.addBookmark(tab.url, tab.title)
                             Browser.host?.toast("Bookmarked")
                         }
                         bookmarked = !bookmarked

@@ -28,9 +28,25 @@ object Browser {
         private set
     lateinit var prefs: Prefs
         private set
-    /** The history and bookmarks of the profile in use. */
-    lateinit var db: Db
-        private set
+    /** The history of the profile in use (the first profile's, when history is shared). */
+    val db: Db
+        get() = if (prefs.splitHistory) dbOf(Profiles.current) else mainDb
+
+    /** Where a tab's visits go: its own profile's history (shared tabs can be another profile's). */
+    fun historyOf(tab: Tab): Db = if (prefs.splitHistory) dbOf(tab.profile) else mainDb
+
+    /** The bookmarks of the profile in use (the first profile's, when bookmarks are shared). */
+    val marks: Db
+        get() = if (prefs.splitBookmarks) dbOf(Profiles.current) else mainDb
+
+    /** Address-bar suggestions: bookmarks first, then history (each from where it's kept). */
+    fun suggest(query: String, limit: Int = 6): List<Pair<String, String>> {
+        if (query.isBlank()) return emptyList()
+        val seen = LinkedHashMap<String, String>()
+        marks.bookmarks(query).take(limit).forEach { seen[it.url] = it.title }
+        db.history(query, limit * 2).forEach { if (seen.size < limit) seen.putIfAbsent(it.url, it.title) }
+        return seen.entries.take(limit).map { it.key to it.value }
+    }
 
     /** The first profile's: Firefox Sync follows it, and it keeps the downloads list. */
     lateinit var mainDb: Db
@@ -88,7 +104,6 @@ object Browser {
         mainDb = Db(app)
         mainDb.interruptRunning()
         Profiles.load(app, prefs)
-        db = dbOf(Profiles.current)
         privateScreenshots = prefs.privateScreenshots
         privateLocked = prefs.privateLock
 
@@ -236,8 +251,9 @@ object Browser {
         opener: Tab? = null,
         open: Boolean = true,
         lazy: Boolean = false,
+        profile: String = Profiles.current,
     ): Tab {
-        val tab = Tab(nextId++, isPrivate, if (isPrivate) null else Profiles.contextId(Profiles.current))
+        val tab = Tab(nextId++, isPrivate, if (isPrivate) "" else profile)
         tab.openerId = opener?.id
         Delegates.attach(tab)
         val at = opener?.let { tabs.indexOf(it) }?.takeIf { it >= 0 }?.plus(1) ?: tabs.size
@@ -569,10 +585,15 @@ object Browser {
 
     fun saveTabs() {
         if (!started) return
-        val kept = tabs.filter { !it.isPrivate && UrlText.isWeb(it.pendingUrl ?: it.url) }
+        writeTabs(tabs.filter { !it.isPrivate && UrlText.isWeb(it.pendingUrl ?: it.url) })
+    }
+
+    /** Saves these tabs as the open tabs (of the profile [Prefs.scope] points at). */
+    private fun writeTabs(kept: List<Tab>) {
         prefs.savedTabs = kept.map { it.pendingUrl ?: it.url }
         prefs.savedTabTitles = kept.map { it.title }
         prefs.savedTabUsed = kept.map { it.lastUsed }
+        prefs.savedTabProfiles = kept.map { it.profile }
         // Their page colours too, so a reopened tab is covered in its own colours until it draws.
         prefs.savedTabColors = kept.map { it.edgeTop to it.edgeBottom }
         prefs.savedTabIndex = kept.indexOf(current).coerceAtLeast(0)
@@ -600,9 +621,12 @@ object Browser {
         val colors = prefs.savedTabColors
         val titles = prefs.savedTabTitles
         val used = prefs.savedTabUsed
+        // Shared tabs come back in their own profiles; separate ones are all this profile's.
+        val owners = prefs.savedTabProfiles
         val back = ArrayList<Tab>(urls.size)
         urls.forEachIndexed { i, url ->
-            val tab = newTab(url, isPrivate = false, select = false, lazy = true)
+            val owner = if (prefs.splitTabs) Profiles.current else owners.getOrNull(i)?.takeIf { id -> Profiles.list.any { it.id == id } } ?: ""
+            val tab = newTab(url, isPrivate = false, select = false, lazy = true, profile = owner)
             back += tab
             colors.getOrNull(i)?.let { (top, bottom) ->
                 tab.edgeTop = top
@@ -639,6 +663,12 @@ object Browser {
      */
     fun switchProfile(id: String) {
         if (id == Profiles.current || Profiles.list.none { it.id == id }) return
+        if (!prefs.splitTabs) {
+            // Shared tabs: they stay (each in its own profile); a new tab opens in this one.
+            Profiles.use(id)
+            newTab(null, isPrivate = false)
+            return
+        }
         saveTabs()
         mini?.let { closeMini(it) }
         mini = null
@@ -647,13 +677,52 @@ object Browser {
         if (current?.isPrivate != true) current = null
         leaving.forEach { putAway(it) }
         Profiles.use(id)
-        db = dbOf(id)
         restoreTabs(fresh = false)
+    }
+
+    /**
+     * Settings › Profiles › Open tabs. Shared: every profile's saved tabs join the open ones (each
+     * keeps its own profile). Separate: each profile takes its own tabs back; only this one's stay.
+     */
+    fun changeSplitTabs(separate: Boolean) {
+        if (separate == prefs.splitTabs) return
+        val here = Profiles.current
+        if (!separate) {
+            saveTabs()
+            Profiles.list.filter { it.id != here }.forEach { pr ->
+                prefs.scope = pr.id
+                val urls = prefs.savedTabs
+                val titles = prefs.savedTabTitles
+                val used = prefs.savedTabUsed
+                prefs.scope = here
+                urls.forEachIndexed { i, url ->
+                    val t = newTab(url, isPrivate = false, select = false, lazy = true, profile = pr.id)
+                    titles.getOrNull(i)?.let { t.title = it }
+                    used.getOrNull(i)?.takeIf { it > 0 }?.let { t.lastUsed = it }
+                }
+            }
+            prefs.splitTabs = false
+            saveTabs()
+        } else {
+            prefs.splitTabs = true
+            Profiles.list.filter { it.id != here }.forEach { pr ->
+                val theirs = tabs.filter { !it.isPrivate && it.profile == pr.id }
+                prefs.scope = pr.id
+                writeTabs(theirs.filter { UrlText.isWeb(it.pendingUrl ?: it.url) })
+                prefs.scope = here
+                theirs.forEach { putAway(it) }
+            }
+            if (current == null) {
+                tabs.lastOrNull { !it.isPrivate }?.let { select(it) } ?: newTab(null, isPrivate = false)
+            }
+            saveTabs()
+        }
     }
 
     /** Takes a tab out without the rest of closing (no new tab, no saving). */
     private fun putAway(tab: Tab) {
         tabs.remove(tab)
+        if (current === tab) current = null
         Prompts.queue.removeAll { it.tab === tab }
         Bar.forget(tab)
         BackPeek.forget(tab)
@@ -665,6 +734,8 @@ object Browser {
     fun deleteProfile(id: String) {
         if (id.isEmpty()) return
         if (Profiles.current == id) switchProfile("")
+        // Shared tabs: its own tabs close.
+        tabs.filter { !it.isPrivate && it.profile == id }.forEach { close(it) }
         Profiles.contextId(id)?.let { runCatching { runtime.storageController.clearDataForSessionContext(it) } }
         dbs.remove(id)?.close()
         app.deleteDatabase(Profiles.dbName(id))

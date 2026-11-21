@@ -383,10 +383,43 @@ internal fun ProfilesPage() {
             Text("Add profile", color = p.text, fontSize = 16.sp)
         }
     }
+    Hint("Switch by holding the profile picture in the bar, or tapping it on the start page.")
+
+    val prefs = Browser.prefs
+    var tabs by remember { mutableStateOf(prefs.splitTabs) }
+    var history by remember { mutableStateOf(prefs.splitHistory) }
+    var bookmarks by remember { mutableStateOf(prefs.splitBookmarks) }
+    var shortcuts by remember { mutableStateOf(prefs.splitShortcuts) }
+    GroupTitle("Kept separate in each profile")
+    Group {
+        Toggle(
+            "Open tabs",
+            if (tabs) "Switching shows that profile's own tabs" else "One list of tabs; each tab keeps its own profile's sign-ins",
+            tabs,
+        ) {
+            Browser.changeSplitTabs(it)
+            tabs = it
+            Profiles.changed()
+        }
+        Toggle("History", if (history) null else "Every profile sees the first profile's history", history) {
+            prefs.splitHistory = it
+            history = it
+            Profiles.changed()
+        }
+        Toggle("Bookmarks", if (bookmarks) null else "Every profile sees the first profile's bookmarks", bookmarks) {
+            prefs.splitBookmarks = it
+            bookmarks = it
+            Profiles.changed()
+        }
+        Toggle("Start page shortcuts", if (shortcuts) null else "Every profile has the same shortcuts", shortcuts) {
+            prefs.splitShortcuts = it
+            shortcuts = it
+            Profiles.changed()
+        }
+    }
     Hint(
-        "Each profile has its own sign-ins, site data, open tabs, history, bookmarks and start page shortcuts. " +
-            "Extensions, settings and downloads are shared. Switch by holding the profile picture in the bar, " +
-            "or tapping it on the start page.",
+        "Sign-ins, cookies and site data are always separate. Turning something back to separate brings back what each " +
+            "profile had. Extensions, settings and downloads are shared by all profiles.",
     )
     editing?.let { pr -> ProfileDialog(pr) { editing = null } }
     if (adding) ProfileDialog(null) { adding = false }

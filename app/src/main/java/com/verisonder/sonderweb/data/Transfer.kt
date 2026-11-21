@@ -42,7 +42,7 @@ object Transfer {
     val otherName: String = if (BuildConfig.FIREFOX_SYNC) "SonderWeb" else "SonderWeb Sync"
 
     /** Settings that aren't copied: open tabs are added to (not replaced), the rest belongs to this app. */
-    private val NOT_COPIED = setOf("tabs", "tab_titles", "tab_colors", "tab_used", "tab_index")
+    private val NOT_COPIED = setOf("tabs", "tab_titles", "tab_colors", "tab_used", "tab_index", "tab_profiles")
 
     /** Profiles stay in their own app: only the first profile is copied. */
     private fun ownProfileKey(key: String) = '@' in key || key == "profiles" || key == "profile"

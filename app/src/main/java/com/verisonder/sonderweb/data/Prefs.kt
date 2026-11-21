@@ -15,7 +15,34 @@ class Prefs(context: Context) {
      */
     var scope = ""
 
-    private fun k(key: String) = if (scope.isEmpty()) key else "$key@$scope"
+    /** A key of the profile in use, when that kind of thing is kept separate per profile. */
+    private fun k(key: String, separate: Boolean) = if (scope.isEmpty() || !separate) key else "$key@$scope"
+    private fun t(key: String) = k(key, splitTabs)
+
+    // What each profile keeps to itself (the same for all profiles). Sign-ins always are.
+    var splitTabs: Boolean
+        get() = sp.getBoolean("split_tabs", true)
+        set(v) = sp.edit().putBoolean("split_tabs", v).apply()
+    var splitHistory: Boolean
+        get() = sp.getBoolean("split_history", true)
+        set(v) = sp.edit().putBoolean("split_history", v).apply()
+    var splitBookmarks: Boolean
+        get() = sp.getBoolean("split_bookmarks", true)
+        set(v) = sp.edit().putBoolean("split_bookmarks", v).apply()
+    var splitShortcuts: Boolean
+        get() = sp.getBoolean("split_shortcuts", true)
+        set(v) = sp.edit().putBoolean("split_shortcuts", v).apply()
+
+    /** Which profile each saved tab belongs to (shared tabs keep their own profile), in the order of [savedTabs]. */
+    var savedTabProfiles: List<String>
+        get() {
+            val raw = sp.getString(t("tab_profiles"), null) ?: return emptyList()
+            return runCatching {
+                val a = JSONArray(raw)
+                List(a.length()) { a.optString(it) }
+            }.getOrDefault(emptyList())
+        }
+        set(v) = sp.edit().putString(t("tab_profiles"), JSONArray(v).toString()).apply()
 
     /** The open tabs saved for another profile (to keep their pictures). */
     fun savedTabsOf(profile: String): List<String> {
@@ -30,7 +57,7 @@ class Prefs(context: Context) {
     fun forgetProfile(profile: String) {
         if (profile.isEmpty()) return
         val e = sp.edit()
-        listOf("tabs", "tab_titles", "tab_colors", "tab_used", "tab_index", "shortcuts").forEach { e.remove("$it@$profile") }
+        listOf("tabs", "tab_titles", "tab_colors", "tab_used", "tab_index", "tab_profiles", "shortcuts").forEach { e.remove("$it@$profile") }
         e.apply()
     }
 
@@ -255,29 +282,29 @@ class Prefs(context: Context) {
     /** Addresses of the normal (not private) tabs, to reopen next launch. */
     var savedTabs: List<String>
         get() {
-            val raw = sp.getString(k("tabs"), null) ?: return emptyList()
+            val raw = sp.getString(t("tabs"), null) ?: return emptyList()
             return runCatching {
                 val a = JSONArray(raw)
                 List(a.length()) { a.getString(it) }
             }.getOrDefault(emptyList())
         }
-        set(v) = sp.edit().putString(k("tabs"), JSONArray(v).toString()).apply()
+        set(v) = sp.edit().putString(t("tabs"), JSONArray(v).toString()).apply()
 
     /** Each saved tab's page title, in the order of [savedTabs]. */
     var savedTabTitles: List<String>
         get() {
-            val raw = sp.getString(k("tab_titles"), null) ?: return emptyList()
+            val raw = sp.getString(t("tab_titles"), null) ?: return emptyList()
             return runCatching {
                 val a = JSONArray(raw)
                 List(a.length()) { a.optString(it) }
             }.getOrDefault(emptyList())
         }
-        set(v) = sp.edit().putString(k("tab_titles"), JSONArray(v).toString()).apply()
+        set(v) = sp.edit().putString(t("tab_titles"), JSONArray(v).toString()).apply()
 
     /** Each saved tab's page colours (top, bottom; null = unknown), in the order of [savedTabs]. */
     var savedTabColors: List<Pair<Int?, Int?>>
         get() {
-            val raw = sp.getString(k("tab_colors"), null) ?: return emptyList()
+            val raw = sp.getString(t("tab_colors"), null) ?: return emptyList()
             return runCatching {
                 val a = JSONArray(raw)
                 List(a.length()) { i ->
@@ -293,23 +320,23 @@ class Prefs(context: Context) {
             v.forEach { (top, bottom) ->
                 a.put(JSONArray().put(top ?: JSONObject.NULL).put(bottom ?: JSONObject.NULL))
             }
-            sp.edit().putString(k("tab_colors"), a.toString()).apply()
+            sp.edit().putString(t("tab_colors"), a.toString()).apply()
         }
 
     /** When each saved tab was last used (ms), in the order of [savedTabs]. */
     var savedTabUsed: List<Long>
         get() {
-            val raw = sp.getString(k("tab_used"), null) ?: return emptyList()
+            val raw = sp.getString(t("tab_used"), null) ?: return emptyList()
             return runCatching {
                 val a = JSONArray(raw)
                 List(a.length()) { a.optLong(it) }
             }.getOrDefault(emptyList())
         }
-        set(v) = sp.edit().putString(k("tab_used"), JSONArray(v).toString()).apply()
+        set(v) = sp.edit().putString(t("tab_used"), JSONArray(v).toString()).apply()
 
     var savedTabIndex: Int
-        get() = sp.getInt(k("tab_index"), 0)
-        set(v) = sp.edit().putInt(k("tab_index"), v).apply()
+        get() = sp.getInt(t("tab_index"), 0)
+        set(v) = sp.edit().putInt(t("tab_index"), v).apply()
 
     // ---- Start page ----
 
@@ -350,7 +377,7 @@ class Prefs(context: Context) {
     /** Start page shortcuts. None until you add some. */
     var shortcuts: List<Shortcut>
         get() {
-            val raw = sp.getString(k("shortcuts"), null) ?: return defaultShortcuts
+            val raw = sp.getString(k("shortcuts", splitShortcuts), null) ?: return defaultShortcuts
             return runCatching {
                 val a = JSONArray(raw)
                 List(a.length()) { i ->
@@ -362,7 +389,7 @@ class Prefs(context: Context) {
         set(v) {
             val a = JSONArray()
             v.forEach { a.put(JSONObject().put("u", it.url).put("t", it.title)) }
-            sp.edit().putString(k("shortcuts"), a.toString()).apply()
+            sp.edit().putString(k("shortcuts", splitShortcuts), a.toString()).apply()
         }
 
     companion object {

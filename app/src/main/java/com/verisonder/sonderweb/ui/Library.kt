@@ -245,7 +245,7 @@ fun BookmarksScreen(ui: UiState) {
     val path = remember { androidx.compose.runtime.mutableStateListOf<Bookmark>() }
     val here = path.lastOrNull()
     val items = remember(q, version, here?.id, com.verisonder.sonderweb.sync.FxSync.bookmarksVersion) {
-        if (q.isNotEmpty()) Browser.db.bookmarks(q) else Browser.db.bookmarksIn(here?.id ?: 0L)
+        if (q.isNotEmpty()) Browser.marks.bookmarks(q) else Browser.marks.bookmarksIn(here?.id ?: 0L)
     }
     var editing by remember { mutableStateOf<Bookmark?>(null) }
     var newFolder by remember { mutableStateOf(false) }
@@ -296,7 +296,7 @@ fun BookmarksScreen(ui: UiState) {
                             if (b.folder) {
                                 deleting = b
                             } else {
-                                Browser.db.deleteBookmark(b.id)
+                                Browser.marks.deleteBookmark(b.id)
                                 version++
                             }
                         },
@@ -312,28 +312,28 @@ fun BookmarksScreen(ui: UiState) {
             if (b.folder) null else b.url,
             { editing = null },
         ) { title, url ->
-            Browser.db.editBookmark(b.id, title, url)
+            Browser.marks.editBookmark(b.id, title, url)
             editing = null
             version++
         }
     }
     if (newFolder) {
         BookmarkEditDialog("New folder", "", null, { newFolder = false }) { title, _ ->
-            Browser.db.addFolder(title, here?.id ?: 0L)
+            Browser.marks.addFolder(title, here?.id ?: 0L)
             newFolder = false
             version++
         }
     }
     moving?.let { b ->
         MoveBookmarkDialog(b, { moving = null }) { to ->
-            Browser.db.moveBookmark(b.id, to)
+            Browser.marks.moveBookmark(b.id, to)
             moving = null
             version++
         }
     }
     deleting?.let { b ->
         ConfirmDialog("Delete \"${b.title.ifBlank { "Folder" }}\"?", "The folder and everything in it.", "Delete", { deleting = null }) {
-            Browser.db.deleteBookmark(b.id)
+            Browser.marks.deleteBookmark(b.id)
             version++
         }
     }
@@ -449,7 +449,7 @@ private fun MoveBookmarkDialog(b: Bookmark, onDismiss: () -> Unit, onMove: (Long
     val p = LocalPalette.current
     val folders = remember(b.id) {
         // Not into itself, nor into a folder inside it.
-        val all = Browser.db.folders()
+        val all = Browser.marks.folders()
         val inside = HashSet<Long>().apply { add(b.id) }
         var grew = true
         while (grew) {

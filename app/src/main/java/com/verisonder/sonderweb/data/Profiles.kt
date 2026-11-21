@@ -34,6 +34,14 @@ object Profiles {
     var pictures by mutableIntStateOf(0)
         private set
 
+    /** Goes up when what profiles keep separate changes (lists read again). */
+    var changes by mutableIntStateOf(0)
+        private set
+
+    fun changed() {
+        changes++
+    }
+
     private val cache = HashMap<String, Bitmap?>()
 
     val colors = listOf(
