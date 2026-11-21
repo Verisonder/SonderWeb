@@ -66,6 +66,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("profiles_on", false)
         set(v) = sp.edit().putBoolean("profiles_on", v).apply()
 
+    /** A profile without a picture of its own shows its Google account's picture. */
+    var profileGooglePictures: Boolean
+        get() = sp.getBoolean("profile_google_pictures", true)
+        set(v) = sp.edit().putBoolean("profile_google_pictures", v).apply()
+
     /** The profiles (JSON) and which one is in use. */
     var profiles: String?
         get() = sp.getString("profiles", null)

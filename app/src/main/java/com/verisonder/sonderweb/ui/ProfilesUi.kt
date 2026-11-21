@@ -258,7 +258,7 @@ fun ProfileDialog(existing: Profile?, onDone: (Profile?) -> Unit) {
     var deleting by remember { mutableStateOf(false) }
     val id = existing?.id
     val version = Profiles.pictures
-    val hasPicture = remember(id, version) { id != null && Profiles.picture(id) != null }
+    val hasPicture = remember(id, version) { id != null && Profiles.hasOwnPicture(id) }
 
     AlertDialog(
         onDismissRequest = { onDone(null) },
@@ -301,6 +301,14 @@ fun ProfileDialog(existing: Profile?, onDone: (Profile?) -> Unit) {
                 Spacer(Modifier.height(14.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Profiles.colors.forEach { c -> Swatch(Color(c), c == color, null) { color = c } }
+                }
+                if (Browser.prefs.profileGooglePictures && !hasPicture && picked == null) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Without a picture of its own, the profile shows the picture of the Google account signed in on it.",
+                        color = p.faint,
+                        fontSize = 13.sp,
+                    )
                 }
                 if (existing != null && existing.id.isNotEmpty()) {
                     Spacer(Modifier.height(10.dp))
@@ -406,6 +414,17 @@ internal fun ProfilesPage() {
     Hint("Switch by holding the profile picture in the bar, or tapping it on the start page.")
 
     val prefs = Browser.prefs
+    var google by remember { mutableStateOf(prefs.profileGooglePictures) }
+    Group {
+        Toggle(
+            "Google account pictures",
+            "A profile without its own picture shows the picture of the Google account signed in on it",
+            google,
+        ) {
+            Profiles.changeGooglePictures(it)
+            google = it
+        }
+    }
     var tabs by remember { mutableStateOf(prefs.splitTabs) }
     var history by remember { mutableStateOf(prefs.splitHistory) }
     var bookmarks by remember { mutableStateOf(prefs.splitBookmarks) }

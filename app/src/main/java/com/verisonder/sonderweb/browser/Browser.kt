@@ -149,6 +149,7 @@ object Browser {
         AddonsSite.install(runtime)
         Shields.install(runtime)
         Pip.install(runtime)
+        GoogleAccount.install(runtime)
         // SonderWeb Sync: Firefox Sync, if you turned it on (nothing of it loads otherwise).
         if (com.verisonder.sonderweb.BuildConfig.FIREFOX_SYNC) {
             FxaChannel.install(runtime)

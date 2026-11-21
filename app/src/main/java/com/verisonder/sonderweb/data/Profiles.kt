@@ -17,7 +17,7 @@ import java.io.File
  * One profile: its own sign-ins and site data, open tabs, history, bookmarks and start page
  * shortcuts. The first profile ([id] "") is what SonderWeb always had.
  */
-data class Profile(val id: String, val name: String, val color: Int)
+data class Profile(val id: String, val name: String, val color: Int, val google: String = "")
 
 /** The profiles, which one is in use, and their pictures. */
 object Profiles {
@@ -61,7 +61,7 @@ object Profiles {
             val a = JSONArray(p.profiles ?: "[]")
             for (i in 0 until a.length()) {
                 val o = a.getJSONObject(i)
-                list += Profile(o.getString("id"), o.optString("name"), o.optInt("color", colors[0]))
+                list += Profile(o.getString("id"), o.optString("name"), o.optInt("color", colors[0]), o.optString("g"))
             }
         }
         if (list.none { it.id.isEmpty() }) list.add(0, Profile("", "Personal", colors[0]))
@@ -72,7 +72,7 @@ object Profiles {
 
     private fun save() {
         val a = JSONArray()
-        list.forEach { a.put(JSONObject().put("id", it.id).put("name", it.name).put("color", it.color)) }
+        list.forEach { a.put(JSONObject().put("id", it.id).put("name", it.name).put("color", it.color).put("g", it.google)) }
         prefs.profiles = a.toString()
     }
 
@@ -119,14 +119,68 @@ object Profiles {
         list.removeAll { it.id == id }
         save()
         removePicture(id)
+        googleFile(id).delete()
     }
 
     // ---- Pictures ----
 
     private fun pictureFile(id: String) = File(File(app.filesDir, "profiles"), (id.ifEmpty { "default" }) + ".png")
+    private fun googleFile(id: String) = File(File(app.filesDir, "profiles"), (id.ifEmpty { "default" }) + ".google.png")
 
+    /** The picture you chose, else (if that's on) the Google account's, else none. */
     fun picture(id: String): Bitmap? = cache.getOrPut(id) {
-        pictureFile(id).takeIf { it.exists() }?.let { runCatching { BitmapFactory.decodeFile(it.path) }.getOrNull() }
+        val own = pictureFile(id).takeIf { it.exists() }
+        val file = own ?: googleFile(id).takeIf { it.exists() && prefs.profileGooglePictures }
+        file?.let { runCatching { BitmapFactory.decodeFile(it.path) }.getOrNull() }
+    }
+
+    /** You chose a picture for this profile (not the Google account's). */
+    fun hasOwnPicture(id: String): Boolean = pictureFile(id).exists()
+
+    /** Settings › Profiles › Google account pictures. */
+    fun changeGooglePictures(on: Boolean) {
+        prefs.profileGooglePictures = on
+        cache.clear()
+        pictures++
+    }
+
+    /**
+     * The picture of the Google account signed in on a profile (from its Google pages). Downloaded
+     * at 256 px, once per address. Ignored while profiles or Google pictures are off.
+     */
+    fun googlePicture(id: String, url: String) {
+        if (!enabled || !prefs.profileGooglePictures) return
+        val p = list.firstOrNull { it.id == id } ?: return
+        if (!url.startsWith("https://") || !Regex("^https://lh\\d\\.googleusercontent\\.com/").containsMatchIn(url)) return
+        // Ask for it at 256 px (the address ends in its size, like "=s32-c").
+        val big = if ('=' in url.substringAfterLast('/')) url.substringBeforeLast('=') + "=s256-c" else "$url=s256-c"
+        if (p.google == big && googleFile(id).exists()) return
+        Thread {
+            val ok = runCatching {
+                val c = java.net.URL(big).openConnection() as java.net.HttpURLConnection
+                c.connectTimeout = 15_000
+                c.readTimeout = 15_000
+                val bytes = c.inputStream.use { it.readBytes() }
+                c.disconnect()
+                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)!!
+                val side = minOf(bmp.width, bmp.height)
+                val square = Bitmap.createBitmap(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side)
+                val small = Bitmap.createScaledBitmap(square, 256, 256, true)
+                val f = googleFile(id)
+                f.parentFile?.mkdirs()
+                f.outputStream().use { small.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }.isSuccess
+            com.verisonder.sonderweb.browser.Browser.main.post {
+                if (!ok) return@post
+                val i = list.indexOfFirst { it.id == id }
+                if (i >= 0) {
+                    list[i] = list[i].copy(google = big)
+                    save()
+                }
+                cache.remove(id)
+                pictures++
+            }
+        }.start()
     }
 
     /** A picked image, cut to a square from its middle and kept small. Off the main thread. */
