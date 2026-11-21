@@ -37,6 +37,11 @@ object PickedFiles {
         }.getOrNull()
         // Only a plain file name: no folders, nothing that climbs out of the cache.
         val clean = shown?.substringAfterLast('/')?.replace(Regex("[\\\\:*?\"<>|\\u0000-\\u001f]"), "_")?.trim()
-        return clean?.takeIf { it.isNotEmpty() && it != "." && it != ".." } ?: "file$i"
+        val name = clean?.takeIf { it.isNotEmpty() && it != "." && it != ".." } ?: "file$i"
+        // Pages judge a file by its type, which comes from its extension (uBlock Origin only
+        // restores .txt and .json backups): a name without one gets the picker's type's.
+        if (name.substringAfterLast('.', "").isNotEmpty()) return name
+        val ext = ctx.contentResolver.getType(uri)?.let { android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+        return if (ext.isNullOrEmpty()) name else "$name.$ext"
     }
 }

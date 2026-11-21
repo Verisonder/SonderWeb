@@ -51,6 +51,11 @@ object Ublock {
         extension?.let { Extensions.showPopup(it, tab) }
     }
 
+    /** The engine's current object for uBlock Origin (a new one after it restarts itself). */
+    internal fun adopt(ext: WebExtension) {
+        extension = ext
+    }
+
     fun closePopup() = Extensions.closePopup()
 
     fun openDashboard() {
@@ -95,7 +100,8 @@ object Extensions {
         if (Browser.started) controller.enableExtensionProcessSpawning()
     }
 
-    private val registered = HashSet<String>()
+    /** The extension objects whose buttons and tabs are hooked up, by id. */
+    private val registered = HashMap<String, WebExtension>()
     private val actions = HashMap<String, WebExtension.Action>()
     private val defaults = HashMap<String, WebExtension.Action>()
 
@@ -153,7 +159,13 @@ object Extensions {
                 Browser.main.post { started(extension) }
             }
             override fun onUninstalled(extension: WebExtension) = refresh()
-            override fun onEnabled(extension: WebExtension) = refresh()
+            override fun onEnabled(extension: WebExtension) {
+                // Turned back on (or restarted): its buttons and tabs get hooked up to the new object.
+                Browser.main.post {
+                    registered.remove(extension.id)
+                    refresh()
+                }
+            }
             override fun onDisabled(extension: WebExtension) = refresh()
             override fun onOptionalPermissionsChanged(extension: WebExtension) = refresh()
             override fun onInstallationFailed(extension: WebExtension?, installException: WebExtension.InstallException) {
@@ -209,7 +221,11 @@ object Extensions {
     }
 
     private fun register(ext: WebExtension) {
-        if (!registered.add(ext.id)) return
+        // The same object: already hooked up. A new one (the extension restarted itself, as
+        // uBlock Origin does after restoring a backup): hooked up again.
+        if (registered[ext.id] === ext) return
+        registered[ext.id] = ext
+        if (ext.id == Ublock.ID) Ublock.adopt(ext)
         ext.setActionDelegate(actionDelegate(ext, null))
         ext.setTabDelegate(tabDelegate)
         // browser.downloads: without this, an extension's downloads would wait forever.

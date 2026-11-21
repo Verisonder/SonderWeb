@@ -98,10 +98,14 @@ fun ProfileAvatar(profile: Profile, size: Dp, modifier: Modifier = Modifier) {
 @Composable
 fun ProfileHomeButton(ui: UiState, tab: Tab) {
     val haptics = LocalHapticFeedback.current
+    val p = LocalPalette.current
+    // A grey ring in the address field's colour, as tall as the field (40 dp), so the two line up.
     Box(
         Modifier
             .size(44.dp)
+            .padding(2.dp)
             .clip(CircleShape)
+            .background(p.field)
             .combinedClickable(
                 onLongClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -111,7 +115,7 @@ fun ProfileHomeButton(ui: UiState, tab: Tab) {
             ),
         contentAlignment = Alignment.Center,
     ) {
-        ProfileAvatar(Profiles.active, 26.dp)
+        ProfileAvatar(Profiles.active, 30.dp)
     }
 }
 
