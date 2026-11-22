@@ -137,12 +137,14 @@ fun PrivateAvatar(size: Dp, modifier: Modifier = Modifier) {
 }
 
 /** In the bar, where Home was: tap to switch profiles, hold for the start page. In private tabs
- *  (profiles don't apply there) a tap goes to the start page too. */
+ *  (profiles don't apply there) a tap asks before going to the start page: a stray tap must not
+ *  lose the page you're on. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ProfileHomeButton(ui: UiState, tab: Tab) {
     val haptics = LocalHapticFeedback.current
     val p = LocalPalette.current
+    var askHome by remember { mutableStateOf(false) }
     // A grey ring in the address field's colour, as tall as the field (40 dp), so the two line up.
     // 4 dp more on the left: the ring then sits as far from the bar's side (4 + 2 + 4 = 10 dp) as
     // from its top (the 2 dp loading line + 8 dp).
@@ -159,16 +161,33 @@ fun ProfileHomeButton(ui: UiState, tab: Tab) {
                     Browser.goHome(tab)
                 },
                 onClick = {
-                    if (tab.isPrivate) {
-                        Browser.goHome(tab)
-                    } else {
+                    if (!tab.isPrivate) {
                         ui.profiles = true
+                    } else if (!tab.isBlank) {
+                        askHome = true
                     }
                 },
             ),
         contentAlignment = Alignment.Center,
     ) {
         if (tab.isPrivate) PrivateAvatar(30.dp) else ProfileAvatar(Profiles.active, 30.dp)
+    }
+    if (askHome) {
+        AlertDialog(
+            onDismissRequest = { askHome = false },
+            containerColor = p.card,
+            title = { Text("Go to the start page?", color = p.text, fontSize = 18.sp) },
+            text = { Text("You'll leave this page, and anything not saved on it may be lost.", color = p.mute) },
+            confirmButton = {
+                TextButton({
+                    askHome = false
+                    Browser.goHome(tab)
+                }) { Text("Start page", color = p.accent, fontWeight = FontWeight.SemiBold) }
+            },
+            dismissButton = {
+                TextButton({ askHome = false }) { Text("Stay", color = p.text) }
+            },
+        )
     }
 }
 
