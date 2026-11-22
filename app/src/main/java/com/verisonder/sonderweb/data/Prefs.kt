@@ -114,9 +114,10 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("fingerprinting", true)
         set(v) = sp.edit().putBoolean("fingerprinting", v).apply()
 
-    /** Encrypted DNS: 0 off (the phone's own DNS, e.g. a VPN's blocker), 1 Quad9, 2 Mullvad, 3 Cloudflare. */
+    /** Encrypted DNS: 0 off (the phone's own DNS, e.g. a VPN's blocker), 1 Quad9, 2 Mullvad, 3 Cloudflare.
+     *  Quad9 unless you chose otherwise: some networks' DNS breaks sites (Cloudflare's checks). */
     var secureDns: Int
-        get() = sp.getInt("secure_dns", 0)
+        get() = sp.getInt("secure_dns", 1)
         set(v) = sp.edit().putInt("secure_dns", v).apply()
 
     /** Private tabs: ask for your fingerprint / screen lock after you've left the app. */
