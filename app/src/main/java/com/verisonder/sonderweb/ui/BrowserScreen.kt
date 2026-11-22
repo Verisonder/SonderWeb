@@ -390,17 +390,18 @@ fun BrowserScreen(activity: MainActivity) {
                         exit = fadeOut(tween(120)),
                     ) {
                         // Typing: the page stays in view, dimmed, behind the search sheet; tapping it cancels.
+                        // The start page goes almost black, so its own search field doesn't show through.
                         Box(
                             Modifier
                                 .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.35f))
+                                .background(Color.Black.copy(alpha = if (tab?.isBlank == true) 0.85f else 0.55f))
                                 .clickable(interactionSource = null, indication = null) { ui.editing = false },
                         )
                     }
                 }
-                // The (+) in the middle: search or type an address.
+                // The (+) in the middle: search or type an address (can be turned off in Settings).
                 AnimatedVisibility(
-                    visible = startPage && !activity.fullView,
+                    visible = startPage && !activity.fullView && remember(ui.themeVersion) { Browser.prefs.showSearchButton },
                     enter = fadeIn(tween(180)) + scaleIn(spring(dampingRatio = 0.75f, stiffness = 500f), initialScale = 0.85f),
                     exit = fadeOut(tween(120)) + scaleOut(tween(140), targetScale = 0.9f),
                     modifier = Modifier

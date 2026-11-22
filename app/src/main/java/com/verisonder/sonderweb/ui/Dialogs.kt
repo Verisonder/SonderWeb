@@ -5,6 +5,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -406,18 +408,43 @@ fun UblockSheet(session: GeckoSession) {
         view.setSession(session)
         onDispose { view.releaseSession() }
     }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val closeBy = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
     ModalBottomSheet(
         onDismissRequest = { Ublock.closePopup() },
         sheetState = state,
+        // The sheet itself doesn't follow the finger: swipes inside belong to the panel, so
+        // a tall one (NopeCHA's) scrolls. The handle still closes it with a swipe down.
+        sheetGesturesEnabled = false,
         containerColor = p.bar,
         dragHandle = {
+            var pulled by remember { mutableStateOf(0f) }
             Box(
                 Modifier
-                    .padding(vertical = 10.dp)
-                    .size(width = 36.dp, height = 4.dp)
-                    .clip(CircleShape)
-                    .background(p.line),
-            )
+                    .fillMaxWidth()
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onDragStart = { pulled = 0f },
+                            onDragEnd = {
+                                if (pulled > closeBy) {
+                                    scope.launch { state.hide() }.invokeOnCompletion { Ublock.closePopup() }
+                                }
+                            },
+                        ) { change, dy ->
+                            change.consume()
+                            pulled += dy
+                        }
+                    }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier
+                        .size(width = 36.dp, height = 4.dp)
+                        .clip(CircleShape)
+                        .background(p.line),
+                )
+            }
         },
     ) {
         Box(

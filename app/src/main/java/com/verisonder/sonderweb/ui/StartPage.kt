@@ -371,7 +371,7 @@ private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser
                 }
 
                 Spacer(Modifier.height(30.dp))
-                ShortcutGrid(
+                if (prefs.showShortcuts) ShortcutGrid(
                     shortcuts,
                     onOpen = { Browser.load(tab, it.url) },
                     onEdit = { editing = it },

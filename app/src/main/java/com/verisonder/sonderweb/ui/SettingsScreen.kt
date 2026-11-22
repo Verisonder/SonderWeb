@@ -146,6 +146,9 @@ private val index: List<Pair<String, Page>> = (
     "Shortcuts" to Page.Start,
     "Shortcut names" to Page.Start,
     "Add button" to Page.Start,
+    "Search button" to Page.Start,
+    "Search suggestions" to Page.Search,
+    "Recent sites" to Page.Search,
     "Picture-in-picture" to Page.Tabs,
     "Videos" to Page.Tabs,
     "Search engine" to Page.Search,
@@ -527,6 +530,24 @@ private fun SearchPage() {
         }
     }
     Hint("Type !w, !yt, !gh … before or after your words to search a site directly. Unknown bangs go through DuckDuckGo.")
+    var recent by remember { mutableStateOf(prefs.suggestRecent) }
+    var fromHistory by remember { mutableStateOf(prefs.suggestHistory) }
+    var fromBookmarks by remember { mutableStateOf(prefs.suggestBookmarks) }
+    GroupTitle("Suggestions")
+    Group {
+        Toggle("Recent sites", "Your latest sites, before you type anything", recent) {
+            recent = it
+            prefs.suggestRecent = it
+        }
+        Toggle("History", "Pages you visited that match what you type", fromHistory) {
+            fromHistory = it
+            prefs.suggestHistory = it
+        }
+        Toggle("Bookmarks", "Bookmarks that match what you type", fromBookmarks) {
+            fromBookmarks = it
+            prefs.suggestBookmarks = it
+        }
+    }
     var clean by remember { mutableStateOf(prefs.cleanDdg) }
     Spacer(Modifier.height(12.dp))
     Group {
@@ -1166,6 +1187,8 @@ private fun StartSettings(ui: UiState) {
     var greeting by remember { mutableStateOf(prefs.showGreeting) }
     var names by remember { mutableStateOf(prefs.showShortcutNames) }
     var addTile by remember { mutableStateOf(prefs.showAddShortcut) }
+    var shortcutsOn by remember { mutableStateOf(prefs.showShortcuts) }
+    var searchButton by remember { mutableStateOf(prefs.showSearchButton) }
     var weatherOn by remember { mutableStateOf(prefs.weatherOn) }
     var fahrenheit by remember { mutableStateOf(prefs.fahrenheit) }
     var place by remember { mutableStateOf(prefs.place) }
@@ -1185,14 +1208,26 @@ private fun StartSettings(ui: UiState) {
             prefs.showGreeting = it
             ui.themeVersion++
         }
-        Toggle("Shortcut names", "The site's name under each shortcut", names) {
-            names = it
-            prefs.showShortcutNames = it
+        Toggle("Shortcuts", "Your sites under the search field, with their +", shortcutsOn) {
+            shortcutsOn = it
+            prefs.showShortcuts = it
             ui.themeVersion++
         }
-        Toggle("Add button", "The + after the shortcuts. Always shown while there are none", addTile) {
-            addTile = it
-            prefs.showAddShortcut = it
+        if (shortcutsOn) {
+            Toggle("Shortcut names", "The site's name under each shortcut", names) {
+                names = it
+                prefs.showShortcutNames = it
+                ui.themeVersion++
+            }
+            Toggle("Add button", "The + after the shortcuts. Always shown while there are none", addTile) {
+                addTile = it
+                prefs.showAddShortcut = it
+                ui.themeVersion++
+            }
+        }
+        Toggle("Search button", "The + at the bottom that opens the search", searchButton) {
+            searchButton = it
+            prefs.showSearchButton = it
             ui.themeVersion++
         }
         Toggle("Weather", "From Open-Meteo. Only the city you pick is sent.", weatherOn) {

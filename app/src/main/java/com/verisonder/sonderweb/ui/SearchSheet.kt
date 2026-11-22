@@ -236,6 +236,7 @@ private fun SheetSuggestions(ui: UiState, tab: Tab, enter: () -> Float) {
         when {
             tab.isPrivate -> emptyList()
             // Each site once: its latest (or best-matching) page, not every page of it.
+            text.isBlank() && !Browser.prefs.suggestRecent -> emptyList()
             text.isBlank() -> Browser.db.history("", 200).distinctBy { UrlText.host(it.url) }.take(5).map { it.url to it.title }
             else -> Browser.suggest(text, 30).distinctBy { UrlText.host(it.first) }.take(6)
         }

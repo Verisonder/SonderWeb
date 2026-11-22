@@ -43,8 +43,8 @@ object Browser {
     fun suggest(query: String, limit: Int = 6): List<Pair<String, String>> {
         if (query.isBlank()) return emptyList()
         val seen = LinkedHashMap<String, String>()
-        marks.bookmarks(query).take(limit).forEach { seen[it.url] = it.title }
-        db.history(query, limit * 2).forEach { if (seen.size < limit) seen.putIfAbsent(it.url, it.title) }
+        if (prefs.suggestBookmarks) marks.bookmarks(query).take(limit).forEach { seen[it.url] = it.title }
+        if (prefs.suggestHistory) db.history(query, limit * 2).forEach { if (seen.size < limit) seen.putIfAbsent(it.url, it.title) }
         return seen.entries.take(limit).map { it.key to it.value }
     }
 

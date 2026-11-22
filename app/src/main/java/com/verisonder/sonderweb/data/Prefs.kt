@@ -284,6 +284,29 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("show_greeting", true)
         set(v) = sp.edit().putBoolean("show_greeting", v).apply()
 
+    /** The start page shortcuts (and their +). */
+    var showShortcuts: Boolean
+        get() = sp.getBoolean("shortcuts_on", true)
+        set(v) = sp.edit().putBoolean("shortcuts_on", v).apply()
+
+    /** The (+) at the bottom of the start page that opens the search. */
+    var showSearchButton: Boolean
+        get() = sp.getBoolean("search_button", true)
+        set(v) = sp.edit().putBoolean("search_button", v).apply()
+
+    /** Search suggestions: your latest sites before you type, then history and bookmarks. */
+    var suggestRecent: Boolean
+        get() = sp.getBoolean("suggest_recent", true)
+        set(v) = sp.edit().putBoolean("suggest_recent", v).apply()
+
+    var suggestHistory: Boolean
+        get() = sp.getBoolean("suggest_history", true)
+        set(v) = sp.edit().putBoolean("suggest_history", v).apply()
+
+    var suggestBookmarks: Boolean
+        get() = sp.getBoolean("suggest_bookmarks", true)
+        set(v) = sp.edit().putBoolean("suggest_bookmarks", v).apply()
+
     /** 0 = follow the system, 1 = light, 2 = dark. */
     var theme: Int
         get() = sp.getInt("theme", 0)
