@@ -1,34 +1,9 @@
 // Picture-in-picture: tells the browser while a video is playing (and its shape), and while
 // the page is in the small window, makes that video fill it on black.
 (() => {
-  // Leaving the app, turning the screen off or the picture-in-picture window: the page isn't
-  // told it's hidden, so sites that pause then (YouTube) keep playing. The browser itself
-  // still pauses pages that aren't playing anything, to save battery.
-  try {
-    const page = window.wrappedJSObject;
-    const proto = page.Document.prototype;
-    const visible = (name, value) => Object.defineProperty(proto, name, {
-      get: exportFunction(() => value, window),
-      configurable: true,
-    });
-    visible("hidden", false);
-    visible("webkitHidden", false);
-    visible("visibilityState", "visible");
-    visible("webkitVisibilityState", "visible");
-  } catch (e) {}
-  for (const t of ["visibilitychange", "webkitvisibilitychange"]) {
-    window.addEventListener(t, (e) => e.stopImmediatePropagation(), true);
-  }
-  // Losing focus (the small window never has it) and the page being frozen or hidden are
-  // also kept from the page. Only the window's own events: a text field's blur still goes through.
-  for (const t of ["blur", "pagehide", "freeze"]) {
-    window.addEventListener(t, (e) => {
-      if (e.target === window || e.target === document) e.stopImmediatePropagation();
-    }, true);
-  }
-  try {
-    exportFunction(() => true, window.wrappedJSObject.Document.prototype, { defineAs: "hasFocus" });
-  } catch (e) {}
+  // Cloudflare's "are you a bot" check (and its frame) looks for pages whose built-in
+  // functions were changed, and refuses them. Nothing is touched there.
+  if (location.hostname === "challenges.cloudflare.com") return;
 
   // While the video is in a small window or playing with the app in the background, the page
   // may not stop it: YouTube calls pause() itself when it notices. The play/pause button, the
@@ -47,21 +22,61 @@
       if (s.el.paused && !s.el.ended) s.el.play().catch(() => {});
     } catch (err) {}
   }
-  try {
-    const mproto = window.wrappedJSObject.HTMLMediaElement.prototype;
-    const realPause = mproto.pause;
-    exportFunction(function () {
-      // Held: nothing on the page can pause it. In the small windows the page can't be touched;
-      // the window's own buttons and the media controls don't come through here.
-      if (hold) {
-        // The player now thinks it paused: told to play again in a moment.
-        setTimeout(keepGoing, 300);
-        return undefined;
-      }
-      strayPause = { at: Date.now(), el: this };
-      return realPause.call(this);
-    }, mproto, { defineAs: "pause" });
-  } catch (e) {}
+
+  // The page's own functions are only changed once a video plays here, so pages without
+  // video (sign-ins, security checks) see the browser exactly as it is.
+  let hooked = false;
+  function hookPage() {
+    if (hooked) return;
+    hooked = true;
+    // Leaving the app, turning the screen off or the picture-in-picture window: the page isn't
+    // told it's hidden, so sites that pause then (YouTube) keep playing. The browser itself
+    // still pauses pages that aren't playing anything, to save battery.
+    try {
+      const page = window.wrappedJSObject;
+      const proto = page.Document.prototype;
+      const visible = (name, value) => Object.defineProperty(proto, name, {
+        get: exportFunction(() => value, window),
+        configurable: true,
+      });
+      visible("hidden", false);
+      visible("webkitHidden", false);
+      visible("visibilityState", "visible");
+      visible("webkitVisibilityState", "visible");
+    } catch (e) {}
+    for (const t of ["visibilitychange", "webkitvisibilitychange"]) {
+      window.addEventListener(t, (e) => e.stopImmediatePropagation(), true);
+    }
+    // Losing focus (the small window never has it) and the page being frozen or hidden are
+    // also kept from the page. Only the window's own events: a text field's blur still goes through.
+    for (const t of ["blur", "pagehide", "freeze"]) {
+      window.addEventListener(t, (e) => {
+        if (e.target === window || e.target === document) e.stopImmediatePropagation();
+      }, true);
+    }
+    try {
+      exportFunction(() => true, window.wrappedJSObject.Document.prototype, { defineAs: "hasFocus" });
+    } catch (e) {}
+
+    try {
+      const mproto = window.wrappedJSObject.HTMLMediaElement.prototype;
+      const realPause = mproto.pause;
+      exportFunction(function () {
+        // Held: nothing on the page can pause it. In the small windows the page can't be touched;
+        // the window's own buttons and the media controls don't come through here.
+        if (hold) {
+          // The player now thinks it paused: told to play again in a moment.
+          setTimeout(keepGoing, 300);
+          return undefined;
+        }
+        strayPause = { at: Date.now(), el: this };
+        return realPause.call(this);
+      }, mproto, { defineAs: "pause" });
+    } catch (e) {}
+  }
+  document.addEventListener("play", (e) => {
+    if (e.target instanceof HTMLMediaElement) hookPage();
+  }, true);
 
   let port = null;
   let video = null;
@@ -70,6 +85,7 @@
 
   // On while the video is in a small window or the app is in the background; off again at full size.
   function setHold(on) {
+    if (on) hookPage();
     // A fresh hold (you just left with it playing): an old pause of yours no longer counts.
     if (on && !hold) {
       userPaused = false;
