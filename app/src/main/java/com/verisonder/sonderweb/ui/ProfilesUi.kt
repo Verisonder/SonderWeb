@@ -136,7 +136,8 @@ fun PrivateAvatar(size: Dp, modifier: Modifier = Modifier) {
     }
 }
 
-/** In the bar, where Home was: tap to switch profiles, hold for the start page. */
+/** In the bar, where Home was: tap to switch profiles, hold for the start page. In private tabs
+ *  (profiles don't apply there) a tap goes to the start page too. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ProfileHomeButton(ui: UiState, tab: Tab) {
@@ -157,7 +158,13 @@ fun ProfileHomeButton(ui: UiState, tab: Tab) {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     Browser.goHome(tab)
                 },
-                onClick = { ui.profiles = true },
+                onClick = {
+                    if (tab.isPrivate) {
+                        Browser.goHome(tab)
+                    } else {
+                        ui.profiles = true
+                    }
+                },
             ),
         contentAlignment = Alignment.Center,
     ) {
@@ -165,20 +172,21 @@ fun ProfileHomeButton(ui: UiState, tab: Tab) {
     }
 }
 
-/** The start page's profile button, bottom left: tap to switch profiles. */
+/** The start page's profile button, bottom left: tap to switch profiles (not in private tabs). */
 @Composable
 fun StartProfileButton(ui: UiState, modifier: Modifier) {
     val p = LocalPalette.current
+    val inPrivate = Browser.current?.isPrivate == true
     Box(
         modifier
             .shadow(6.dp, CircleShape)
             .clip(CircleShape)
             .background(p.field)
-            .clickable { ui.profiles = true }
+            .clickable(enabled = !inPrivate) { ui.profiles = true }
             .size(44.dp),
         contentAlignment = Alignment.Center,
     ) {
-        if (Browser.current?.isPrivate == true) PrivateAvatar(32.dp) else ProfileAvatar(Profiles.active, 32.dp)
+        if (inPrivate) PrivateAvatar(32.dp) else ProfileAvatar(Profiles.active, 32.dp)
     }
 }
 
