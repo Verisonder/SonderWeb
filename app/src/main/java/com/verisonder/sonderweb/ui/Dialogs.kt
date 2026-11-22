@@ -409,30 +409,37 @@ fun UblockSheet(session: GeckoSession) {
         onDispose { view.releaseSession() }
     }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val closeBy = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    // Pulling the handle up gives the panel more room (up to nearly the whole screen), down gives
+    // it less; pulled well below its smallest size, it closes. Null: the panel's own size.
+    var manual by remember(session) { mutableStateOf<Float?>(null) }
+    val tallest = LocalConfiguration.current.screenHeightDp * 0.9f
+    val smallest = 160f
     ModalBottomSheet(
         onDismissRequest = { Ublock.closePopup() },
         sheetState = state,
         // The sheet itself doesn't follow the finger: swipes inside belong to the panel, so
-        // a tall one (NopeCHA's) scrolls. The handle still closes it with a swipe down.
+        // a tall one (NopeCHA's) scrolls. The handle resizes it, and closes it with a swipe down.
         sheetGesturesEnabled = false,
         containerColor = p.bar,
         dragHandle = {
-            var pulled by remember { mutableStateOf(0f) }
+            // The height the finger asks for, before it's held between the smallest and tallest.
+            var wanted by remember { mutableStateOf(0f) }
             Box(
                 Modifier
                     .fillMaxWidth()
                     .pointerInput(Unit) {
                         detectVerticalDragGestures(
-                            onDragStart = { pulled = 0f },
+                            onDragStart = { wanted = manual ?: fit.value },
                             onDragEnd = {
-                                if (pulled > closeBy) {
+                                if (wanted < smallest - 60f) {
                                     scope.launch { state.hide() }.invokeOnCompletion { Ublock.closePopup() }
                                 }
                             },
                         ) { change, dy ->
                             change.consume()
-                            pulled += dy
+                            wanted -= dy / density
+                            manual = wanted.coerceIn(smallest, tallest)
                         }
                     }
                     .padding(vertical = 10.dp),
@@ -450,7 +457,7 @@ fun UblockSheet(session: GeckoSession) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(fit)
+                .height(manual?.dp ?: fit)
                 .navigationBarsPadding(),
         ) {
             AndroidView(factory = { view }, modifier = Modifier.fillMaxWidth().fillMaxHeight())
