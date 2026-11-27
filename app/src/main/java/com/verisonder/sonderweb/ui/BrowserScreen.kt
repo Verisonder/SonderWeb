@@ -198,6 +198,13 @@ fun BrowserScreen(activity: MainActivity) {
     // On the start page the bar starts as the small button (button mode).
     LaunchedEffect(tab, tab?.isBlank) { if (tab?.isBlank == true) Bar.collapse() }
     var barPx by remember { mutableIntStateOf(0) }
+    // The bar's latest height. It only counts once typing is over: the search sheet makes the bar
+    // much taller for a moment, and its last size change can land just before the sheet reports
+    // being gone (then the page kept a stale height and a top bar covered the page's top).
+    var barMeasured by remember { mutableIntStateOf(0) }
+    LaunchedEffect(barMeasured, ui.editing, ui.sheetShown) {
+        if (!ui.editing && !ui.sheetShown && barMeasured > 0) barPx = barMeasured
+    }
     // The start page shows no bar: only the tabs button and the menu (the bar comes back to type).
     val startPage = tab?.isBlank == true && !ui.editing && !ui.finding
     val pinned = ui.editing || ui.menu || ui.finding || tab == null || activity.fullView ||
@@ -441,7 +448,7 @@ fun BrowserScreen(activity: MainActivity) {
                     exit = fadeOut(tween(120)),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    Box(Modifier.fillMaxSize()) { BarArea(ui, tab, barTop, hideMode, { morphState.value }, { barOffsetState.value }) { if (!ui.editing && !ui.sheetShown) barPx = it } }
+                    Box(Modifier.fillMaxSize()) { BarArea(ui, tab, barTop, hideMode, { morphState.value }, { barOffsetState.value }) { barMeasured = it } }
                 }
             }
 
