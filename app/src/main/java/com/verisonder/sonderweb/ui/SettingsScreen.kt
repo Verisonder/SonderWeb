@@ -147,6 +147,14 @@ private val index: List<Pair<String, Page>> = (
     "Shortcut names" to Page.Start,
     "Add button" to Page.Start,
     "Search button" to Page.Start,
+    "Search field" to Page.Start,
+    "Exit button" to Page.Tabs,
+    "Tab list layout" to Page.Tabs,
+    "List view" to Page.Tabs,
+    "Tabs at the bottom" to Page.Tabs,
+    "Swipe to close tabs" to Page.Tabs,
+    "Import bookmarks" to Page.About,
+    "Export bookmarks" to Page.About,
     "Search suggestions" to Page.Search,
     "Recent sites" to Page.Search,
     "Picture-in-picture" to Page.Tabs,
@@ -814,6 +822,35 @@ private fun TabsPage() {
             prefs.restoreTabs = it
         }
     }
+    GroupTitle("Tab list")
+    val p = LocalPalette.current
+    var asList by remember { mutableStateOf(prefs.tabsAsList) }
+    var atBottom by remember { mutableStateOf(prefs.tabsAtBottom) }
+    Group {
+        Row(
+            Modifier.fillMaxWidth().background(p.field).heightIn(min = 56.dp).padding(horizontal = 18.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Layout", color = p.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            Segmented(listOf("Grid", "List"), if (asList) 1 else 0, p.accent) {
+                asList = it == 1
+                prefs.tabsAsList = asList
+            }
+        }
+        Toggle("Tabs at the bottom", "With only a few tabs, they sit at the bottom, near your thumb", atBottom) {
+            atBottom = it
+            prefs.tabsAtBottom = it
+        }
+    }
+    Hint("Swipe a tab sideways to close it.")
+    Spacer(Modifier.height(16.dp))
+    var exit by remember { mutableStateOf(prefs.menuExit) }
+    Group {
+        Toggle("Exit button", "Exit at the end of the ⋮ menu closes the app. Your tabs are kept.", exit) {
+            exit = it
+            prefs.menuExit = it
+        }
+    }
     Spacer(Modifier.height(16.dp))
     var pip by remember { mutableStateOf(prefs.pip) }
     Group {
@@ -1060,6 +1097,47 @@ private fun AboutPage(ui: UiState) {
         }
     }
     Spacer(Modifier.height(12.dp))
+    // Bookmarks to and from other browsers: the HTML file Chrome, Firefox and the others use.
+    var bookmarksBusy by remember { mutableStateOf(false) }
+    val bookmarksJob: (suspend () -> String) -> Unit = { job ->
+        bookmarksBusy = true
+        scope.launch {
+            val message = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { job() }.getOrElse { it.message ?: "Something went wrong" }
+            }
+            bookmarksBusy = false
+            Browser.host?.toast(message)
+        }
+    }
+    val importPick = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) bookmarksJob {
+            val r = com.verisonder.sonderweb.data.BookmarksFile.import(ctx, uri, Browser.marks)
+            when {
+                r.added == 0 -> "Those bookmarks are already here"
+                r.skipped > 0 -> "Added ${r.added} bookmarks (${r.skipped} were already here)"
+                else -> "Added ${r.added} bookmarks"
+            }
+        }
+    }
+    val exportPick = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/html"),
+    ) { uri ->
+        if (uri != null) bookmarksJob {
+            val n = com.verisonder.sonderweb.data.BookmarksFile.export(ctx, uri, Browser.marks)
+            "Saved $n bookmarks"
+        }
+    }
+    Group {
+        Action("Import bookmarks", "From an HTML bookmarks file (Chrome, Firefox, Edge, Brave, Safari…). Added to your bookmarks with their folders.") {
+            if (!bookmarksBusy) importPick.launch(arrayOf("text/html", "application/xhtml+xml", "application/octet-stream", "text/plain"))
+        }
+        Action("Export bookmarks", "Saves them all, with their folders, as an HTML file other browsers can import.") {
+            if (!bookmarksBusy) exportPick.launch("bookmarks.html")
+        }
+    }
+    Spacer(Modifier.height(12.dp))
     Group {
         Action("SonderWeb " + BuildConfig.VERSION_NAME, "by Verisonder · Apache License 2.0") {}
         Action("Source code", "github.com/Verisonder/SonderWeb") {
@@ -1189,6 +1267,7 @@ private fun StartSettings(ui: UiState) {
     var addTile by remember { mutableStateOf(prefs.showAddShortcut) }
     var shortcutsOn by remember { mutableStateOf(prefs.showShortcuts) }
     var searchButton by remember { mutableStateOf(prefs.showSearchButton) }
+    var searchField by remember { mutableStateOf(prefs.showSearchField) }
     var weatherOn by remember { mutableStateOf(prefs.weatherOn) }
     var fahrenheit by remember { mutableStateOf(prefs.fahrenheit) }
     var place by remember { mutableStateOf(prefs.place) }
@@ -1225,7 +1304,15 @@ private fun StartSettings(ui: UiState) {
                 ui.themeVersion++
             }
         }
-        Toggle("Search button", "The + at the bottom that opens the search", searchButton) {
+        // One way to search always stays: the field and the + can't both be off.
+        Toggle("Search field", if (searchButton) "The search box under the clock" else "The search box under the clock. Turn on the Search button to hide it", searchField) {
+            if (!it && !searchButton) return@Toggle
+            searchField = it
+            prefs.showSearchField = it
+            ui.themeVersion++
+        }
+        Toggle("Search button", if (searchField) "The + at the bottom that opens the search" else "The + at the bottom that opens the search. Turn on the Search field to hide it", searchButton) {
+            if (!it && !searchField) return@Toggle
             searchButton = it
             prefs.showSearchButton = it
             ui.themeVersion++

@@ -356,18 +356,21 @@ private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser
                     }
                 }
 
-                Spacer(Modifier.height(30.dp))
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(p.field)
-                        .clickable { startEditing(ui, tab) }
-                        .padding(horizontal = 18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Outlined.Search, "Search", tint = p.faint, modifier = Modifier.size(20.dp))
+                // Settings › Start page › Search field (the + at the bottom opens the same search).
+                if (prefs.showSearchField) {
+                    Spacer(Modifier.height(30.dp))
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(p.field)
+                            .clickable { startEditing(ui, tab) }
+                            .padding(horizontal = 18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.Search, "Search", tint = p.faint, modifier = Modifier.size(20.dp))
+                    }
                 }
 
                 Spacer(Modifier.height(30.dp))

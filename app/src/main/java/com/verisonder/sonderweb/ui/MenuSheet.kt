@@ -220,6 +220,14 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                 ui.panel = Panel.Settings
                 close()
             }
+            // Settings › Tabs › Exit in the menu: closes the app, your tabs stay saved.
+            if (Browser.prefs.menuExit) {
+                Item("Exit", Icons.AutoMirrored.Outlined.Logout) {
+                    close()
+                    Browser.saveTabs()
+                    (ctx as? android.app.Activity)?.finishAndRemoveTask()
+                }
+            }
             if (!top) actions()
         }
     }

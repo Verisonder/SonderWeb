@@ -38,7 +38,22 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,6 +91,9 @@ fun TabsScreen(ui: UiState) {
     // Empty new tabs are just the start page: not listed here.
     val list = Browser.tabs.filter { it.isPrivate == privateMode && !it.isBlank && it !in inactive }
     val accent = if (privateMode) PrivatePalette.accent else p.accent
+    // Settings › Tabs › Tab list: cards or rows, and whether a short list sits at the bottom.
+    val asList = remember { Browser.prefs.tabsAsList }
+    val atBottom = remember { Browser.prefs.tabsAtBottom }
 
     // Opens at the bottom, where the newest tabs are (and again on switching normal / private).
     val grid = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
@@ -135,26 +153,37 @@ fun TabsScreen(ui: UiState) {
             }
             LazyVerticalGrid(
                 state = grid,
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Fixed(if (asList) 1 else 2),
                 contentPadding = PaddingValues(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(
+                    if (asList) 8.dp else 12.dp,
+                    if (atBottom) Alignment.Bottom else Alignment.Top,
+                ),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (remote.isNotEmpty()) {
-                    item(key = "remote", span = { GridItemSpan(2) }) {
+                    item(key = "remote", span = { GridItemSpan(maxLineSpan) }) {
                         RemoteRow(remote) { showRemote = true }
                     }
                 }
                 if (inactive.isNotEmpty()) {
-                    item(key = "inactive", span = { GridItemSpan(2) }) {
+                    item(key = "inactive", span = { GridItemSpan(maxLineSpan) }) {
                         InactiveRow(inactive.size) { showInactive = true }
                     }
                 }
                 items(list, key = { it.id }) { t ->
-                    TabCard(ui, t, selected = t === Browser.current, accent = accent, modifier = Modifier.animateItem()) {
-                        Browser.select(t)
-                        ui.panel = Panel.None
+                    // Swipe a tab sideways to close it (cards and rows alike).
+                    SwipeToClose(t, Modifier.animateItem()) {
+                        val open = {
+                            Browser.select(t)
+                            ui.panel = Panel.None
+                        }
+                        if (asList) {
+                            TabRow(t, selected = t === Browser.current, accent = accent, onClick = open)
+                        } else {
+                            TabCard(ui, t, selected = t === Browser.current, accent = accent, modifier = Modifier, onClick = open)
+                        }
                     }
                 }
             }
@@ -474,6 +503,99 @@ private fun TabCard(ui: UiState, tab: Tab, selected: Boolean, accent: Color, mod
                     Text(UrlText.host(tab.url), color = p.faint, fontSize = 11.sp, maxLines = 1)
                 }
             }
+        }
+    }
+}
+
+/**
+ * Lets a tab be swiped sideways to close it: it follows the finger and fades; let go past 40% of
+ * its width (or flick it) and it slides off and closes, otherwise it springs back.
+ */
+@Composable
+private fun SwipeToClose(tab: Tab, modifier: Modifier, content: @Composable () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val dx = remember(tab.id) { Animatable(0f) }
+    var width by remember { mutableIntStateOf(1) }
+    val haptics = LocalHapticFeedback.current
+    val back = spring<Float>(dampingRatio = 0.78f, stiffness = 500f)
+    Box(
+        modifier
+            .onSizeChanged { width = it.width.coerceAtLeast(1) }
+            .graphicsLayer {
+                translationX = dx.value
+                alpha = 1f - 0.8f * (abs(dx.value) / width).coerceIn(0f, 1f)
+            }
+            .pointerInput(tab.id) {
+                val tracker = VelocityTracker()
+                // Measured from the drag itself, not the finger's place inside the moving card.
+                var moved = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        tracker.resetTracking()
+                        moved = dx.value
+                    },
+                    onDragEnd = {
+                        val v = tracker.calculateVelocity().x
+                        val flung = abs(v) > 1400f && abs(moved) > 24f && (v > 0f) == (moved > 0f)
+                        val gone = abs(moved) > width * 0.4f || flung
+                        scope.launch {
+                            if (gone) {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                dx.animateTo(if (moved > 0f) width * 1.1f else -width * 1.1f, tween(170))
+                                Browser.close(tab)
+                                dx.snapTo(0f)
+                            } else {
+                                dx.animateTo(0f, back)
+                            }
+                        }
+                    },
+                    onDragCancel = { scope.launch { dx.animateTo(0f, back) } },
+                ) { change, amount ->
+                    change.consume()
+                    moved += amount
+                    tracker.addPosition(change.uptimeMillis, Offset(moved, 0f))
+                    val to = moved
+                    scope.launch { dx.snapTo(to) }
+                }
+            },
+    ) { content() }
+}
+
+/** A tab as one row (Settings › Tabs › Layout › List): icon, title and site, and its ×. */
+@Composable
+private fun TabRow(tab: Tab, selected: Boolean, accent: Color, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    val shape = RoundedCornerShape(16.dp)
+    val url = tab.pendingUrl ?: tab.url
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(p.card)
+            .then(if (selected) Modifier.border(2.dp, accent, shape) else Modifier.border(1.dp, p.line, shape))
+            .clickable(onClick = onClick)
+            .height(64.dp)
+            .padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TabIcon(tab)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                tab.title.ifBlank { UrlText.host(url).ifEmpty { tab.displayTitle } },
+                color = p.text,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(UrlText.host(url), color = p.faint, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Box(
+            Modifier.size(40.dp).clip(CircleShape).clickable { Browser.close(tab) },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Outlined.Close, "Close tab", tint = p.mute, modifier = Modifier.size(16.dp))
         }
     }
 }

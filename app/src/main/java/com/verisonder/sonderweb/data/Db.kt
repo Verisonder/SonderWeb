@@ -287,6 +287,35 @@ class Db(context: Context, name: String = "sonderweb.db") : SQLiteOpenHelper(con
         return id
     }
 
+    /**
+     * Adds one entry from a bookmarks file at the end of [parent]: a folder when [url] is null
+     * (one with the same name already there is reused), else a page (skipped, -1, if that address
+     * is already bookmarked). Returns the entry's id. Sync is told once, by [importDone].
+     */
+    fun importEntry(title: String, url: String?, parent: Long, added: Long): Long {
+        val db = writableDatabase
+        if (url == null) {
+            bookmarksIn(parent).firstOrNull { it.folder && it.title == title }?.let { return it.id }
+        } else if (isBookmarked(url)) {
+            return -1
+        }
+        val next = db.rawQuery("SELECT COALESCE(MAX(position), -1) + 1 FROM bookmarks WHERE parent = ?", arrayOf(parent.toString()))
+            .use { if (it.moveToFirst()) it.getInt(0) else 0 }
+        val cv = ContentValues().apply {
+            put("title", title)
+            put("added", added)
+            put("parent", parent)
+            put("position", next)
+            if (url == null) put("folder", 1) else put("url", url)
+        }
+        return db.insert("bookmarks", null, cv)
+    }
+
+    /** After an import: the Firefox Sync app sends the new bookmarks. */
+    fun importDone() {
+        if (synced) FxSync.noteBookmarksChanged()
+    }
+
     /** Renames a bookmark or folder (and changes a bookmark's address, if [url] is given). */
     fun editBookmark(id: Long, title: String, url: String? = null) {
         val cv = ContentValues().apply {

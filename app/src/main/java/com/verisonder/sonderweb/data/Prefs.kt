@@ -295,6 +295,26 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("search_button", true)
         set(v) = sp.edit().putBoolean("search_button", v).apply()
 
+    /** The search field on the start page (under the clock). */
+    var showSearchField: Boolean
+        get() = sp.getBoolean("search_field", true)
+        set(v) = sp.edit().putBoolean("search_field", v).apply()
+
+    /** The tab list as a list of rows instead of the grid of cards. */
+    var tabsAsList: Boolean
+        get() = sp.getBoolean("tabs_list", false)
+        set(v) = sp.edit().putBoolean("tabs_list", v).apply()
+
+    /** With only a few tabs, they sit at the bottom of the tab list (near the thumb). */
+    var tabsAtBottom: Boolean
+        get() = sp.getBoolean("tabs_bottom", false)
+        set(v) = sp.edit().putBoolean("tabs_bottom", v).apply()
+
+    /** Exit at the end of the menu (closes the app; tabs are kept). */
+    var menuExit: Boolean
+        get() = sp.getBoolean("menu_exit", false)
+        set(v) = sp.edit().putBoolean("menu_exit", v).apply()
+
     /** Search suggestions: your latest sites before you type, then history and bookmarks. */
     var suggestRecent: Boolean
         get() = sp.getBoolean("suggest_recent", true)
