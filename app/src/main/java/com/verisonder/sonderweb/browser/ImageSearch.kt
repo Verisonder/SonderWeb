@@ -66,7 +66,8 @@ object ImageSearch {
         }
     }
 
-    private fun page(jpeg: ByteArray): String {
+    /** The page that sends [jpeg] to Google Lens (a data: address). */
+    fun page(jpeg: ByteArray): String {
         val image = Base64.encodeToString(jpeg, Base64.NO_WRAP)
         val lang = Locale.getDefault().toLanguageTag()
         val action = "https://lens.google.com/v3/upload?hl=" + Uri.encode(lang) + "&st=" + System.currentTimeMillis()

@@ -49,14 +49,16 @@ jobs:
           SLUG=$(echo "${GITHUB_REF_NAME#test/}" | tr '/' '-')
           APK=$(find app/build/outputs/apk/standard/release -name '*.apk' | head -n 1)
           SYNC_APK=$(find app/build/outputs/apk/sync/release -name '*.apk' | head -n 1)
-          if [ -z "$APK" ] || [ -z "$SYNC_APK" ]; then
-            echo "::error::An APK is missing (SonderWeb: '$APK', SonderWeb Sync: '$SYNC_APK')."
+          CIRCLE_APK=$(find circle/build/outputs/apk/release -name '*.apk' | head -n 1)
+          if [ -z "$APK" ] || [ -z "$SYNC_APK" ] || [ -z "$CIRCLE_APK" ]; then
+            echo "::error::An APK is missing (SonderWeb: '$APK', SonderWeb Sync: '$SYNC_APK', SonderCircle: '$CIRCLE_APK')."
             exit 1
           fi
           cp "$APK" "SonderWeb-$SLUG.apk"
           cp "$SYNC_APK" "SonderWeb-Sync-$SLUG.apk"
+          cp "$CIRCLE_APK" "SonderCircle-$SLUG.apk"
           gh release delete "test-$SLUG" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
-          gh release create "test-$SLUG" "SonderWeb-Sync-$SLUG.apk" "SonderWeb-$SLUG.apk" \
+          gh release create "test-$SLUG" "SonderWeb-Sync-$SLUG.apk" "SonderCircle-$SLUG.apk" "SonderWeb-$SLUG.apk" \
             --repo "$GITHUB_REPOSITORY" \
             --prerelease \
             --target "$GITHUB_SHA" \

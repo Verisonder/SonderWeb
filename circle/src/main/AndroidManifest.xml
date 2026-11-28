@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The circle opens in SonderWeb (with your sign-ins): which SonderWeb is installed. -->
+    <queries>
+        <package android:name="com.verisonder.sonderweb" />
+        <package android:name="com.verisonder.sonderweb.sync" />
+    </queries>
+
+    <!-- Opening SonderWeb's circle screen. The same permission as SonderWeb declares, so the
+         order the apps are installed in doesn't matter; only apps with the same key get it. -->
+    <permission
+        android:name="com.verisonder.sonderweb.permission.CIRCLE"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.verisonder.sonderweb.permission.CIRCLE" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SonderCircle">
+
+        <!-- The app icon (and the Quick Settings tile): takes the screenshot, then SonderWeb opens the circle. -->
+        <activity
+            android:name=".CaptureActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:noHistory="true"
+            android:taskAffinity="com.verisonder.sondercircle.capture"
+            android:theme="@style/Theme.SonderCircle.Invisible">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- The screenshot, shared with SonderWeb (only for the one it opens). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.shots"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/shots" />
+        </provider>
+
+        <!-- Setting it up: the screenshot permission, the assistant, the tile. -->
+        <activity
+            android:name=".SetupActivity"
+            android:exported="true"
+            android:label="@string/setup_title"
+            android:taskAffinity="com.verisonder.sondercircle.setup"
+            android:theme="@style/Theme.SonderCircle" />
+
+        <!-- Takes the screenshot when you ask for SonderCircle. Nothing else: it reads no screens
+             and sees no typing (no events, no window content). -->
+        <service
+            android:name=".CircleAccessibility"
+            android:exported="false"
+            android:label="@string/accessibility_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility" />
+        </service>
+
+        <!-- Quick Settings tile. -->
+        <service
+            android:name=".CircleTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="false" />
+        </service>
+
+        <!-- As the phone's assistant (where the phone lets you pick one): hold the home button
+             or the power button and the circle opens over what's on screen. -->
+        <service
+            android:name=".assist.CircleVoiceService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/voice_interaction" />
+        </service>
+        <service
+            android:name=".assist.CircleSessionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+        <!-- Android wants a speech service next to an assistant; this one hands speech to the phone's own. -->
+        <service
+            android:name=".assist.NoRecognition"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/recognition" />
+        </service>
+    </application>
+</manifest>

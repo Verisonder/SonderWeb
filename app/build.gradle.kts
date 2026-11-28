@@ -188,6 +188,8 @@ dependencies {
     implementation(libs.androidx.compose.icons)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.geckoview)
+    // Circle to search: reads the words on the screenshot, on the phone (model inside the app).
+    implementation(libs.mlkit.text)
     // SonderWeb Sync only: Firefox Sync (Mozilla account, bookmarks, history, open tabs, passwords, addresses, cards).
     "syncImplementation"(libs.appservices.fxaclient)
     "syncImplementation"(libs.appservices.logins)

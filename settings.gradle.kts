@@ -24,3 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "SonderWeb"
 include(":app")
+// SonderCircle: circle anything on the screen to search it (its own small app, same releases).
+include(":circle")

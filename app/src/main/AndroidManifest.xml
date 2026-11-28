@@ -35,6 +35,12 @@
         android:protectionLevel="signature" />
     <uses-permission android:name="com.verisonder.sonderweb.permission.COPY_IN" />
 
+    <!-- SonderCircle hands its screenshot to SonderWeb, which shows the circle with your own
+         sign-ins. Only apps signed with the same key (SonderCircle) may open it. -->
+    <permission
+        android:name="com.verisonder.sonderweb.permission.CIRCLE"
+        android:protectionLevel="signature" />
+
     <application
         android:name=".SonderWebApp"
         android:allowBackup="false"
@@ -44,6 +50,18 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.SonderWeb">
+
+        <!-- Circle to search (opened by SonderCircle with a screenshot). -->
+        <activity
+            android:name=".circle.CircleActivity"
+            android:exported="true"
+            android:permission="com.verisonder.sonderweb.permission.CIRCLE"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="com.verisonder.sonderweb.circle"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.SonderWeb.Circle" />
 
         <activity
             android:name=".ui.MainActivity"
@@ -189,6 +207,8 @@
         <!-- The other SonderWeb app (SonderWeb / SonderWeb Sync), to copy everything to it. -->
         <package android:name="com.verisonder.sonderweb" />
         <package android:name="com.verisonder.sonderweb.sync" />
+        <!-- SonderCircle (circle to search), to install, update or open it from Settings. -->
+        <package android:name="com.verisonder.sondercircle" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />
