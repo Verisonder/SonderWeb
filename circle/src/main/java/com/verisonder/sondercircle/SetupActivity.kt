@@ -337,6 +337,7 @@ private fun Setup(
             text = "How long the glow runs up the screen when the circle opens. Off: the circle opens straight away.",
             tenths = intro,
             max = Handoff.MAX_INTRO,
+            default = Handoff.INTRO_DEFAULT,
             onChange = onIntro,
         )
         TenthsRow(
@@ -344,29 +345,9 @@ private fun Setup(
             text = "Time to open a menu or scroll first. SonderCircle gets out of the way, then takes the screenshot.",
             tenths = delay,
             max = Handoff.MAX_DELAY,
+            default = 0,
             onChange = onDelay,
         )
-        // Both back as they came: the glow at 1.1 s, no delay.
-        val changed = intro != Handoff.INTRO_DEFAULT || delay != 0
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(Card)
-                .clickable(enabled = changed) {
-                    onIntro(Handoff.INTRO_DEFAULT)
-                    onDelay(0)
-                }
-                .padding(horizontal = 18.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("Reset to default", color = if (changed) Text1 else Text2, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.height(3.dp))
-                Text("Opening animation 1.1 s, no delay", color = Text2, fontSize = 13.sp, lineHeight = 18.sp)
-            }
-        }
 
         Section("Updates")
         UpdateRow(version, onCheck, onUpdate)
@@ -473,7 +454,7 @@ private fun Picker(title: String, hint: String, options: List<Pair<String, Strin
 
 /** Settings › Advanced: a time in tenths of a second, 0 (off) to [max] (slide, or − and + for 0.1). */
 @Composable
-private fun TenthsRow(title: String, text: String, tenths: Int, max: Int, onChange: (Int) -> Unit) {
+private fun TenthsRow(title: String, text: String, tenths: Int, max: Int, default: Int, onChange: (Int) -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -519,6 +500,19 @@ private fun TenthsRow(title: String, text: String, tenths: Int, max: Int, onChan
             ),
             modifier = Modifier.padding(end = 8.dp),
         )
+        // This one back to how it came.
+        if (tenths != default) {
+            Text(
+                "Reset to default (" + (if (default == 0) "Off" else "%.1f s".format(java.util.Locale.US, default / 10f)) + ")",
+                color = Accent,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onChange(default) }
+                    .padding(vertical = 6.dp, horizontal = 2.dp),
+            )
+        }
     }
 }
 
