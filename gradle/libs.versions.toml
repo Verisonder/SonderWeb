@@ -7,6 +7,8 @@ activityCompose = "1.13.0"
 composeBom = "2026.09.00"
 coroutines = "1.11.0"
 junit = "4.13.2"
+# SonderCircle: reading the words on the screen, on the phone itself (model inside the app).
+mlkitText = "16.0.1"
 # Material icons are no longer versioned by the Compose BOM; 1.7.8 is the last release.
 materialIcons = "1.7.8"
 # Toolchain matches what Mozilla builds Firefox 159 with (AGP, Kotlin, Gradle 9.8.1).
@@ -38,6 +40,7 @@ appservices-syncmanager = { group = "org.mozilla.appservices", name = "syncmanag
 appservices-viaduct = { group = "org.mozilla.appservices", name = "viaduct", version.ref = "appservices" }
 appservices-init = { group = "org.mozilla.appservices", name = "init_rust_components", version.ref = "appservices" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+mlkit-text = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitText" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

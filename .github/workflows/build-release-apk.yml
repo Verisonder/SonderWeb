@@ -68,21 +68,24 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_PAT || github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          # Two apps: SonderWeb, and SonderWeb Sync (with Firefox Sync).
+          # Three apps: SonderWeb, SonderWeb Sync (with Firefox Sync), and SonderCircle.
           APK=$(find app/build/outputs/apk/standard/release -name '*.apk' | head -n 1)
           SYNC_APK=$(find app/build/outputs/apk/sync/release -name '*.apk' | head -n 1)
-          if [ -z "$APK" ] || [ -z "$SYNC_APK" ]; then
-            echo "::error::An APK is missing (SonderWeb: '$APK', SonderWeb Sync: '$SYNC_APK')."
+          CIRCLE_APK=$(find circle/build/outputs/apk/release -name '*.apk' | head -n 1)
+          if [ -z "$APK" ] || [ -z "$SYNC_APK" ] || [ -z "$CIRCLE_APK" ]; then
+            echo "::error::An APK is missing (SonderWeb: '$APK', SonderWeb Sync: '$SYNC_APK', SonderCircle: '$CIRCLE_APK')."
             exit 1
           fi
           cp "$APK" "SonderWeb-$VERSION.apk"
           cp "$SYNC_APK" "SonderWeb-Sync-$VERSION.apk"
+          cp "$CIRCLE_APK" "SonderCircle-$VERSION.apk"
           # SonderWeb Sync first: older SonderWeb versions take the last APK whose name starts
           # with "SonderWeb-", so theirs has to come last.
           gh release create "$GITHUB_REF_NAME" "SonderWeb-Sync-$VERSION.apk" \
             --repo "$GITHUB_REPOSITORY" \
             --title "SonderWeb $VERSION" \
             --notes-file docs/releasenote/release_notes_$GITHUB_REF_NAME.md
+          gh release upload "$GITHUB_REF_NAME" "SonderCircle-$VERSION.apk" --repo "$GITHUB_REPOSITORY"
           gh release upload "$GITHUB_REF_NAME" "SonderWeb-$VERSION.apk" --repo "$GITHUB_REPOSITORY"
       - name: Report the failure
         if: failure()

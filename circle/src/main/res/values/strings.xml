@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SonderCircle</string>
+    <string name="setup_title">SonderCircle settings</string>
+    <string name="tile_label">SonderCircle</string>
+    <string name="accessibility_label">SonderCircle</string>
+    <string name="accessibility_description">Lets SonderCircle take a screenshot when you open it (from its icon or its Quick Settings tile), so you can circle anything on the screen and search it. It takes nothing else: it doesn\'t read your screen, your typing or your notifications, and the screenshot never leaves the phone unless you circle something to search.</string>
+</resources>

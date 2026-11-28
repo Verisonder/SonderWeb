@@ -126,6 +126,28 @@ class SearchWidget : AppWidgetProvider() {
         private const val ICON = 2
         private const val ACCENT = 3
 
+        /**
+         * The look of the widget on your home screen (the last one placed, or the default), with
+         * its colours worked out: background, text, icons, coloured icons. Circle to search draws
+         * its search field from it.
+         */
+        fun currentLook(context: Context): Pair<WidgetLook, IntArray> {
+            val look = placed(context).lastOrNull()?.let { WidgetLook.load(context, it) } ?: WidgetLook()
+            val base = when (look.theme) {
+                WidgetLook.FOLLOW -> FOLLOW_RES.map { context.getColor(it) }.toIntArray()
+                WidgetLook.ADAPTIVE -> ADAPTIVE_RES.map { context.getColor(it) }.toIntArray()
+                WidgetLook.LIGHT -> LIGHT_COLORS.copyOf()
+                else -> DARK_COLORS.copyOf()
+            }
+            look.bg?.let { base[BG] = it }
+            look.text?.let { base[TEXT] = it }
+            look.tint?.let {
+                base[ICON] = it
+                base[ACCENT] = it
+            }
+            return look to base
+        }
+
         /** The search widgets on the home screen. */
         fun placed(context: Context): IntArray =
             AppWidgetManager.getInstance(context).getAppWidgetIds(ComponentName(context, SearchWidget::class.java))

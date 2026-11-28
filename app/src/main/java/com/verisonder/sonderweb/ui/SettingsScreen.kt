@@ -39,6 +39,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Gesture
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Info
@@ -329,7 +330,32 @@ private fun MainPage(
             "Extensions",
             ublockStatus(),
         ) { onOpen(Page.Shields) }
-        NavRow(Icons.Outlined.Dashboard, "Start page", null, last = true) { onOpen(Page.Start) }
+        NavRow(Icons.Outlined.Dashboard, "Start page", null) { onOpen(Page.Start) }
+        // SonderCircle: its own small app (circle to search), installed from here.
+        val circleScope = androidx.compose.runtime.rememberCoroutineScope()
+        val circleBusy = com.verisonder.sonderweb.data.CircleApp.progress
+        val circleVersion = remember(circleBusy, ui.themeVersion) { com.verisonder.sonderweb.data.CircleApp.installedVersion(ctx) }
+        val circleOld = circleVersion != null && com.verisonder.sonderweb.data.AppUpdate.newer(BuildConfig.VERSION_NAME, circleVersion)
+        NavRow(
+            Icons.Outlined.Gesture,
+            "SonderCircle",
+            when {
+                circleBusy != null -> "Downloading… ${(circleBusy * 100).toInt()}%"
+                circleVersion == null -> "Circle anything on screen to search it. Tap to install"
+                circleOld -> "Tap to update to ${BuildConfig.VERSION_NAME}"
+                else -> "Circle to search · installed"
+            },
+            last = true,
+        ) {
+            if (circleVersion != null && !circleOld) {
+                runCatching { com.verisonder.sonderweb.data.CircleApp.open(ctx) }
+            } else if (circleBusy == null) {
+                circleScope.launch {
+                    runCatching { com.verisonder.sonderweb.data.CircleApp.install(ctx) }
+                        .onFailure { Browser.host?.toast(it.message ?: "Couldn't download SonderCircle") }
+                }
+            }
+        }
     }
 
     GroupTitle("General")
