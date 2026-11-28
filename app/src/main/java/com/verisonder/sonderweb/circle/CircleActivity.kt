@@ -36,8 +36,10 @@ class CircleActivity : ComponentActivity() {
         // SonderCircle's settings: which engines to search with.
         val textEngine = intent?.getStringExtra("text_engine").orEmpty()
         val imageEngine = intent?.getStringExtra("image_engine") ?: "google"
+        // How long the opening glow runs (an older SonderCircle doesn't say: as before).
+        val introMs = (intent?.getIntExtra("intro_ms", 1100) ?: 1100).coerceIn(0, 3000)
         setContent {
-            CircleScreen(shot = shot, image = image, textEngine = textEngine, imageEngine = imageEngine, onClose = ::finishQuietly)
+            CircleScreen(shot = shot, image = image, textEngine = textEngine, imageEngine = imageEngine, introMs = introMs, onClose = ::finishQuietly)
         }
     }
 

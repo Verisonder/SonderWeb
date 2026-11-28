@@ -74,6 +74,17 @@ object Handoff {
     /** 3.0 seconds, in tenths. */
     const val MAX_DELAY = 30
 
+    /** Settings › Advanced: how long the opening glow runs, in tenths of a second (0: none; 1.1 s as before). */
+    fun intro(ctx: Context): Int =
+        ctx.getSharedPreferences("circle", Context.MODE_PRIVATE).getInt("intro_tenths", INTRO_DEFAULT).coerceIn(0, MAX_INTRO)
+
+    fun changeIntro(ctx: Context, tenths: Int) {
+        ctx.getSharedPreferences("circle", Context.MODE_PRIVATE).edit().putInt("intro_tenths", tenths.coerceIn(0, MAX_INTRO)).apply()
+    }
+
+    const val INTRO_DEFAULT = 11
+    const val MAX_INTRO = 30
+
     fun setImageEngine(ctx: Context, id: String) {
         ctx.getSharedPreferences("circle", Context.MODE_PRIVATE).edit().putString("image_engine", id).apply()
     }
@@ -91,6 +102,7 @@ object Handoff {
             .setData(uri)
             .putExtra("text_engine", textEngine(ctx))
             .putExtra("image_engine", imageEngine(ctx))
+            .putExtra("intro_ms", intro(ctx) * 100)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
     }
 }

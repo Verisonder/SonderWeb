@@ -82,6 +82,11 @@ class SetupActivity : ComponentActivity() {
                     Handoff.setImageEngine(this, it)
                     refresh++
                 },
+                intro = Handoff.intro(this),
+                onIntro = {
+                    Handoff.changeIntro(this, it)
+                    refresh++
+                },
                 delay = Handoff.delay(this),
                 onDelay = {
                     Handoff.changeDelay(this, it)
@@ -205,6 +210,8 @@ private fun Setup(
     imageEngine: String,
     onTextEngine: (String) -> Unit,
     onImageEngine: (String) -> Unit,
+    intro: Int,
+    onIntro: (Int) -> Unit,
     delay: Int,
     onDelay: (Int) -> Unit,
     onTarget: () -> Unit,
@@ -325,7 +332,20 @@ private fun Setup(
         )
 
         Section("Advanced")
-        DelayRow(delay, onDelay)
+        TenthsRow(
+            title = "Opening animation",
+            text = "How long the glow runs up the screen when the circle opens. Off: the circle opens straight away.",
+            tenths = intro,
+            max = Handoff.MAX_INTRO,
+            onChange = onIntro,
+        )
+        TenthsRow(
+            title = "Delay before the screenshot",
+            text = "Time to open a menu or scroll first. SonderCircle gets out of the way, then takes the screenshot.",
+            tenths = delay,
+            max = Handoff.MAX_DELAY,
+            onChange = onDelay,
+        )
 
         Section("Updates")
         UpdateRow(version, onCheck, onUpdate)
@@ -430,9 +450,9 @@ private fun Picker(title: String, hint: String, options: List<Pair<String, Strin
     }
 }
 
-/** Settings › Advanced: a wait before the screenshot, 0 to 3 seconds in tenths (slide, or − and + for 0.1). */
+/** Settings › Advanced: a time in tenths of a second, 0 (off) to [max] (slide, or − and + for 0.1). */
 @Composable
-private fun DelayRow(tenths: Int, onChange: (Int) -> Unit) {
+private fun TenthsRow(title: String, text: String, tenths: Int, max: Int, onChange: (Int) -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -443,10 +463,10 @@ private fun DelayRow(tenths: Int, onChange: (Int) -> Unit) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Delay before the screenshot", color = Text1, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Text(title, color = Text1, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(3.dp))
                 Text(
-                    "Time to open a menu or scroll first. SonderCircle gets out of the way, then takes the screenshot.",
+                    text,
                     color = Text2,
                     fontSize = 13.sp,
                     lineHeight = 18.sp,
@@ -462,13 +482,13 @@ private fun DelayRow(tenths: Int, onChange: (Int) -> Unit) {
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 modifier = Modifier.width(52.dp),
             )
-            StepButton("+", enabled = tenths < Handoff.MAX_DELAY) { onChange(tenths + 1) }
+            StepButton("+", enabled = tenths < max) { onChange(tenths + 1) }
         }
         androidx.compose.material3.Slider(
             value = tenths.toFloat(),
             onValueChange = { onChange(kotlin.math.round(it).toInt()) },
-            valueRange = 0f..Handoff.MAX_DELAY.toFloat(),
-            steps = Handoff.MAX_DELAY - 1,
+            valueRange = 0f..max.toFloat(),
+            steps = max - 1,
             colors = androidx.compose.material3.SliderDefaults.colors(
                 thumbColor = Accent,
                 activeTrackColor = Accent,

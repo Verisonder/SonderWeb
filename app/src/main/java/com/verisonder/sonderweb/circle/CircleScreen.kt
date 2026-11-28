@@ -141,7 +141,7 @@ private val Glow = listOf(Color(0xFF4F8CFF), Color(0xFF9B6BFF), Color(0xFFFF6FA8
  * SonderWeb sign-ins; the card shrinks to stay in view above it.
  */
 @Composable
-fun CircleScreen(shot: Bitmap, image: ImageBitmap, textEngine: String, imageEngine: String, onClose: () -> Unit) {
+fun CircleScreen(shot: Bitmap, image: ImageBitmap, textEngine: String, imageEngine: String, introMs: Int = 1100, onClose: () -> Unit) {
     val ctx = LocalContext.current
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -189,8 +189,14 @@ fun CircleScreen(shot: Bitmap, image: ImageBitmap, textEngine: String, imageEngi
     val settle = remember { Animatable(0f) } // 0: full screen, 1: the card
     val glow = remember { Animatable(0f) } // the light that runs up the screen at the start
     LaunchedEffect(Unit) {
-        launch { glow.animateTo(1f, tween(1100, easing = FastOutSlowInEasing)) }
-        delay(260)
+        // SonderCircle › Advanced › Opening animation: the glow's length (the card starts to settle
+        // a quarter of the way in). Off: no glow, the card settles at once.
+        if (introMs <= 0) {
+            glow.snapTo(1f)
+        } else {
+            launch { glow.animateTo(1f, tween(introMs, easing = FastOutSlowInEasing)) }
+            delay(introMs * 260L / 1100)
+        }
         settle.animateTo(1f, spring(dampingRatio = 0.82f, stiffness = 260f))
     }
     val spin = rememberInfiniteTransition(label = "spin")
