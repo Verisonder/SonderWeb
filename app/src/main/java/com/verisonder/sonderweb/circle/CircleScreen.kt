@@ -25,6 +25,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -164,6 +165,10 @@ fun CircleScreen(shot: Bitmap, image: ImageBitmap, textEngine: String, imageEngi
     // Translate the screen: the translations painted over the text (null: showing the original).
     var translatedLines by remember { mutableStateOf<List<ScreenTranslate.Line>?>(null) }
     var translating by remember { mutableStateOf(false) }
+    // Which language the screen is translated into: the phone's, unless you pick another
+    // (hold the translate button).
+    var translateTo by remember { mutableStateOf(ScreenTranslate.phone()) }
+    var pickingLanguage by remember { mutableStateOf(false) }
     // Pinch zoom on the screenshot: how much, and where the zoomed picture sits in its card
     // (as a share of the card's size, so it stays right while the card resizes with the sheet).
     var zoom by remember { mutableFloatStateOf(1f) }
@@ -302,8 +307,8 @@ fun CircleScreen(shot: Bitmap, image: ImageBitmap, textEngine: String, imageEngi
     }
 
     /** The translate button: paints the screen's text over in the phone's language, or back. */
-    fun translateScreen() {
-        if (translatedLines != null) {
+    fun translateScreen(force: Boolean = false) {
+        if (translatedLines != null && !force) {
             translatedLines = null
             return
         }
@@ -316,7 +321,7 @@ fun CircleScreen(shot: Bitmap, image: ImageBitmap, textEngine: String, imageEngi
                 delay(150)
                 waited += 150
             }
-            val result = if (words.isEmpty()) emptyList() else ScreenTranslate.translate(shot, words)
+            val result = if (words.isEmpty()) emptyList() else ScreenTranslate.translate(shot, words, translateTo)
             translating = false
             when {
                 result == null -> Toast.makeText(ctx, "Couldn't translate. Check the connection.", Toast.LENGTH_SHORT).show()
@@ -887,8 +892,72 @@ fun CircleScreen(shot: Bitmap, image: ImageBitmap, textEngine: String, imageEngi
                     .padding(bottom = with(density) { WindowInsets.navigationBars.getBottom(this).toDp() } + 14.dp)
                     .padding(horizontal = 14.dp),
             ) {
-                WidgetBar(query, onQuery = { query = it }, onSearch = { searchText(query) }, onMic = speak) {
+                WidgetBar(
+                    query,
+                    onQuery = { query = it },
+                    onSearch = { searchText(query) },
+                    onMic = speak,
+                    onTranslateHold = { pickingLanguage = true },
+                ) {
                     translateScreen()
+                }
+            }
+        }
+
+        // ---- Hold translate: the languages, the phone's first ----
+        if (pickingLanguage) {
+            val choices = remember { ScreenTranslate.choices() }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.35f))
+                    .clickable(interactionSource = null, indication = null) { pickingLanguage = false },
+            )
+            androidx.compose.foundation.lazy.LazyColumn(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = with(density) { WindowInsets.navigationBars.getBottom(this).toDp() } + 76.dp)
+                    .padding(horizontal = 14.dp)
+                    .fillMaxWidth()
+                    .height(360.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(PopupBg),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp),
+            ) {
+                item {
+                    Text(
+                        "Translate the screen into",
+                        color = Text2,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                    )
+                }
+                items(choices.size) { i ->
+                    val (code, name) = choices[i]
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                pickingLanguage = false
+                                translateTo = code
+                                translateScreen(force = true)
+                            }
+                            .padding(horizontal = 20.dp, vertical = 13.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            if (i == 0) "$name (phone)" else name,
+                            color = Text1,
+                            fontSize = 15.sp,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (code == translateTo) {
+                            Box(Modifier.size(20.dp).clip(CircleShape).background(Pick), contentAlignment = Alignment.Center) {
+                                Box(Modifier.size(8.dp).clip(CircleShape).background(Color.White))
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -975,9 +1044,11 @@ private fun WidgetBar(
     onQuery: (String) -> Unit,
     onSearch: () -> Unit,
     onMic: () -> Unit,
+    onTranslateHold: () -> Unit,
     onTranslate: () -> Unit,
 ) {
     val ctx = LocalContext.current
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val (look, colors) = remember { com.verisonder.sonderweb.ui.SearchWidget.currentLook(ctx) }
     val bg = Color(colors[0] or 0xFF000000.toInt())
     val bgAlpha = ((colors[0] ushr 24) / 255f).let { if (it == 0f) 1f else it }
@@ -1034,7 +1105,17 @@ private fun WidgetBar(
             Icon(androidx.compose.ui.res.painterResource(com.verisonder.sonderweb.R.drawable.widget_mic), "Speak", tint = icon, modifier = Modifier.size(width = 26.dp, height = 26.dp))
         }
         Box(
-            Modifier.size(width = 50.dp, height = 40.dp).clip(RoundedCornerShape(20.dp)).clickable(onClick = onTranslate),
+            Modifier
+                .size(width = 50.dp, height = 40.dp)
+                .clip(RoundedCornerShape(20.dp))
+                // Tap: translate (or back to the original). Hold: pick the language.
+                .combinedClickable(
+                    onClick = onTranslate,
+                    onLongClick = {
+                        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        onTranslateHold()
+                    },
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Outlined.Translate, "Translate", tint = icon, modifier = Modifier.size(24.dp))

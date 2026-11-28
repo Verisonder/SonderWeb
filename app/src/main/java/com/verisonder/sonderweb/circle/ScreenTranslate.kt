@@ -27,10 +27,9 @@ object ScreenTranslate {
         }
 
     /** Translates every line into the phone's language. Off the main thread; null if it failed. */
-    suspend fun translate(shot: Bitmap, words: List<Ocr.Word>): List<Line>? = withContext(Dispatchers.IO) {
+    suspend fun translate(shot: Bitmap, words: List<Ocr.Word>, target: String = phone()): List<Line>? = withContext(Dispatchers.IO) {
         val lines = lines(words).filter { it.second.isNotBlank() }
         if (lines.isEmpty()) return@withContext emptyList()
-        val target = Locale.getDefault().language
         // All lines in one go, one per row; if the rows don't come back one for one, line by line.
         val joined = runCatching { request(lines.joinToString("\n") { it.second }, target) }.getOrNull()
         val rows = joined?.split('\n')?.map { it.trim() }
@@ -44,6 +43,35 @@ object ScreenTranslate {
             val bg = background(shot, line.first)
             Line(line.first, line.second, tr, bg, ink(bg))
         }
+    }
+
+    /** The phone's language (Google Translate's code for it). */
+    fun phone(): String = code(Locale.getDefault())
+
+    private fun code(l: Locale): String = when (l.language) {
+        "zh" -> if (l.country == "TW" || l.country == "HK" || l.script == "Hant") "zh-TW" else "zh-CN"
+        "iw" -> "he"
+        "in" -> "id"
+        else -> l.language
+    }
+
+    /** The languages offered when you hold the translate button: the phone's first, then A–Z. */
+    fun choices(): List<Pair<String, String>> {
+        val codes = listOf(
+            "af", "am", "ar", "az", "be", "bg", "bn", "bs", "ca", "cs", "cy", "da", "de", "el", "en", "es", "et",
+            "eu", "fa", "fi", "fr", "ga", "gl", "gu", "ha", "he", "hi", "hr", "hu", "hy", "id", "is", "it", "ja",
+            "ka", "kk", "km", "kn", "ko", "ku", "ky", "lo", "lt", "lv", "mk", "ml", "mn", "mr", "ms", "my", "ne",
+            "nl", "no", "pa", "pl", "ps", "pt", "ro", "ru", "si", "sk", "sl", "so", "sq", "sr", "sv", "sw", "ta",
+            "te", "tg", "th", "tl", "tr", "uk", "ur", "uz", "vi", "yo", "zh-CN", "zh-TW", "zu",
+        )
+        fun name(c: String): String {
+            val l = Locale.forLanguageTag(c)
+            val n = l.getDisplayName(Locale.getDefault()).ifBlank { c }
+            return n.replaceFirstChar { it.titlecase(Locale.getDefault()) }
+        }
+        val mine = phone()
+        val rest = codes.filter { it != mine }.map { it to name(it) }.sortedBy { it.second.lowercase() }
+        return listOf(mine to name(mine)) + rest
     }
 
     /** Google Translate's free endpoint (the one its own web widgets use). */
