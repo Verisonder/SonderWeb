@@ -52,6 +52,7 @@ import androidx.compose.material.icons.outlined.Tab
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.AlertDialog
 import kotlinx.coroutines.launch
+import com.verisonder.sonderweb.data.Backup
 import androidx.compose.foundation.layout.offset
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.outlined.MoreVert
@@ -1173,66 +1174,88 @@ private fun AboutPage(ui: UiState) {
         }
     }
     Spacer(Modifier.height(12.dp))
-    // Bookmarks to and from other browsers: the HTML file Chrome, Firefox and the others use.
-    var bookmarksBusy by remember { mutableStateOf(false) }
-    val bookmarksJob: (String, suspend () -> String) -> Unit = { failed, job ->
-        bookmarksBusy = true
+    // Settings, start page and bookmarks to and from a file (bookmarks alone: the HTML file other
+    // browsers use). History and open tabs are never in it.
+    var backupBusy by remember { mutableStateOf(false) }
+    var backupAsk by remember { mutableStateOf(false) }
+    var parts by remember { mutableStateOf(Backup.Part.entries.toSet()) }
+    val backupJob: (String, suspend () -> Backup.Result) -> Unit = { failed, job ->
+        backupBusy = true
         scope.launch {
-            val message = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                runCatching { job() }.getOrElse { "$failed: " + (it.message ?: "something went wrong") }
+            val r = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { job() }.getOrElse { Backup.Result("$failed: " + (it.message ?: "something went wrong"), false) }
             }
-            bookmarksBusy = false
-            Browser.host?.toast(message)
+            backupBusy = false
+            if (r.restart) {
+                // Settings and the start page are read as the app starts: start it again.
+                Browser.host?.toast(r.message + " · restarting")
+                Browser.saveTabs()
+                kotlinx.coroutines.delay(1400)
+                (ctx as? android.app.Activity)?.let { com.verisonder.sonderweb.data.Transfer.restart(it) }
+            } else {
+                Browser.host?.toast(r.message)
+            }
         }
     }
     val importPick = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        if (uri != null) bookmarksJob("Import failed") {
-            val r = com.verisonder.sonderweb.data.BookmarksFile.import(ctx, uri, Browser.marks)
-            when {
-                r.added == 0 -> "Import done: those bookmarks are already here"
-                r.skipped > 0 -> "Import done: ${r.added} bookmarks added (${r.skipped} were already here)"
-                else -> "Import done: ${r.added} bookmarks added"
-            }
-        }
+        val chosen = parts
+        if (uri != null) backupJob("Import failed") { Backup.import(ctx, uri, chosen, Browser.marks) }
     }
-    val exportPick = androidx.activity.compose.rememberLauncherForActivityResult(
+    val exportDone: (android.net.Uri?) -> Unit = { uri ->
+        val chosen = parts
+        if (uri != null) backupJob("Export failed") { Backup.Result(Backup.export(ctx, uri, chosen, Browser.marks), false) }
+    }
+    val exportZip = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip"),
+        exportDone,
+    )
+    val exportHtml = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/html"),
-    ) { uri ->
-        if (uri != null) bookmarksJob("Export failed") {
-            val n = com.verisonder.sonderweb.data.BookmarksFile.export(ctx, uri, Browser.marks)
-            "Exported $n bookmarks"
-        }
-    }
-    var bookmarksAsk by remember { mutableStateOf(false) }
+        exportDone,
+    )
     Group {
-        Action("Import / Export bookmarks", "An HTML bookmarks file, with folders, that Chrome, Firefox, Edge, Brave and Safari read and write.") {
-            if (!bookmarksBusy) bookmarksAsk = true
+        Action("Import / Export", "Settings, start page and bookmarks, to a file or from one. Bookmarks also from other browsers.") {
+            if (!backupBusy) backupAsk = true
         }
     }
-    if (bookmarksAsk) {
+    if (backupAsk) {
         AlertDialog(
-            onDismissRequest = { bookmarksAsk = false },
+            onDismissRequest = { backupAsk = false },
             containerColor = p.card,
-            title = { Text("Bookmarks", color = p.text) },
+            title = { Text("Import / Export", color = p.text) },
             text = {
-                Text(
-                    "Import adds the bookmarks from a file to yours. Export saves all of yours to a file.",
-                    color = p.mute,
-                )
+                Column {
+                    Backup.Part.entries.forEach { part ->
+                        Check(part.label, part in parts) { on -> parts = if (on) parts + part else parts - part }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Importing replaces your settings and start page with the file's, and adds its bookmarks to yours. History and open tabs aren't included.",
+                        color = p.faint,
+                        fontSize = 13.sp,
+                    )
+                }
             },
             confirmButton = {
-                TextButton({
-                    bookmarksAsk = false
-                    exportPick.launch("bookmarks.html")
-                }) { Text("Export", color = p.accent) }
+                TextButton(
+                    {
+                        backupAsk = false
+                        val name = Backup.fileName(parts)
+                        if (name.endsWith(".html")) exportHtml.launch(name) else exportZip.launch(name)
+                    },
+                    enabled = parts.isNotEmpty(),
+                ) { Text("Export", color = if (parts.isNotEmpty()) p.accent else p.faint) }
             },
             dismissButton = {
-                TextButton({
-                    bookmarksAsk = false
-                    importPick.launch(arrayOf("text/html", "application/xhtml+xml", "application/octet-stream", "text/plain"))
-                }) { Text("Import", color = p.accent) }
+                TextButton(
+                    {
+                        backupAsk = false
+                        importPick.launch(arrayOf("application/zip", "text/html", "application/xhtml+xml", "application/octet-stream", "text/plain"))
+                    },
+                    enabled = parts.isNotEmpty(),
+                ) { Text("Import", color = if (parts.isNotEmpty()) p.accent else p.faint) }
             },
         )
     }

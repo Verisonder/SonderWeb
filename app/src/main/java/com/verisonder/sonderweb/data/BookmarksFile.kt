@@ -16,6 +16,11 @@ object BookmarksFile {
     fun import(ctx: Context, uri: Uri, db: Db): Result {
         val html = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
             ?: error("Couldn't open the file")
+        return importHtml(html, db)
+    }
+
+    /** Adds the bookmarks of an HTML bookmarks file (its text) at the top level, in their order. */
+    fun importHtml(html: String, db: Db): Result {
         val entries = BookmarksHtml.parse(html)
         require(BookmarksHtml.pageCount(entries) > 0) { "No bookmarks in that file" }
         var added = 0
@@ -42,6 +47,14 @@ object BookmarksFile {
 
     /** Writes every bookmark, in its folders, to [uri]. Returns how many pages went in. */
     fun export(ctx: Context, uri: Uri, db: Db): Int {
+        val (html, count) = exportHtml(db)
+        val out = ctx.contentResolver.openOutputStream(uri, "wt") ?: error("Couldn't write the file")
+        out.use { it.write(html.toByteArray(Charsets.UTF_8)) }
+        return count
+    }
+
+    /** Every bookmark, in its folders, as an HTML bookmarks file (its text), and how many pages. */
+    fun exportHtml(db: Db): Pair<String, Int> {
         fun tree(parent: Long, depth: Int): List<BookmarksHtml.Entry> =
             db.bookmarksIn(parent).mapNotNull { b ->
                 when {
@@ -51,9 +64,6 @@ object BookmarksFile {
                 }
             }
         val entries = tree(0L, 0)
-        val html = BookmarksHtml.write(entries)
-        val out = ctx.contentResolver.openOutputStream(uri, "wt") ?: error("Couldn't write the file")
-        out.use { it.write(html.toByteArray(Charsets.UTF_8)) }
-        return BookmarksHtml.pageCount(entries)
+        return BookmarksHtml.write(entries) to BookmarksHtml.pageCount(entries)
     }
 }
