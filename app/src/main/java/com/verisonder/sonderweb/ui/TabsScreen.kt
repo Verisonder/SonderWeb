@@ -362,7 +362,8 @@ private fun InactiveTabs(ui: UiState, tabs: List<Tab>, onBack: () -> Unit) {
             Text("Inactive tabs", color = p.text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
         Text(
-            "Not used for ${Browser.INACTIVE_DAYS} days, or open in another tab.",
+            "Not used for ${Browser.INACTIVE_DAYS} days, or open in another tab." +
+                Browser.prefs.inactiveCloseDays.let { d -> if (d > 0) " Closed after ${if (d == 1) "1 more day" else "$d more days"}." else "" },
             color = p.faint,
             fontSize = 13.sp,
             modifier = Modifier.padding(horizontal = 20.dp),

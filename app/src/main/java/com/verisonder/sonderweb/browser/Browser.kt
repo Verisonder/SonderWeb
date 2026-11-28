@@ -390,8 +390,11 @@ object Browser {
         }.forEach { close(it) }
     }
 
-    /** How many tabs the tabs button shows: the ones the tab list shows (empty tabs aren't). */
-    fun countFor(isPrivate: Boolean): Int = tabs.count { it.isPrivate == isPrivate && !it.isBlank }
+    /** How many tabs the tabs button shows: the ones the tab list's grid shows (empty and inactive tabs aren't). */
+    fun countFor(isPrivate: Boolean): Int {
+        val inactive = if (isPrivate) emptySet() else inactiveTabs().toHashSet()
+        return tabs.count { it.isPrivate == isPrivate && !it.isBlank && it !in inactive }
+    }
 
     fun closeAll(isPrivate: Boolean) {
         tabs.filter { it.isPrivate == isPrivate }.forEach { close(it) }
@@ -402,7 +405,7 @@ object Browser {
      * a page that is open in another tab. Never the current tab.
      */
     fun inactiveTabs(): List<Tab> {
-        val cutoff = System.currentTimeMillis() - INACTIVE_DAYS * 24L * 60 * 60 * 1000
+        val cutoff = System.currentTimeMillis() - INACTIVE_DAYS * DAY
         val normal = tabs.filter { !it.isPrivate && it !== current }
         val newest = HashMap<String, Tab>()
         tabs.filter { !it.isPrivate && !it.isBlank }.forEach { t ->
@@ -418,6 +421,25 @@ object Browser {
     }
 
     const val INACTIVE_DAYS = 14
+
+    private const val DAY = 24L * 60 * 60 * 1000
+
+    /**
+     * Settings › Tabs › Close inactive tabs: inactive tabs left alone for that many more days are
+     * closed (old tabs: [INACTIVE_DAYS] + that; older copies of an open page: that since last used).
+     * Runs when the app starts and each time you come back to it.
+     */
+    fun closeOldInactive() {
+        val days = prefs.inactiveCloseDays
+        if (days <= 0) return
+        val now = System.currentTimeMillis()
+        val old = now - (INACTIVE_DAYS + days) * DAY
+        val copy = now - days * DAY
+        val cutoff = now - INACTIVE_DAYS * DAY
+        inactiveTabs()
+            .filter { it !== mini && it !== current && (it.lastUsed < old || (it.lastUsed >= cutoff && it.lastUsed < copy)) }
+            .forEach { close(it) }
+    }
 
     fun privateTabsOpen(): Boolean = tabs.any { it.isPrivate }
 

@@ -310,6 +310,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("tabs_bottom", false)
         set(v) = sp.edit().putBoolean("tabs_bottom", v).apply()
 
+    /** Inactive tabs are closed after this many days of being inactive (0: never). */
+    var inactiveCloseDays: Int
+        get() = sp.getInt("inactive_close", 3)
+        set(v) = sp.edit().putInt("inactive_close", v).apply()
+
     /** Exit at the end of the menu (closes the app; tabs are kept). */
     var menuExit: Boolean
         get() = sp.getBoolean("menu_exit", false)

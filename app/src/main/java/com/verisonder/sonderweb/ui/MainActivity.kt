@@ -308,6 +308,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
         com.verisonder.sonderweb.sync.FxSync.appVisible(true)
         // Loads just after coming back are watched: a page process frozen while you were away is restarted.
         com.verisonder.sonderweb.browser.Unstick.back()
+        // Inactive tabs left alone long enough are closed (Settings › Tabs).
+        com.verisonder.sonderweb.browser.Browser.closeOldInactive()
         wake()
     }
 

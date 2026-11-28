@@ -35,6 +35,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Extension
@@ -153,6 +155,8 @@ private val index: List<Pair<String, Page>> = (
     "List view" to Page.Tabs,
     "Tabs at the bottom" to Page.Tabs,
     "Swipe to close tabs" to Page.Tabs,
+    "Close inactive tabs" to Page.Tabs,
+    "Inactive tabs" to Page.Tabs,
     "Import bookmarks" to Page.About,
     "Export bookmarks" to Page.About,
     "Search suggestions" to Page.Search,
@@ -843,6 +847,38 @@ private fun TabsPage() {
         }
     }
     Hint("Swipe a tab sideways to close it.")
+    GroupTitle("Inactive tabs")
+    var closeDays by remember { mutableStateOf(prefs.inactiveCloseDays) }
+    Group {
+        Toggle("Close inactive tabs", "Tabs not used for ${Browser.INACTIVE_DAYS} days, or older copies of a page open in another tab", closeDays > 0) {
+            closeDays = if (it) 3 else 0
+            prefs.inactiveCloseDays = closeDays
+        }
+        if (closeDays > 0) {
+            Row(
+                Modifier.fillMaxWidth().background(p.field).heightIn(min = 56.dp).padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("After", color = p.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                IconButtonSmall(Icons.Outlined.Remove, "Fewer days") {
+                    closeDays = (closeDays - 1).coerceAtLeast(1)
+                    prefs.inactiveCloseDays = closeDays
+                }
+                Text(
+                    if (closeDays == 1) "1 day" else "$closeDays days",
+                    color = p.text,
+                    fontSize = 15.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.width(64.dp),
+                )
+                IconButtonSmall(Icons.Outlined.Add, "More days") {
+                    closeDays = (closeDays + 1).coerceAtMost(90)
+                    prefs.inactiveCloseDays = closeDays
+                }
+            }
+        }
+    }
+    Hint("Counted from when a tab became inactive. Inactive tabs aren't in the tab count.")
     Spacer(Modifier.height(16.dp))
     var exit by remember { mutableStateOf(prefs.menuExit) }
     Group {
