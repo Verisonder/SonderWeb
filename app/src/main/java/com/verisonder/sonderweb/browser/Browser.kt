@@ -173,7 +173,7 @@ object Browser {
 
     private fun colorScheme() = when (prefs.theme) {
         1 -> GeckoRuntimeSettings.COLOR_SCHEME_LIGHT
-        2 -> GeckoRuntimeSettings.COLOR_SCHEME_DARK
+        2, 3 -> GeckoRuntimeSettings.COLOR_SCHEME_DARK
         else -> GeckoRuntimeSettings.COLOR_SCHEME_SYSTEM
     }
 

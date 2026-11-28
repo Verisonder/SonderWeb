@@ -91,7 +91,7 @@ class WidgetSettingsActivity : ComponentActivity() {
         val start = WidgetLook.load(this, widgetId)
         val theme = Prefs(this).theme
         setContent {
-            SonderTheme(if (isDark(theme)) DarkPalette else LightPalette) {
+            SonderTheme(paletteFor(theme)) {
                 WidgetSettings(start, onCancel = { finish() }, onSave = ::save)
             }
         }

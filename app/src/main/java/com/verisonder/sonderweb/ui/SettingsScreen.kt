@@ -621,6 +621,7 @@ private fun LookPage(ui: UiState) {
         Choice("Follow the system", theme == 0) { theme = 0; prefs.theme = 0; changed() }
         Choice("Light", theme == 1) { theme = 1; prefs.theme = 1; changed() }
         Choice("Dark", theme == 2) { theme = 2; prefs.theme = 2; changed() }
+        Choice("OLED", theme == 3, "Dark on pure black: black pixels stay off") { theme = 3; prefs.theme = 3; changed() }
     }
 
     GroupTitle("App icon")

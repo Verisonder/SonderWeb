@@ -47,7 +47,7 @@ class TransferActivity : ComponentActivity() {
         }
         val theme = Prefs(this).theme
         setContent {
-            SonderTheme(if (isDark(theme)) DarkPalette else LightPalette) {
+            SonderTheme(paletteFor(theme)) {
                 val p = LocalPalette.current
                 val inc = incoming
                 when {

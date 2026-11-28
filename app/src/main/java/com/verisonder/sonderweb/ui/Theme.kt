@@ -67,6 +67,15 @@ val LightPalette = Palette(
     danger = Color(0xFFD93025),
 )
 
+/** OLED: the dark look on pure black (pixels off), with slightly darker fields and cards. */
+val OledPalette = DarkPalette.copy(
+    bg = Color(0xFF000000),
+    bar = Color(0xFF000000),
+    field = Color(0xFF1C1C1E),
+    card = Color(0xFF121214),
+    line = Color(0xFF2C2C2E),
+)
+
 /** Private tabs: pure black, nothing shared with the normal look. */
 val PrivatePalette = DarkPalette.copy(
     bg = Color(0xFF000000),
@@ -119,8 +128,16 @@ fun Unscaled(content: @Composable () -> Unit) {
 @Composable
 fun isDark(theme: Int): Boolean = when (theme) {
     1 -> false
-    2 -> true
+    2, 3 -> true
     else -> isSystemInDarkTheme()
+}
+
+/** The look for Settings › Appearance › Theme (0 system, 1 light, 2 dark, 3 OLED black). */
+@Composable
+fun paletteFor(theme: Int): Palette = when {
+    theme == 3 -> OledPalette
+    isDark(theme) -> DarkPalette
+    else -> LightPalette
 }
 
 private fun typography(): Typography {

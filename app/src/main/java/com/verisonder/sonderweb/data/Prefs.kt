@@ -379,7 +379,7 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("suggest_bookmarks", true)
         set(v) = sp.edit().putBoolean("suggest_bookmarks", v).apply()
 
-    /** 0 = follow the system, 1 = light, 2 = dark. */
+    /** 0 = follow the system, 1 = light, 2 = dark, 3 = OLED (dark on pure black). */
     var theme: Int
         get() = sp.getInt("theme", 0)
         set(v) = sp.edit().putInt("theme", v).apply()

@@ -161,8 +161,7 @@ fun BrowserScreen(activity: MainActivity) {
     val tab = Browser.current
     // Reading themeVersion makes a theme change in Settings recompose this screen.
     val theme = ui.themeVersion.let { Browser.prefs.theme }
-    val dark = isDark(theme)
-    val base = if (dark) DarkPalette else LightPalette
+    val base = paletteFor(theme)
     val palette = if (tab?.isPrivate == true) PrivatePalette else base
 
     // Status/navigation bar icons follow the bar colour.
