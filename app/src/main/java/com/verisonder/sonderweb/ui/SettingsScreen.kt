@@ -1129,6 +1129,7 @@ private fun OpenOnLaunch() {
 
 @Composable
 private fun AboutPage(ui: UiState) {
+    val p = LocalPalette.current
     val ctx = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val transfer = com.verisonder.sonderweb.data.Transfer
@@ -1204,13 +1205,36 @@ private fun AboutPage(ui: UiState) {
             "Exported $n bookmarks"
         }
     }
+    var bookmarksAsk by remember { mutableStateOf(false) }
     Group {
-        Action("Import bookmarks", "From an HTML bookmarks file (Chrome, Firefox, Edge, Brave, Safari…). Added to your bookmarks with their folders.") {
-            if (!bookmarksBusy) importPick.launch(arrayOf("text/html", "application/xhtml+xml", "application/octet-stream", "text/plain"))
+        Action("Import / Export bookmarks", "An HTML bookmarks file, with folders, that Chrome, Firefox, Edge, Brave and Safari read and write.") {
+            if (!bookmarksBusy) bookmarksAsk = true
         }
-        Action("Export bookmarks", "Saves them all, with their folders, as an HTML file other browsers can import.") {
-            if (!bookmarksBusy) exportPick.launch("bookmarks.html")
-        }
+    }
+    if (bookmarksAsk) {
+        AlertDialog(
+            onDismissRequest = { bookmarksAsk = false },
+            containerColor = p.card,
+            title = { Text("Bookmarks", color = p.text) },
+            text = {
+                Text(
+                    "Import adds the bookmarks from a file to yours. Export saves all of yours to a file.",
+                    color = p.mute,
+                )
+            },
+            confirmButton = {
+                TextButton({
+                    bookmarksAsk = false
+                    exportPick.launch("bookmarks.html")
+                }) { Text("Export", color = p.accent) }
+            },
+            dismissButton = {
+                TextButton({
+                    bookmarksAsk = false
+                    importPick.launch(arrayOf("text/html", "application/xhtml+xml", "application/octet-stream", "text/plain"))
+                }) { Text("Import", color = p.accent) }
+            },
+        )
     }
     Spacer(Modifier.height(12.dp))
     Group {
