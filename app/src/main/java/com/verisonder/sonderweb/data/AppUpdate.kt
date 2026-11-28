@@ -43,7 +43,10 @@ object AppUpdate {
     private const val PREFS = "app_update"
     private const val AUTO_EVERY_MS = 6 * 3_600_000L
 
-    /** On app open: the last known result straight away, then a fresh check if it's been a while. */
+    /**
+     * On app open and each time you come back: the last known result straight away, then a fresh
+     * check if it's been a while (even when an update was already found: a newer one replaces it).
+     */
     suspend fun autoCheck(ctx: Context) {
         withContext(Dispatchers.IO) { cleanUp(ctx) }
         restore(ctx)

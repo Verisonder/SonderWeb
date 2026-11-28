@@ -1373,6 +1373,38 @@ private fun UpdateRow() {
             Spacer(Modifier.height(10.dp))
             Text(info.notes.trim().take(600), color = p.mute, fontSize = 13.sp, lineHeight = 18.sp)
         }
+        // An update was found: you can still look for an even newer one.
+        if (info != null && progress == null) {
+            Spacer(Modifier.height(6.dp))
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(enabled = !checking) {
+                        scope.launch {
+                            checking = true
+                            val shown = info.version
+                            note = runCatching { up.check(ctx) }.fold(
+                                { found -> if (found == null || found.version == shown) "No newer version than $shown" else null },
+                                { "Couldn't check: " + (it.message ?: "network error") },
+                            )
+                            checking = false
+                        }
+                    }
+                    .padding(vertical = 8.dp, horizontal = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (checking) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        color = p.accent,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(if (checking) "Checking…" else "Check again", color = p.accent, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            }
+            note?.let { Text(it, color = p.faint, fontSize = 13.sp) }
+        }
     }
 }
 

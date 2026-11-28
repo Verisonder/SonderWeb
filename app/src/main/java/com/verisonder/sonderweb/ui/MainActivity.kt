@@ -266,7 +266,6 @@ class MainActivity : ComponentActivity(), Browser.Host {
         if (android.os.Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
         if (savedInstanceState == null) handleIntent(intent)
         ContextCompat.registerReceiver(this, pipButton, android.content.IntentFilter(PIP_TOGGLE), ContextCompat.RECEIVER_NOT_EXPORTED)
-        lifecycleScope.launch { com.verisonder.sonderweb.data.AppUpdate.autoCheck(this@MainActivity) }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -301,6 +300,9 @@ class MainActivity : ComponentActivity(), Browser.Host {
     override fun onStart() {
         super.onStart()
         ownScreen = false
+        // Updates: looked for each time you come back (at most every few hours), also when one
+        // was already found, so an even newer version replaces it.
+        lifecycleScope.launch { com.verisonder.sonderweb.data.AppUpdate.autoCheck(this@MainActivity) }
         com.verisonder.sonderweb.browser.Extensions.wake()
         // Pages that failed to load while you were away (no network in the background) load again.
         com.verisonder.sonderweb.browser.Retry.back()
