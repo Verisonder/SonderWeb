@@ -84,6 +84,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -1371,7 +1372,7 @@ private fun UpdateRow() {
         }
         if (info != null && info.notes.isNotBlank() && progress == null) {
             Spacer(Modifier.height(10.dp))
-            Text(info.notes.trim().take(600), color = p.mute, fontSize = 13.sp, lineHeight = 18.sp)
+            Text(remember(info.notes) { notesText(info.notes.trim().take(900)) }, color = p.mute, fontSize = 13.sp, lineHeight = 18.sp)
         }
         // An update was found: you can still look for an even newer one.
         if (info != null && progress == null) {
@@ -1888,3 +1889,28 @@ private fun Check(label: String, on: Boolean, onChange: (Boolean) -> Unit) {
         Text(label, color = p.text, fontSize = 14.sp)
     }
 }
+
+/**
+ * Release notes are Markdown: shown here without its marks. **Bold** turns bold, "- " lines get
+ * a bullet, `code` loses its backticks and [links](…) keep only their text.
+ */
+private fun notesText(md: String): androidx.compose.ui.text.AnnotatedString =
+    androidx.compose.ui.text.buildAnnotatedString {
+        val lines = md.lines().dropWhile { it.isBlank() }
+        lines.forEachIndexed { i, raw ->
+            var line = raw.trimEnd()
+            if (line.startsWith("#")) line = "**" + line.trimStart('#').trim() + "**"
+            if (line.startsWith("- ") || line.startsWith("* ")) line = "•  " + line.drop(2)
+            line = line.replace(Regex("\\[([^\\]]+)]\\([^)]*\\)"), "$1").replace("`", "")
+            // Bold between pairs of **.
+            val parts = line.split("**")
+            parts.forEachIndexed { j, part ->
+                if (j % 2 == 1 && j < parts.size - 1) {
+                    withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.SemiBold)) { append(part) }
+                } else {
+                    append(if (j % 2 == 1) "**$part" else part)
+                }
+            }
+            if (i < lines.size - 1) append('\n')
+        }
+    }
