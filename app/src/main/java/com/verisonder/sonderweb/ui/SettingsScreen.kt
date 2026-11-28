@@ -1271,6 +1271,7 @@ private fun AboutPage(ui: UiState) {
         "Engine: GeckoView by Mozilla (Mozilla Public License 2.0)\n" +
             "uBlock Origin by Raymond Hill (GPL-3.0), included unmodified\n" +
             "Inter typeface (SIL Open Font License 1.1)\n" +
+            "Clock fonts: Unbounded, Philosopher, Doto, Space Grotesk, Fraunces, Cinzel, Michroma, Major Mono Display, Zen Dots, Bungee, Silkscreen (SIL Open Font License 1.1)\n" +
             "No accounts, no telemetry, no tracking.",
     )
 }

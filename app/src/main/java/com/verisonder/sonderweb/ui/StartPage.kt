@@ -60,6 +60,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.composed
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.ui.graphics.vector.PathParser
@@ -284,6 +285,8 @@ private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser
     var version by remember { mutableIntStateOf(0) }
     val shortcuts = remember(version, ui.themeVersion, com.verisonder.sonderweb.data.Profiles.current, com.verisonder.sonderweb.data.Profiles.changes) { prefs.shortcuts }
     var editing by remember { mutableStateOf<Int?>(null) } // index, or -1 for a new one
+    var clockFont by remember(ui.themeVersion) { mutableStateOf(prefs.clockFont) }
+    var pickingFont by remember { mutableStateOf(false) }
 
     // Everything sits in the middle of the screen, a little below centre; it scrolls if it doesn't fit.
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(if (ownBackground) p.bg else Color.Transparent)) {
@@ -301,6 +304,7 @@ private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser
             val lift = if (preview == null) prefs.clockLift.coerceIn(-120, 200) else 0
             if (preview == null) Spacer(Modifier.height(88.dp))
             if (prefs.showClock) {
+                val font = ClockFonts.of(clockFont)
                 Column(
                     Modifier.offset { androidx.compose.ui.unit.IntOffset(0, -lift.dp.roundToPx()) },
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -308,10 +312,12 @@ private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser
                     Text(
                         time,
                         color = p.text,
-                        fontSize = 88.sp,
-                        fontWeight = FontWeight.ExtraLight,
-                        letterSpacing = (-2).sp,
+                        fontSize = font.size,
+                        fontFamily = font.family,
+                        fontWeight = font.weight,
+                        letterSpacing = font.spacing,
                         maxLines = 1,
+                        modifier = if (preview == null) Modifier.holdFor(10_000L) { pickingFont = true } else Modifier,
                     )
                     Text(date, color = p.text, fontSize = 16.sp)
                 }
@@ -394,6 +400,13 @@ private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser
                 Spacer(Modifier.height(32.dp))
             }
         }
+    }
+
+    if (pickingFont) {
+        ClockFontPicker(time, clockFont, onPick = {
+            clockFont = it
+            prefs.clockFont = it
+        }) { pickingFont = false }
     }
 
     editing?.let { i ->
@@ -1035,6 +1048,33 @@ private fun SiteRow(
                     Spacer(Modifier.height(6.dp))
                     Text("Add", color = p.faint, fontSize = 11.sp)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Runs [action] once a finger has rested on this for [ms] without moving away or lifting.
+ * Nothing is consumed, so the page still scrolls normally.
+ */
+private fun Modifier.holdFor(ms: Long, action: () -> Unit): Modifier = composed {
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val latest by androidx.compose.runtime.rememberUpdatedState(action)
+    pointerInput(ms) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            val slop = viewConfiguration.touchSlop
+            val held = withTimeoutOrNull(ms) {
+                while (true) {
+                    val e = awaitPointerEvent()
+                    val c = e.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!c.pressed || (c.position - down.position).getDistance() > slop) break
+                }
+            }
+            // Timed out still holding: the menu.
+            if (held == null) {
+                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                latest()
             }
         }
     }

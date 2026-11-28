@@ -300,6 +300,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("search_field", true)
         set(v) = sp.edit().putBoolean("search_field", v).apply()
 
+    /** The start page time's font ("" SonderWeb's own; see ClockFonts). */
+    var clockFont: String
+        get() = sp.getString("clock_font", "") ?: ""
+        set(v) = sp.edit().putString("clock_font", v).apply()
+
     /** The tab list as a list of rows instead of the grid of cards. */
     var tabsAsList: Boolean
         get() = sp.getBoolean("tabs_list", false)
