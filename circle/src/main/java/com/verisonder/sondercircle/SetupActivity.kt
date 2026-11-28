@@ -13,6 +13,8 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -53,6 +55,13 @@ class SetupActivity : ComponentActivity() {
     // Bumped on resume so the statuses are read again after a trip to Android's settings.
     private var refresh by androidx.compose.runtime.mutableIntStateOf(0)
 
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
+
+    override fun onDestroy() {
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        super.onDestroy()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -92,7 +101,36 @@ class SetupActivity : ComponentActivity() {
                 onTry = {
                     startActivity(Intent(this, CaptureActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 },
+                version = Updater.current(this),
+                onCheck = ::checkForUpdate,
+                onUpdate = ::installUpdate,
             )
+        }
+        // A newer SonderCircle shows here as soon as the page opens.
+        scope.launch {
+            withContext(kotlinx.coroutines.Dispatchers.IO) { Updater.cleanUp(this@SetupActivity) }
+            runCatching { Updater.check(this@SetupActivity) }
+        }
+    }
+
+    private fun checkForUpdate() {
+        if (Updater.checking) return
+        scope.launch {
+            val r = runCatching { Updater.check(this@SetupActivity) }
+            val text = when {
+                r.isFailure -> "Couldn't check: " + (r.exceptionOrNull()?.message ?: "no connection")
+                r.getOrNull() == null -> "SonderCircle is up to date"
+                else -> null
+            }
+            if (text != null) Toast.makeText(this@SetupActivity, text, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun installUpdate() {
+        scope.launch {
+            runCatching { Updater.install(this@SetupActivity) }.onFailure {
+                Toast.makeText(this@SetupActivity, it.message ?: "Update failed", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -177,6 +215,9 @@ private fun Setup(
     onTile: () -> Unit,
     onAssistant: () -> Unit,
     onTry: () -> Unit,
+    version: String,
+    onCheck: () -> Unit,
+    onUpdate: () -> Unit,
 ) {
     Column(
         Modifier
@@ -285,6 +326,9 @@ private fun Setup(
 
         Section("Advanced")
         DelayRow(delay, onDelay)
+
+        Section("Updates")
+        UpdateRow(version, onCheck, onUpdate)
 
         Spacer(Modifier.height(20.dp))
         Row(
@@ -433,5 +477,54 @@ private fun StepButton(label: String, enabled: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(label, color = if (enabled) Text1 else Text2.copy(alpha = 0.5f), fontSize = 18.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+/** Like SonderWeb's: the version you have, a newer one when there is, one tap to install it. */
+@Composable
+private fun UpdateRow(version: String, onCheck: () -> Unit, onUpdate: () -> Unit) {
+    val newer = Updater.available
+    val progress = Updater.progress
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Card)
+            .padding(start = 18.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(if (newer != null) "Version $newer is ready" else "SonderCircle $version", color = Text1, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(3.dp))
+            Text(
+                when {
+                    progress != null -> "Downloading… ${(progress * 100).toInt()}%"
+                    Updater.checking -> "Looking for a new version…"
+                    newer != null -> "You have $version"
+                    else -> "Checks the SonderWeb releases on GitHub"
+                },
+                color = if (newer != null && progress == null) Accent else Text2,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        val busy = progress != null || Updater.checking
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(19.dp))
+                .background(if (newer != null) Accent else Color(0xFF33363D))
+                .clickable(enabled = !busy) { if (newer != null) onUpdate() else onCheck() }
+                .padding(horizontal = 16.dp, vertical = 9.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                if (newer != null) "Update" else "Check",
+                color = if (busy) Text2 else Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
 }
