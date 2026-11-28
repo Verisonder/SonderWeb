@@ -480,29 +480,59 @@ object Shields {
     const val ID = "shields@sonderweb"
     private const val LOCATION = "resource://android/assets/extensions/shields/"
     private var port: WebExtension.Port? = null
+    private var extension: WebExtension? = null
 
     fun install(runtime: GeckoRuntime) {
         runtime.webExtensionController.ensureBuiltIn(LOCATION, ID).accept({ ext ->
             if (ext != null) {
                 Browser.main.post {
+                    extension = ext
                     runtime.webExtensionController.setAllowedInPrivateBrowsing(ext, true)
-                    // Its switches (Settings › Privacy & security › Shields) are sent when it connects.
-                    ext.setMessageDelegate(
-                        object : WebExtension.MessageDelegate {
-                            override fun onConnect(p: WebExtension.Port) {
-                                port = p
-                                p.setDelegate(
-                                    object : WebExtension.PortDelegate {
-                                        override fun onDisconnect(p: WebExtension.Port) {
-                                            if (port === p) port = null
-                                        }
-                                    },
-                                )
-                                apply()
+                    hook(ext)
+                    turn()
+                }
+            }
+        }, { _ -> })
+    }
+
+    // Its switches (Settings › Privacy & security › Shields) are sent when it connects.
+    private fun hook(ext: WebExtension) {
+        ext.setMessageDelegate(
+            object : WebExtension.MessageDelegate {
+                override fun onConnect(p: WebExtension.Port) {
+                    port = p
+                    p.setDelegate(
+                        object : WebExtension.PortDelegate {
+                            override fun onDisconnect(p: WebExtension.Port) {
+                                if (port === p) port = null
                             }
                         },
-                        "shields",
                     )
+                    apply()
+                }
+            },
+            "shields",
+        )
+    }
+
+    /** All three switches off: the extension stops running on pages; any one on: it runs again. */
+    private fun turn() {
+        val ext = extension ?: return
+        val prefs = Browser.prefs
+        val on = prefs.shieldWebrtc || prefs.shieldAmp || prefs.shieldDebounce
+        val c = Browser.runtime.webExtensionController
+        val enabled = ext.metaData.enabled
+        val r = when {
+            on && !enabled -> c.enable(ext, WebExtensionController.EnableSource.USER)
+            !on && enabled -> c.disable(ext, WebExtensionController.EnableSource.USER)
+            else -> return
+        }
+        r.accept({ e ->
+            Browser.main.post {
+                if (e != null) {
+                    extension = e
+                    // A re-enabled extension is a new object: its message delegate is set again.
+                    if (on) hook(e)
                 }
             }
         }, { _ -> })
@@ -516,5 +546,6 @@ object Shields {
             .put("amp", prefs.shieldAmp)
             .put("debounce", prefs.shieldDebounce)
         runCatching { port?.postMessage(m) }
+        turn()
     }
 }

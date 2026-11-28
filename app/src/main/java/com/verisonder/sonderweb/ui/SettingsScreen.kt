@@ -920,6 +920,7 @@ private fun TabsPage() {
             pip = it
             prefs.pip = it
             Browser.host?.updatePip()
+            com.verisonder.sonderweb.browser.Pip.turn(it)
         }
     }
     OpenOnLaunch()

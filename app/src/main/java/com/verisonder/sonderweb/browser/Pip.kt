@@ -3,6 +3,7 @@ package com.verisonder.sonderweb.browser
 import org.json.JSONObject
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.WebExtension
+import org.mozilla.geckoview.WebExtensionController
 
 /**
  * Picture-in-picture: leave the app while a video plays and it keeps playing in a small window.
@@ -24,6 +25,26 @@ object Pip {
                 extension = ext ?: return@post
                 runtime.webExtensionController.setAllowedInPrivateBrowsing(ext, true)
                 Browser.tabs.forEach { attach(it) }
+                turn(Browser.prefs.pip)
+            }
+        }, { _ -> })
+    }
+
+    /** Picture-in-picture switched off: the video helper stops running on pages too. */
+    fun turn(on: Boolean) {
+        val ext = extension ?: return
+        val c = Browser.runtime.webExtensionController
+        val enabled = ext.metaData.enabled
+        val r = when {
+            on && !enabled -> c.enable(ext, WebExtensionController.EnableSource.USER)
+            !on && enabled -> c.disable(ext, WebExtensionController.EnableSource.USER)
+            else -> return
+        }
+        r.accept({ e ->
+            Browser.main.post {
+                if (e != null) extension = e
+                // A re-enabled extension is a new object: hook every tab to it again.
+                if (on) Browser.tabs.forEach { attach(it) }
             }
         }, { _ -> })
     }
