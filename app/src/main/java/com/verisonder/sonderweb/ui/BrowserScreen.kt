@@ -207,6 +207,11 @@ fun BrowserScreen(activity: MainActivity) {
     }
     // The start page shows no bar: only the tabs button and the menu (the bar comes back to type).
     val startPage = tab?.isBlank == true && !ui.editing && !ui.finding
+    // Settings › Start page › Phone's time and battery: hidden while the start page is on screen.
+    LaunchedEffect(tab?.isBlank == true && ui.panel == Panel.None, ui.themeVersion) {
+        activity.onStartPage = tab?.isBlank == true && ui.panel == Panel.None
+        activity.applySystemBars()
+    }
     val pinned = ui.editing || ui.menu || ui.finding || tab == null || activity.fullView ||
         hideMode == Bar.ALWAYS || (hideMode == Bar.SLIDE && tab.isBlank)
     val collapsed = Bar.hidden && !pinned

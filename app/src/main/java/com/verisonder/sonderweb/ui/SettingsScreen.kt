@@ -1419,6 +1419,7 @@ private fun StartSettings(ui: UiState) {
     var lift by remember { mutableStateOf(prefs.clockLift.toFloat()) }
     var rest by remember { mutableStateOf(prefs.restLift.toFloat()) }
     var greeting by remember { mutableStateOf(prefs.showGreeting) }
+    var startStatus by remember { mutableStateOf(prefs.startStatusBar) }
     var names by remember { mutableStateOf(prefs.showShortcutNames) }
     var addTile by remember { mutableStateOf(prefs.showAddShortcut) }
     var shortcutsOn by remember { mutableStateOf(prefs.showShortcuts) }
@@ -1477,6 +1478,11 @@ private fun StartSettings(ui: UiState) {
             weatherOn = it
             prefs.weatherOn = it
             if (!it) Weather.forget()
+            ui.themeVersion++
+        }
+        Toggle("Phone's time and battery", "The status bar at the top, over the start page. Off: hidden there; swipe down to peek.", startStatus) {
+            startStatus = it
+            prefs.startStatusBar = it
             ui.themeVersion++
         }
     }

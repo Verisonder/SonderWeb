@@ -465,6 +465,14 @@ class MainActivity : ComponentActivity(), Browser.Host {
             applySystemBars()
         }
 
+    /** The start page is on screen (no panel over it): Settings › Start page can hide the status bar there. */
+    var onStartPage = false
+        set(v) {
+            if (field == v) return
+            field = v
+            applySystemBars()
+        }
+
     override fun setFullscreen(on: Boolean) {
         inFullscreen = on
         applySystemBars()
@@ -487,7 +495,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
         // Dynamic: only while the page is at its top, or on the start page.
         val cur = Browser.current
         val atTop = cur == null || cur.isBlank || cur.atTop
-        if (prefs.showStatusBar && !hideNavigation && (!prefs.statusBarDynamic || atTop)) {
+        val hiddenOnStart = onStartPage && !prefs.startStatusBar
+        if (prefs.showStatusBar && !hideNavigation && !hiddenOnStart && (!prefs.statusBarDynamic || atTop)) {
             c.show(WindowInsetsCompat.Type.statusBars())
         } else {
             c.hide(WindowInsetsCompat.Type.statusBars())

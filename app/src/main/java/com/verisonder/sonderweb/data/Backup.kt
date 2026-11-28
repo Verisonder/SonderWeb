@@ -32,7 +32,7 @@ object Backup {
         "shortcuts", "shortcuts_on", "shortcut_add", "shortcut_names", "collections",
         "show_clock", "show_greeting", "name", "clock_lift", "rest_lift", "search_field", "search_button",
         "weather", "fahrenheit", "place_name", "place_lat", "place_lon",
-        "start_bg_color", "start_dim", "start_wallpaper", "clock_font",
+        "start_bg_color", "start_dim", "start_wallpaper", "clock_font", "start_status",
         "start_collections", "start_bookmarks", "start_most", "start_recent", "start_closed",
     )
 
