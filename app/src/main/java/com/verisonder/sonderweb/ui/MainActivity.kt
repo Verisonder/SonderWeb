@@ -394,10 +394,8 @@ class MainActivity : ComponentActivity(), Browser.Host {
                         if (Browser.current == null) freshTab()
                         openSearch = true
                     }
-                    SearchWidget.HOME -> {
-                        freshTab()
-                        openHome = true
-                    }
+                    // The logo: just the app, as you left it (the page you were on stays).
+                    SearchWidget.HOME -> Unit
                     SearchWidget.VOICE -> startVoiceSearch()
                     else -> askImage = true
                 }

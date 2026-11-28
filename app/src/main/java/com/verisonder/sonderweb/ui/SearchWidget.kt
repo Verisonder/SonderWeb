@@ -298,7 +298,7 @@ class SearchWidget : AppWidgetProvider() {
 
             if (clickable) {
                 v.setOnClickPendingIntent(R.id.widget_pill, open(context, SEARCH, 1))
-                // The logo: just the start page, without the search.
+                // The logo: just opens the app, on the page you were on.
                 v.setOnClickPendingIntent(R.id.widget_logo, open(context, HOME, 4))
             }
             return v
