@@ -374,7 +374,7 @@ private fun MainPage(
         NavRow(
             Icons.AutoMirrored.Outlined.OpenInNew,
             "Default browser",
-            if (isDefault) "SonderWeb opens links from other apps" else "Open links from other apps here",
+            if (isDefault) "Thank you for using SonderWeb" else "Open links from other apps here",
         ) {
             Browser.host?.askDefaultBrowser()
         }
