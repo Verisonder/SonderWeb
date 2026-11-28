@@ -73,6 +73,11 @@ class SetupActivity : ComponentActivity() {
                     Handoff.setImageEngine(this, it)
                     refresh++
                 },
+                delay = Handoff.delay(this),
+                onDelay = {
+                    Handoff.changeDelay(this, it)
+                    refresh++
+                },
                 onTarget = {
                     val now = Handoff.target(this)
                     Handoff.choose(this, if (now == Handoff.SONDERWEB) Handoff.SONDERWEB_SYNC else Handoff.SONDERWEB)
@@ -162,6 +167,8 @@ private fun Setup(
     imageEngine: String,
     onTextEngine: (String) -> Unit,
     onImageEngine: (String) -> Unit,
+    delay: Int,
+    onDelay: (Int) -> Unit,
     onTarget: () -> Unit,
     assistant: Boolean,
     needsScreenshot: Boolean,
@@ -276,6 +283,9 @@ private fun Setup(
             onClick = null,
         )
 
+        Section("Advanced")
+        DelayRow(delay, onDelay)
+
         Spacer(Modifier.height(20.dp))
         Row(
             Modifier
@@ -373,5 +383,55 @@ private fun Picker(title: String, hint: String, options: List<Pair<String, Strin
             }
             Spacer(Modifier.height(6.dp))
         }
+    }
+}
+
+/** Settings › Advanced: a wait before the screenshot, in seconds (− and +; 0 is off). */
+@Composable
+private fun DelayRow(seconds: Int, onChange: (Int) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Card)
+            .padding(start = 18.dp, end = 10.dp, top = 14.dp, bottom = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Delay before the screenshot", color = Text1, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(3.dp))
+            Text(
+                "Time to open a menu or scroll first. SonderCircle gets out of the way, then takes the screenshot.",
+                color = Text2,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        StepButton("−", enabled = seconds > 0) { onChange(seconds - 1) }
+        Text(
+            if (seconds == 0) "Off" else "$seconds s",
+            color = if (seconds == 0) Text2 else Accent,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.width(44.dp),
+        )
+        StepButton("+", enabled = seconds < Handoff.MAX_DELAY) { onChange(seconds + 1) }
+    }
+}
+
+@Composable
+private fun StepButton(label: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(Color(0xFF33363D))
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = if (enabled) Text1 else Text2.copy(alpha = 0.5f), fontSize = 18.sp, fontWeight = FontWeight.Medium)
     }
 }

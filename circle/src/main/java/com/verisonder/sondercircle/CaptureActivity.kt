@@ -26,6 +26,16 @@ class CaptureActivity : Activity() {
             return
         }
         // Long enough for the Quick Settings panel (or a sidebar) to finish closing.
+        val settle = if (intent?.getBooleanExtra(EXTRA_FROM_TILE, false) == true) TILE_DELAY else ICON_DELAY
+        val delay = Handoff.delay(this)
+        if (delay > 0) {
+            // A delay of your own: this screen goes away at once (so the phone can be used
+            // meanwhile) and the screenshot is taken later.
+            if (delay >= 3) Toast.makeText(this, "Screenshot in $delay seconds", Toast.LENGTH_SHORT).show()
+            service.captureLater(settle + delay * 1000L)
+            done()
+            return
+        }
         main.postDelayed({
             service.capture { bmp ->
                 if (bmp == null) {
@@ -47,7 +57,7 @@ class CaptureActivity : Activity() {
                     }
                 }.start()
             }
-        }, if (intent?.getBooleanExtra(EXTRA_FROM_TILE, false) == true) TILE_DELAY else ICON_DELAY)
+        }, settle)
     }
 
     private fun done() {

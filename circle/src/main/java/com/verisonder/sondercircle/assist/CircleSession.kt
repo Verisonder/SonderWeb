@@ -20,6 +20,17 @@ class CircleSession(context: Context) : VoiceInteractionSession(context) {
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
         opened = false
+        // Settings › Advanced › Delay: the screenshot comes later, from SonderCircle's own
+        // screenshot switch (Android's picture is taken right now).
+        val delay = Handoff.delay(context)
+        val service = com.verisonder.sondercircle.CircleAccessibility.instance
+        if (delay > 0 && service != null) {
+            opened = true
+            if (delay >= 3) Toast.makeText(context, "Screenshot in $delay seconds", Toast.LENGTH_SHORT).show()
+            hide()
+            service.captureLater(300L + delay * 1000L)
+            return
+        }
         if (showFlags and SHOW_WITH_SCREENSHOT == 0) {
             // The phone's "Use screenshot" switch for the assistant is off.
             Toast.makeText(context, "Turn on \"Use screenshot\" in the assistant settings", Toast.LENGTH_LONG).show()

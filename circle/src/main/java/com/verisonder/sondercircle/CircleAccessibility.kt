@@ -19,6 +19,7 @@ class CircleAccessibility : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        main.removeCallbacksAndMessages(null)
         if (instance === this) instance = null
         super.onDestroy()
     }
@@ -31,6 +32,36 @@ class CircleAccessibility : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
 
     override fun onInterrupt() = Unit
+
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /**
+     * Settings › Advanced › Delay: waits [ms] with nothing of SonderCircle's on screen (so you can
+     * open a menu or scroll first), then takes the screenshot and opens the circle on it.
+     */
+    fun captureLater(ms: Long) {
+        main.removeCallbacksAndMessages(null)
+        main.postDelayed({
+            capture { bmp ->
+                if (bmp == null) {
+                    android.widget.Toast.makeText(this, "Couldn't take a screenshot. Try again.", android.widget.Toast.LENGTH_SHORT).show()
+                    return@capture
+                }
+                Thread {
+                    val open = runCatching { Handoff.prepare(this, bmp) }.getOrNull()
+                    main.post {
+                        if (open == null) {
+                            android.widget.Toast.makeText(this, "Install SonderWeb first: SonderCircle opens in it", android.widget.Toast.LENGTH_LONG).show()
+                        } else {
+                            // An app whose accessibility service is on may open its screen from here.
+                            runCatching { startActivity(open) }
+                                .onFailure { android.widget.Toast.makeText(this, "Update SonderWeb to use SonderCircle", android.widget.Toast.LENGTH_LONG).show() }
+                        }
+                    }
+                }.start()
+            }
+        }, ms)
+    }
 
     /** Takes the screenshot; [done] gets it (or null) on the main thread. */
     fun capture(done: (Bitmap?) -> Unit) {
