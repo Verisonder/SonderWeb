@@ -130,47 +130,38 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                 Spacer(Modifier.height(6.dp))
             }
 
-            // Settings › Tabs › Menu as a grid: the same options as icons, four to a row.
-            androidx.compose.runtime.CompositionLocalProvider(LocalMenuGrid provides remember(ui.menu) { Browser.prefs.menuGrid }) {
-            // Private tabs stay apart: no way into your normal history, downloads or bookmarks from here.
-            if (!tab.isPrivate) ItemGroup {
-                Item("History", Icons.Outlined.History) {
-                    ui.panel = Panel.History
-                    close()
-                }
-                Item("Downloads", Icons.Outlined.Download) {
-                    ui.panel = Panel.Downloads
-                    close()
-                }
-                Item("Bookmarks", Icons.Outlined.Collections) {
-                    ui.panel = Panel.Bookmarks
-                    close()
+            // What the menu offers, once; drawn as a list, or grouped like Firefox's menu.
+            val nav = buildList {
+                // Private tabs stay apart: no way into your normal history, downloads or bookmarks from here.
+                if (!tab.isPrivate) {
+                    add(MenuOption("History", Icons.Outlined.History) { ui.panel = Panel.History; close() })
+                    add(MenuOption("Downloads", Icons.Outlined.Download) { ui.panel = Panel.Downloads; close() })
+                    add(MenuOption("Bookmarks", Icons.Outlined.Collections) { ui.panel = Panel.Bookmarks; close() })
                 }
             }
-            if (web) {
-                if (!tab.isPrivate) Divider()
-                ItemGroup {
-                Item("Find in page", Icons.Outlined.FindInPage) {
+            val page = buildList {
+                if (!web) return@buildList
+                add(MenuOption("Find in page", Icons.Outlined.FindInPage) {
                     ui.findQuery = ""
                     ui.findResult = ""
                     ui.finding = true
                     close()
-                }
+                })
                 // A video is playing: put it in the small window right away.
                 if (tab.videoPlaying || tab.mediaPlaying) {
-                    Item("Picture-in-picture", Icons.Outlined.PictureInPictureAlt) {
+                    add(MenuOption("Picture-in-picture", Icons.Outlined.PictureInPictureAlt) {
                         close()
                         if (Browser.host?.enterPip() != true) {
                             Browser.host?.toast("Picture-in-picture is off for SonderWeb in the phone's settings")
                         }
-                    }
+                    })
                 }
-                Item(if (tab.translatedTo != null) "Show original" else "Translate page", Icons.Outlined.Translate) {
+                add(MenuOption(if (tab.translatedTo != null) "Show original" else "Translate page", Icons.Outlined.Translate) {
                     Translate.toggle(tab)
                     close()
-                }
+                })
                 if (!tab.isPrivate) {
-                    Item(
+                    add(MenuOption(
                         if (bookmarked) "Remove bookmark" else "Add bookmark",
                         if (bookmarked) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
                     ) {
@@ -183,62 +174,56 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                         }
                         bookmarked = !bookmarked
                         close()
-                    }
+                    })
                 }
                 // Firefox Sync (SonderWeb Sync, signed in): open this page on another of your devices.
-                if (web && !tab.isPrivate && com.verisonder.sonderweb.sync.FxSync.signedIn) {
-                    Item("Send to device", Icons.Outlined.Devices) {
+                if (!tab.isPrivate && com.verisonder.sonderweb.sync.FxSync.signedIn) {
+                    add(MenuOption("Send to device", Icons.Outlined.Devices) {
                         ui.sendTab = tab.title to tab.url
                         close()
-                    }
+                    })
                 }
-                if (LocalMenuGrid.current) {
-                    // In the grid: a tile that lights up while the desktop site is on.
-                    Tile("Desktop site", Icons.Outlined.Computer, selected = tab.desktop) { Browser.setDesktop(tab, !tab.desktop) }
-                } else {
-                    DropdownMenuItem(
-                        text = { Text("Desktop site", fontSize = 16.sp, color = p.text) },
-                        onClick = { Browser.setDesktop(tab, !tab.desktop) },
-                        leadingIcon = { Icon(Icons.Outlined.Computer, null, tint = p.mute, modifier = Modifier.size(22.dp)) },
-                        trailingIcon = {
-                            Checkbox(
-                                tab.desktop,
-                                { Browser.setDesktop(tab, it) },
-                                colors = CheckboxDefaults.colors(checkedColor = p.accent, uncheckedColor = p.mute),
-                            )
-                        },
-                        contentPadding = PaddingValues(start = 20.dp, end = 8.dp),
-                        modifier = Modifier.height(54.dp),
-                    )
-                }
+                add(MenuOption("Desktop site", Icons.Outlined.Computer, toggle = tab.desktop) { Browser.setDesktop(tab, !tab.desktop) })
                 // Like Brave's "Shred site data" (private tabs forget everything anyway).
                 if (!tab.isPrivate) {
-                    Item("Shred site data", ShredIcon) {
+                    add(MenuOption("Shred site data", ShredIcon) {
                         ui.shred = Browser.siteOf(tab.url)
                         close()
-                    }
+                    })
                 }
-                }
             }
-            Divider()
-            ItemGroup {
-            Item("Extensions", Icons.Outlined.Extension) {
-                ui.panel = Panel.Extensions
-                close()
-            }
-            Item("Settings", Icons.Outlined.Settings, dot = com.verisonder.sonderweb.data.AppUpdate.available != null) {
-                ui.panel = Panel.Settings
-                close()
-            }
-            // Settings › Tabs › Exit in the menu: closes the app, your tabs stay saved.
-            if (Browser.prefs.menuExit) {
-                Item("Exit", Icons.AutoMirrored.Outlined.Logout) {
+            val extensions = MenuOption("Extensions", Icons.Outlined.Extension) { ui.panel = Panel.Extensions; close() }
+            val app = buildList {
+                add(MenuOption("Settings", Icons.Outlined.Settings, dot = com.verisonder.sonderweb.data.AppUpdate.available != null) {
+                    ui.panel = Panel.Settings
                     close()
-                    Browser.saveTabs()
-                    (ctx as? android.app.Activity)?.finishAndRemoveTask()
+                })
+                // Settings › Tabs › Exit in the menu: closes the app, your tabs stay saved.
+                if (Browser.prefs.menuExit) {
+                    add(MenuOption("Exit", Icons.AutoMirrored.Outlined.Logout) {
+                        close()
+                        Browser.saveTabs()
+                        (ctx as? android.app.Activity)?.finishAndRemoveTask()
+                    })
                 }
             }
-            }
+
+            if (remember(ui.menu) { Browser.prefs.menuGrid }) {
+                // Settings › Tabs › Grouped menu, like Firefox's: the page's options in a rounded
+                // group, then History · Downloads · Bookmarks · Extensions side by side, then Settings.
+                if (page.isNotEmpty()) CardGroup(page)
+                SideBySide(nav + extensions)
+                CardGroup(app)
+                Spacer(Modifier.height(4.dp))
+            } else {
+                nav.forEach { ListOption(it) }
+                if (page.isNotEmpty()) {
+                    if (nav.isNotEmpty()) Divider()
+                    page.forEach { ListOption(it) }
+                }
+                Divider()
+                ListOption(extensions)
+                app.forEach { ListOption(it) }
             }
             if (!top) actions()
         }
@@ -250,78 +235,128 @@ private fun Divider() {
     HorizontalDivider(color = LocalPalette.current.line, modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp))
 }
 
-/** Settings › Tabs › Menu as a grid. */
-private val LocalMenuGrid = androidx.compose.runtime.staticCompositionLocalOf { false }
+/** One option of the menu. [toggle]: an on/off option (Desktop site), null for a plain action. */
+private class MenuOption(
+    val label: String,
+    val icon: ImageVector,
+    val dot: Boolean = false,
+    val toggle: Boolean? = null,
+    val onClick: () -> Unit,
+)
 
-/** A run of menu options: rows in the list, or four to a row in the grid. */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+/** The list look: a row with its icon (a checkbox for on/off options). */
 @Composable
-private fun ItemGroup(content: @Composable () -> Unit) {
-    if (LocalMenuGrid.current) {
-        androidx.compose.foundation.layout.FlowRow(
-            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
-            maxItemsInEachRow = 4,
-        ) { content() }
-    } else {
-        content()
-    }
-}
-
-/** One option in the grid: its icon on a rounded tile, its name under it. */
-@Composable
-private fun Tile(label: String, icon: ImageVector, dot: Boolean = false, selected: Boolean = false, onClick: () -> Unit) {
-    val p = LocalPalette.current
-    androidx.compose.foundation.layout.Column(
-        Modifier
-            .width(67.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(top = 8.dp, bottom = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier
-                .size(46.dp)
-                .clip(RoundedCornerShape(15.dp))
-                .background(if (selected) p.accent.copy(alpha = 0.22f) else p.bg),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, null, tint = if (selected) p.accent else p.text, modifier = Modifier.size(22.dp))
-            if (dot) UpdateDot(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp))
-        }
-        Spacer(Modifier.height(5.dp))
-        Text(
-            label,
-            color = if (selected) p.accent else p.mute,
-            fontSize = 11.sp,
-            lineHeight = 13.sp,
-            maxLines = 2,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 2.dp),
-        )
-    }
-}
-
-@Composable
-private fun Item(label: String, icon: ImageVector, dot: Boolean = false, onClick: () -> Unit) {
-    if (LocalMenuGrid.current) {
-        Tile(label, icon, dot, onClick = onClick)
-        return
-    }
+private fun ListOption(o: MenuOption) {
     val p = LocalPalette.current
     DropdownMenuItem(
         text = {
             androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text(label, fontSize = 16.sp, color = p.text)
-                if (dot) UpdateDot(Modifier.padding(start = 8.dp))
+                Text(o.label, fontSize = 16.sp, color = p.text)
+                if (o.dot) UpdateDot(Modifier.padding(start = 8.dp))
             }
         },
-        onClick = onClick,
-        leadingIcon = { Icon(icon, null, tint = p.mute, modifier = Modifier.size(22.dp)) },
-        contentPadding = PaddingValues(horizontal = 20.dp),
+        onClick = o.onClick,
+        leadingIcon = { Icon(o.icon, null, tint = p.mute, modifier = Modifier.size(22.dp)) },
+        trailingIcon = o.toggle?.let { on ->
+            {
+                Checkbox(
+                    on,
+                    { o.onClick() },
+                    colors = CheckboxDefaults.colors(checkedColor = p.accent, uncheckedColor = p.mute),
+                )
+            }
+        },
+        contentPadding = if (o.toggle != null) PaddingValues(start = 20.dp, end = 8.dp) else PaddingValues(horizontal = 20.dp),
         modifier = Modifier.height(54.dp),
     )
+}
+
+/** Shapes for pieces of one rounded group: the outer corners round, the inner ones nearly square. */
+private fun piece(first: Boolean, last: Boolean, vertical: Boolean): RoundedCornerShape {
+    val big = 18.dp
+    val small = 5.dp
+    return if (vertical) {
+        RoundedCornerShape(
+            topStart = if (first) big else small,
+            topEnd = if (first) big else small,
+            bottomEnd = if (last) big else small,
+            bottomStart = if (last) big else small,
+        )
+    } else {
+        RoundedCornerShape(
+            topStart = if (first) big else small,
+            bottomStart = if (first) big else small,
+            topEnd = if (last) big else small,
+            bottomEnd = if (last) big else small,
+        )
+    }
+}
+
+/** The grouped look: options stacked in one rounded group, each its own row (On / Off for toggles). */
+@Composable
+private fun CardGroup(options: List<MenuOption>) {
+    if (options.isEmpty()) return
+    val p = LocalPalette.current
+    androidx.compose.foundation.layout.Column(
+        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        options.forEachIndexed { i, o ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .clip(piece(i == 0, i == options.lastIndex, vertical = true))
+                    .background(p.field)
+                    .clickable(onClick = o.onClick)
+                    .padding(start = 16.dp, end = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(o.icon, null, tint = p.mute, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(14.dp))
+                Text(o.label, color = p.text, fontSize = 15.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                if (o.dot) UpdateDot(Modifier.padding(end = 8.dp))
+                o.toggle?.let { on ->
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (on) p.accent else p.card)
+                            .padding(horizontal = 12.dp, vertical = 5.dp),
+                    ) {
+                        Text(if (on) "On" else "Off", color = if (on) p.onAccent else p.text, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The grouped look: a few options side by side in one rounded row, icon over name. */
+@Composable
+private fun SideBySide(options: List<MenuOption>) {
+    if (options.isEmpty()) return
+    val p = LocalPalette.current
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        options.forEachIndexed { i, o ->
+            androidx.compose.foundation.layout.Column(
+                Modifier
+                    .weight(1f)
+                    .height(58.dp)
+                    .clip(piece(i == 0, i == options.lastIndex, vertical = false))
+                    .background(p.field)
+                    .clickable(onClick = o.onClick),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(o.icon, null, tint = p.text, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.height(4.dp))
+                Text(o.label, color = p.mute, fontSize = 11.sp, maxLines = 1, softWrap = false)
+            }
+        }
+    }
 }
 
 /** Round page-action buttons at the edge of the menu, like Brave's. */

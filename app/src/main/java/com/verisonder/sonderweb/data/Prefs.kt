@@ -315,7 +315,7 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("start_status", false)
         set(v) = sp.edit().putBoolean("start_status", v).apply()
 
-    /** The ⋮ menu as a grid of icons (four to a row) instead of a list. */
+    /** The ⋮ menu grouped like Firefox's (rounded groups, History · Downloads · Bookmarks · Extensions side by side). */
     var menuGrid: Boolean
         get() = sp.getBoolean("menu_grid", false)
         set(v) = sp.edit().putBoolean("menu_grid", v).apply()

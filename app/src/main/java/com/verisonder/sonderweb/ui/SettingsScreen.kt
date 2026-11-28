@@ -929,7 +929,7 @@ private fun TabsPage() {
             swipeTabs = it
             prefs.swipeUpTabs = it
         }
-        Toggle("Menu as a grid", "The ⋮ menu shows its options as icons, four to a row, instead of a list.", grid) {
+        Toggle("Grouped menu", "The ⋮ menu in rounded groups, like Firefox's: History, Downloads, Bookmarks and Extensions side by side.", grid) {
             grid = it
             prefs.menuGrid = it
         }
