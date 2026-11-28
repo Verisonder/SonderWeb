@@ -94,6 +94,7 @@
       loadedEnd = 0;
       loadedSince = Date.now();
     }
+    const was = hold;
     hold = on;
     if (on) {
       resumeStray();
@@ -102,6 +103,22 @@
       clearInterval(keeper);
       keeper = null;
     }
+    // Back at full size: YouTube may still think it paused itself (its pause was blocked while
+    // the video kept playing), so its buttons say "paused". It's told it's playing, a few
+    // times, since it sometimes changes its mind just after you come back.
+    if (was && !on) [0, 400, 1200].forEach((ms) => setTimeout(syncPlayer, ms));
+  }
+
+  // The video plays but YouTube's player says "paused" (2): tell it to play, which only fixes
+  // its buttons (the video doesn't jump or restart). Your own pause is left alone.
+  function syncPlayer() {
+    if (hold || userPaused) return;
+    const v = (filledVideo && filledVideo.isConnected) ? filledVideo : video;
+    if (!v || v.paused || v.ended) return;
+    try {
+      const p = youtube();
+      if (p && p.getPlayerState() === 2) p.playVideo();
+    } catch (e) {}
   }
 
   // Blocking YouTube's pause() keeps the picture moving, but YouTube's player then thinks it is
