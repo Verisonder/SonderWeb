@@ -430,39 +430,54 @@ private fun Picker(title: String, hint: String, options: List<Pair<String, Strin
     }
 }
 
-/** Settings › Advanced: a wait before the screenshot, in seconds (− and +; 0 is off). */
+/** Settings › Advanced: a wait before the screenshot, 0 to 3 seconds in tenths (slide, or − and + for 0.1). */
 @Composable
-private fun DelayRow(seconds: Int, onChange: (Int) -> Unit) {
-    Row(
+private fun DelayRow(tenths: Int, onChange: (Int) -> Unit) {
+    Column(
         Modifier
             .fillMaxWidth()
             .padding(bottom = 8.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(Card)
-            .padding(start = 18.dp, end = 10.dp, top = 14.dp, bottom = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(start = 18.dp, end = 10.dp, top = 14.dp, bottom = 8.dp),
     ) {
-        Column(Modifier.weight(1f)) {
-            Text("Delay before the screenshot", color = Text1, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(3.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Delay before the screenshot", color = Text1, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    "Time to open a menu or scroll first. SonderCircle gets out of the way, then takes the screenshot.",
+                    color = Text2,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            StepButton("−", enabled = tenths > 0) { onChange(tenths - 1) }
             Text(
-                "Time to open a menu or scroll first. SonderCircle gets out of the way, then takes the screenshot.",
-                color = Text2,
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
+                if (tenths == 0) "Off" else "%.1f s".format(java.util.Locale.US, tenths / 10f),
+                color = if (tenths == 0) Text2 else Accent,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.width(52.dp),
             )
+            StepButton("+", enabled = tenths < Handoff.MAX_DELAY) { onChange(tenths + 1) }
         }
-        Spacer(Modifier.width(10.dp))
-        StepButton("−", enabled = seconds > 0) { onChange(seconds - 1) }
-        Text(
-            if (seconds == 0) "Off" else "$seconds s",
-            color = if (seconds == 0) Text2 else Accent,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.width(44.dp),
+        androidx.compose.material3.Slider(
+            value = tenths.toFloat(),
+            onValueChange = { onChange(kotlin.math.round(it).toInt()) },
+            valueRange = 0f..Handoff.MAX_DELAY.toFloat(),
+            steps = Handoff.MAX_DELAY - 1,
+            colors = androidx.compose.material3.SliderDefaults.colors(
+                thumbColor = Accent,
+                activeTrackColor = Accent,
+                inactiveTrackColor = Color(0xFF33363D),
+                activeTickColor = Color.Transparent,
+                inactiveTickColor = Color.Transparent,
+            ),
+            modifier = Modifier.padding(end = 8.dp),
         )
-        StepButton("+", enabled = seconds < Handoff.MAX_DELAY) { onChange(seconds + 1) }
     }
 }
 

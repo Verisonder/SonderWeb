@@ -60,14 +60,19 @@ object Handoff {
     }
 
     /** Settings › Advanced: seconds to wait before the screenshot (0: none), to set the screen up first. */
-    fun delay(ctx: Context): Int =
-        ctx.getSharedPreferences("circle", Context.MODE_PRIVATE).getInt("delay", 0).coerceIn(0, MAX_DELAY)
-
-    fun changeDelay(ctx: Context, seconds: Int) {
-        ctx.getSharedPreferences("circle", Context.MODE_PRIVATE).edit().putInt("delay", seconds.coerceIn(0, MAX_DELAY)).apply()
+    /** In tenths of a second (0 to 3.0 s). A delay set in whole seconds before is kept, up to 3 s. */
+    fun delay(ctx: Context): Int {
+        val sp = ctx.getSharedPreferences("circle", Context.MODE_PRIVATE)
+        val tenths = if (sp.contains("delay_tenths")) sp.getInt("delay_tenths", 0) else sp.getInt("delay", 0) * 10
+        return tenths.coerceIn(0, MAX_DELAY)
     }
 
-    const val MAX_DELAY = 10
+    fun changeDelay(ctx: Context, tenths: Int) {
+        ctx.getSharedPreferences("circle", Context.MODE_PRIVATE).edit().putInt("delay_tenths", tenths.coerceIn(0, MAX_DELAY)).apply()
+    }
+
+    /** 3.0 seconds, in tenths. */
+    const val MAX_DELAY = 30
 
     fun setImageEngine(ctx: Context, id: String) {
         ctx.getSharedPreferences("circle", Context.MODE_PRIVATE).edit().putString("image_engine", id).apply()

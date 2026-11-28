@@ -31,8 +31,7 @@ class CaptureActivity : Activity() {
         if (delay > 0) {
             // A delay of your own: this screen goes away at once (so the phone can be used
             // meanwhile) and the screenshot is taken later.
-            if (delay >= 3) Toast.makeText(this, "Screenshot in $delay seconds", Toast.LENGTH_SHORT).show()
-            service.captureLater(settle + delay * 1000L)
+            service.captureLater(settle + delay * 100L)
             done()
             return
         }

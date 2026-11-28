@@ -26,9 +26,8 @@ class CircleSession(context: Context) : VoiceInteractionSession(context) {
         val service = com.verisonder.sondercircle.CircleAccessibility.instance
         if (delay > 0 && service != null) {
             opened = true
-            if (delay >= 3) Toast.makeText(context, "Screenshot in $delay seconds", Toast.LENGTH_SHORT).show()
             hide()
-            service.captureLater(300L + delay * 1000L)
+            service.captureLater(300L + delay * 100L)
             return
         }
         if (showFlags and SHOW_WITH_SCREENSHOT == 0) {
