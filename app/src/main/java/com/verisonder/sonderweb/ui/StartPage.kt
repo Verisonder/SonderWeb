@@ -317,7 +317,7 @@ private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser
                         fontWeight = font.weight,
                         letterSpacing = font.spacing,
                         maxLines = 1,
-                        modifier = if (preview == null) Modifier.holdFor(10_000L) { pickingFont = true } else Modifier,
+                        modifier = if (preview == null) Modifier.holdFor(3_000L) { pickingFont = true } else Modifier,
                     )
                     Text(date, color = p.text, fontSize = 16.sp)
                 }

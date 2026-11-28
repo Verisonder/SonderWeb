@@ -80,7 +80,7 @@ object ClockFonts {
     fun of(id: String): ClockFont = all.firstOrNull { it.id == id } ?: all.first()
 }
 
-/** Hidden: hold the start page's time for 10 seconds. Each font shows the time as it is now. */
+/** Hidden: hold the start page's time for 3 seconds. Each font shows the time as it is now. */
 @Composable
 fun ClockFontPicker(time: String, selected: String, onPick: (String) -> Unit, onDismiss: () -> Unit) {
     val p = LocalPalette.current
