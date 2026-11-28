@@ -149,6 +149,7 @@ object Browser {
         Ublock.install(runtime)
         Look.install(runtime)
         AddonsSite.install(runtime)
+        YoutubeBar.install(runtime)
         Shields.install(runtime)
         Pip.install(runtime)
         GoogleAccount.install(runtime)

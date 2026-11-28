@@ -1,0 +1,20 @@
+/* YouTube's bottom bar (Home, Shorts, Subscriptions, You) as a floating pill, like SonderWeb's own bar. */
+ytm-pivot-bar-renderer {
+  left: 12px !important;
+  right: 12px !important;
+  width: auto !important;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+  height: 56px !important;
+  border: 0 !important;
+  border-radius: 28px !important;
+  overflow: hidden !important;
+  background: rgba(36, 37, 41, 0.84) !important;
+  backdrop-filter: blur(24px) saturate(1.4) !important;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+/* YouTube's light theme. */
+html:not([dark]):not([darker-dark-theme]) ytm-pivot-bar-renderer {
+  background: rgba(250, 250, 252, 0.88) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18), inset 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+}

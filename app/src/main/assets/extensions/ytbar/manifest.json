@@ -1,0 +1,14 @@
+{
+  "manifest_version": 2,
+  "name": "SonderWeb YouTube bar",
+  "version": "1.0",
+  "description": "Gives YouTube's bottom bar SonderWeb's floating pill shape.",
+  "browser_specific_settings": { "gecko": { "id": "ytbar@sonderweb" } },
+  "content_scripts": [
+    {
+      "matches": ["https://m.youtube.com/*"],
+      "css": ["ytbar.css"],
+      "run_at": "document_start"
+    }
+  ]
+}
