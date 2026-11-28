@@ -100,7 +100,47 @@ class Db(context: Context, name: String = "sonderweb.db") : SQLiteOpenHelper(con
         val db = writableDatabase
         val n = db.update("history", cv, "url = ?", arrayOf(url))
         if (n == 0) db.insert("history", null, cv)
+        countVisit(db, url)
     }
+
+    // ---- Most visited sites (the start page's row): one count per site ----
+
+    @Volatile
+    private var visitsReady = false
+
+    private fun visitsTable(db: SQLiteDatabase) {
+        if (visitsReady) return
+        // Added after the schema's version 2: made the first time it's needed.
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS site_visits (host TEXT PRIMARY KEY, url TEXT NOT NULL, " +
+                "count INTEGER NOT NULL, last INTEGER NOT NULL)",
+        )
+        visitsReady = true
+    }
+
+    private fun countVisit(db: SQLiteDatabase, url: String) {
+        val host = com.verisonder.sonderweb.core.UrlText.host(url)
+        if (host.isEmpty()) return
+        runCatching {
+            visitsTable(db)
+            val root = url.substringBefore("://") + "://" + host + "/"
+            val now = System.currentTimeMillis()
+            // Update first, else add (older phones' SQLite has no upsert).
+            db.execSQL("UPDATE site_visits SET count = count + 1, last = ? WHERE host = ?", arrayOf<Any>(now, host))
+            db.execSQL("INSERT OR IGNORE INTO site_visits (host, url, count, last) VALUES (?, ?, 1, ?)", arrayOf<Any>(host, root, now))
+        }
+    }
+
+    /** The sites you open most (each site's main page), most visits first. */
+    fun mostVisited(limit: Int = 12): List<Pair<String, String>> = runCatching {
+        val db = writableDatabase
+        visitsTable(db)
+        db.rawQuery("SELECT url, host FROM site_visits ORDER BY count DESC, last DESC LIMIT ?", arrayOf(limit.toString())).use { c ->
+            val out = ArrayList<Pair<String, String>>(c.count)
+            while (c.moveToNext()) out += c.getString(0) to c.getString(1).removePrefix("www.")
+            out
+        }
+    }.getOrDefault(emptyList())
 
     fun setTitle(url: String, title: String) {
         if (title.isBlank()) return
@@ -131,6 +171,10 @@ class Db(context: Context, name: String = "sonderweb.db") : SQLiteOpenHelper(con
 
     fun clearHistory() {
         writableDatabase.delete("history", null, null)
+        runCatching {
+            visitsTable(writableDatabase)
+            writableDatabase.delete("site_visits", null, null)
+        }
         if (synced) FxSync.noteHistoryCleared()
     }
 

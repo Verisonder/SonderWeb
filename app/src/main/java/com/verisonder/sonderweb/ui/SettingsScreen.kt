@@ -203,6 +203,8 @@ fun SettingsScreen(ui: UiState) {
     var query by remember { mutableStateOf("") }
     var clearing by remember { mutableStateOf(false) }
     val close = { ui.panel = Panel.None }
+    // The main list keeps its place while you're in a page, so back returns where you were.
+    val mainScroll = rememberScrollState()
 
     BackHandler(enabled = page != null) { page = null }
 
@@ -241,7 +243,7 @@ fun SettingsScreen(ui: UiState) {
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(if (shown == null) mainScroll else rememberScrollState())
                 // The list runs on under the gesture bar and ends just above it.
                 .navigationBarsPadding()
                 .padding(bottom = 28.dp),
@@ -856,6 +858,8 @@ private fun TabsPage() {
     val p = LocalPalette.current
     var asList by remember { mutableStateOf(prefs.tabsAsList) }
     var atBottom by remember { mutableStateOf(prefs.tabsAtBottom) }
+    var layoutSwitch by remember { mutableStateOf(prefs.tabsLayoutSwitch) }
+    var closeX by remember { mutableStateOf(prefs.tabsCloseX) }
     Group {
         Row(
             Modifier.fillMaxWidth().background(p.field).heightIn(min = 56.dp).padding(horizontal = 18.dp, vertical = 8.dp),
@@ -870,6 +874,14 @@ private fun TabsPage() {
         Toggle("Tabs at the bottom", "With only a few tabs, they sit at the bottom, near your thumb", atBottom) {
             atBottom = it
             prefs.tabsAtBottom = it
+        }
+        Toggle("Layout switch", "Grid and list icons at the top of the tab list, beside Tabs · Private", layoutSwitch) {
+            layoutSwitch = it
+            prefs.tabsLayoutSwitch = it
+        }
+        Toggle("Close with ×", "An × at the top right of the tab list instead of Done", closeX) {
+            closeX = it
+            prefs.tabsCloseX = it
         }
     }
     Hint("Swipe a tab sideways to close it.")
@@ -1162,11 +1174,11 @@ private fun AboutPage(ui: UiState) {
     Spacer(Modifier.height(12.dp))
     // Bookmarks to and from other browsers: the HTML file Chrome, Firefox and the others use.
     var bookmarksBusy by remember { mutableStateOf(false) }
-    val bookmarksJob: (suspend () -> String) -> Unit = { job ->
+    val bookmarksJob: (String, suspend () -> String) -> Unit = { failed, job ->
         bookmarksBusy = true
         scope.launch {
             val message = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                runCatching { job() }.getOrElse { it.message ?: "Something went wrong" }
+                runCatching { job() }.getOrElse { "$failed: " + (it.message ?: "something went wrong") }
             }
             bookmarksBusy = false
             Browser.host?.toast(message)
@@ -1175,21 +1187,21 @@ private fun AboutPage(ui: UiState) {
     val importPick = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        if (uri != null) bookmarksJob {
+        if (uri != null) bookmarksJob("Import failed") {
             val r = com.verisonder.sonderweb.data.BookmarksFile.import(ctx, uri, Browser.marks)
             when {
-                r.added == 0 -> "Those bookmarks are already here"
-                r.skipped > 0 -> "Added ${r.added} bookmarks (${r.skipped} were already here)"
-                else -> "Added ${r.added} bookmarks"
+                r.added == 0 -> "Import done: those bookmarks are already here"
+                r.skipped > 0 -> "Import done: ${r.added} bookmarks added (${r.skipped} were already here)"
+                else -> "Import done: ${r.added} bookmarks added"
             }
         }
     }
     val exportPick = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/html"),
     ) { uri ->
-        if (uri != null) bookmarksJob {
+        if (uri != null) bookmarksJob("Export failed") {
             val n = com.verisonder.sonderweb.data.BookmarksFile.export(ctx, uri, Browser.marks)
-            "Saved $n bookmarks"
+            "Exported $n bookmarks"
         }
     }
     Group {
@@ -1467,6 +1479,124 @@ private fun StartSettings(ui: UiState) {
         }
     }
     Hint("Add shortcuts with the + on the start page. Long-press one to edit or remove it.")
+    AdvancedStart(ui)
+}
+
+/** Start page › Advanced customization: more rows under the shortcuts, all off by default. */
+@Composable
+private fun AdvancedStart(ui: UiState) {
+    val p = LocalPalette.current
+    val prefs = Browser.prefs
+    var collectionsOn by remember { mutableStateOf(prefs.sectionCollections) }
+    var bookmarks by remember { mutableStateOf(prefs.sectionBookmarks) }
+    var most by remember { mutableStateOf(prefs.sectionMostVisited) }
+    var recent by remember { mutableStateOf(prefs.sectionRecent) }
+    var closed by remember { mutableStateOf(prefs.sectionClosed) }
+    GroupTitle("Advanced customization")
+    Group {
+        Toggle("Collections", "Your own sets of sites, each in its own row", collectionsOn) {
+            collectionsOn = it
+            prefs.sectionCollections = it
+            ui.themeVersion++
+        }
+        Toggle("Bookmarks", "Your latest bookmarks", bookmarks) {
+            bookmarks = it
+            prefs.sectionBookmarks = it
+            ui.themeVersion++
+        }
+        Toggle("Most visited", "The sites you open most", most) {
+            most = it
+            prefs.sectionMostVisited = it
+            ui.themeVersion++
+        }
+        Toggle("Recently visited", "The sites you were on last", recent) {
+            recent = it
+            prefs.sectionRecent = it
+            ui.themeVersion++
+        }
+        Toggle("Recently closed", "Tabs you closed; tap one to open it again", closed) {
+            closed = it
+            prefs.sectionClosed = it
+            ui.themeVersion++
+        }
+    }
+    if (!collectionsOn) return
+
+    GroupTitle("Collections")
+    var list by remember { mutableStateOf(prefs.collections) }
+    // Naming: -1 a new collection, else the one being renamed.
+    var naming by remember { mutableStateOf<Int?>(null) }
+    var deleting by remember { mutableStateOf<Int?>(null) }
+    val save = { v: List<com.verisonder.sonderweb.data.SiteCollection> ->
+        list = v
+        prefs.collections = v
+        ui.themeVersion++
+    }
+    Group {
+        list.forEachIndexed { i, c ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(p.field)
+                    .clickable { naming = i }
+                    .heightIn(min = 56.dp)
+                    .padding(start = 20.dp, end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
+                    Text(c.name, color = p.text, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        if (c.sites.size == 1) "1 site" else "${c.sites.size} sites",
+                        color = p.faint,
+                        fontSize = 13.sp,
+                    )
+                }
+                IconButtonSmall(Icons.Outlined.Close, "Delete " + c.name, size = 44) { deleting = i }
+            }
+        }
+        Action("New collection", "A named row of sites on the start page") { naming = -1 }
+    }
+    Hint("Tap a collection to rename it. On the start page, + adds a site to it; hold a site to edit or remove it.")
+
+    naming?.let { i ->
+        var name by remember(i) { mutableStateOf(list.getOrNull(i)?.name ?: "") }
+        AlertDialog(
+            onDismissRequest = { naming = null },
+            containerColor = p.card,
+            title = { Text(if (i < 0) "New collection" else "Rename collection", color = p.text) },
+            text = { SettingsField(name, "Name") { name = it } },
+            confirmButton = {
+                TextButton(
+                    {
+                        val n = name.trim()
+                        if (n.isNotEmpty()) {
+                            save(
+                                if (i < 0) {
+                                    list + com.verisonder.sonderweb.data.SiteCollection(n, emptyList())
+                                } else {
+                                    list.mapIndexed { j, c -> if (j == i) c.copy(name = n) else c }
+                                },
+                            )
+                            naming = null
+                        }
+                    },
+                    enabled = name.isNotBlank(),
+                ) { Text(if (i < 0) "Add" else "Save", color = if (name.isNotBlank()) p.accent else p.faint) }
+            },
+            dismissButton = { TextButton({ naming = null }) { Text("Cancel", color = p.text) } },
+        )
+    }
+    deleting?.let { i ->
+        val c = list.getOrNull(i)
+        if (c == null) {
+            deleting = null
+        } else {
+            ConfirmDialog("Delete ${c.name}?", "Its row leaves the start page. Your bookmarks and history stay.", "Delete", { deleting = null }) {
+                save(list.filterIndexed { j, _ -> j != i })
+                deleting = null
+            }
+        }
+    }
 }
 
 // ---- Building blocks ----
@@ -1644,7 +1774,10 @@ private fun ClearDataDialog(onDone: () -> Unit) {
         },
         confirmButton = {
             TextButton({
-                if (hist) Browser.db.clearHistory()
+                if (hist) {
+                    Browser.db.clearHistory()
+                    Browser.forgetClosed()
+                }
                 if (downloads) Browser.mainDb.clearDownloads()
                 var flags = 0L
                 if (cookies) {

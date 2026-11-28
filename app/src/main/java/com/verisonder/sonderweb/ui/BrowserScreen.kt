@@ -452,22 +452,6 @@ fun BrowserScreen(activity: MainActivity) {
                 }
             }
 
-            SnackbarHost(
-                activity.snackbar,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(bottom = if (barTop) 16.dp else 72.dp),
-            ) { data ->
-                Snackbar(
-                    data,
-                    containerColor = palette.field,
-                    contentColor = palette.text,
-                    actionColor = palette.accent,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-                )
-            }
-
             // Settings scrolls on under the gesture bar (nothing looks cut off at the bottom);
             // remembered so it doesn't jump while the panel closes.
             val lastPanel = remember { arrayOf(Panel.None) }
@@ -495,6 +479,23 @@ fun BrowserScreen(activity: MainActivity) {
                         Panel.None -> Unit
                     }
                 }
+            }
+
+            // Over the panels too, so messages from Settings and Undo in the tab list are seen.
+            SnackbarHost(
+                activity.snackbar,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(bottom = if (barTop && ui.panel == Panel.None) 16.dp else 72.dp),
+            ) { data ->
+                Snackbar(
+                    data,
+                    containerColor = palette.field,
+                    contentColor = palette.text,
+                    actionColor = palette.accent,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                )
             }
 
             ContextMenu.request?.let { ContextSheet(it) }

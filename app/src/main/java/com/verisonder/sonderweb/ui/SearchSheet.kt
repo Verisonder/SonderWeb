@@ -238,7 +238,13 @@ private fun SheetSuggestions(ui: UiState, tab: Tab, enter: () -> Float) {
             // Each site once: its latest (or best-matching) page, not every page of it.
             text.isBlank() && !Browser.prefs.suggestRecent -> emptyList()
             text.isBlank() -> Browser.db.history("", 200).distinctBy { UrlText.host(it.url) }.take(5).map { it.url to it.title }
-            else -> Browser.suggest(text, 30).distinctBy { UrlText.host(it.first) }.take(6)
+            // Bookmarks each stay (you named them; several can be on one site); history: each site once.
+            else -> {
+                val hosts = HashSet<String>()
+                Browser.suggest(text, 30).filter { (url, _) ->
+                    Browser.marks.isBookmarked(url) || hosts.add(UrlText.host(url))
+                }.take(6)
+            }
         }
     }
     val bangHints = remember(text) {
@@ -281,6 +287,8 @@ private fun SheetSuggestions(ui: UiState, tab: Tab, enter: () -> Float) {
             row++,
             enter,
             { SiteGlyph(url, if (bookmarked) Icons.Outlined.Bookmark else Icons.Outlined.History) },
+            // The address under the name, so pages with names of your own are easy to tell apart.
+            sub = UrlText.editable(url).takeIf { title.isNotBlank() },
         ) {
             ui.editing = false
             Browser.load(tab, url)
@@ -289,7 +297,14 @@ private fun SheetSuggestions(ui: UiState, tab: Tab, enter: () -> Float) {
 }
 
 @Composable
-private fun SheetRow(title: String, index: Int, enter: () -> Float, icon: @Composable () -> Unit, onClick: () -> Unit) {
+private fun SheetRow(
+    title: String,
+    index: Int,
+    enter: () -> Float,
+    icon: @Composable () -> Unit,
+    sub: String? = null,
+    onClick: () -> Unit,
+) {
     val p = LocalPalette.current
     Row(
         Modifier
@@ -301,12 +316,19 @@ private fun SheetRow(title: String, index: Int, enter: () -> Float, icon: @Compo
                 translationY = (1f - t) * 14.dp.toPx()
             }
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 14.dp),
+            .padding(horizontal = 24.dp, vertical = if (sub != null) 9.dp else 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) { icon() }
         Spacer(Modifier.width(18.dp))
-        Text(title, color = p.text, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        if (sub == null) {
+            Text(title, color = p.text, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        } else {
+            androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                Text(title, color = p.text, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(sub, color = p.faint, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
 }
 

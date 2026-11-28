@@ -57,7 +57,7 @@ class Prefs(context: Context) {
     fun forgetProfile(profile: String) {
         if (profile.isEmpty()) return
         val e = sp.edit()
-        listOf("tabs", "tab_titles", "tab_colors", "tab_used", "tab_index", "tab_profiles", "shortcuts").forEach { e.remove("$it@$profile") }
+        listOf("tabs", "tab_titles", "tab_colors", "tab_used", "tab_index", "tab_profiles", "shortcuts", "collections").forEach { e.remove("$it@$profile") }
         e.apply()
     }
 
@@ -310,6 +310,37 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("tabs_bottom", false)
         set(v) = sp.edit().putBoolean("tabs_bottom", v).apply()
 
+    /** A grid / list switch at the top of the tab list, beside Tabs · Private. */
+    var tabsLayoutSwitch: Boolean
+        get() = sp.getBoolean("tabs_switch", false)
+        set(v) = sp.edit().putBoolean("tabs_switch", v).apply()
+
+    /** The tab list closes with an × instead of Done. */
+    var tabsCloseX: Boolean
+        get() = sp.getBoolean("tabs_close_x", false)
+        set(v) = sp.edit().putBoolean("tabs_close_x", v).apply()
+
+    // Settings › Start page › Advanced: more rows on the start page, under the shortcuts.
+    var sectionCollections: Boolean
+        get() = sp.getBoolean("start_collections", false)
+        set(v) = sp.edit().putBoolean("start_collections", v).apply()
+
+    var sectionBookmarks: Boolean
+        get() = sp.getBoolean("start_bookmarks", false)
+        set(v) = sp.edit().putBoolean("start_bookmarks", v).apply()
+
+    var sectionMostVisited: Boolean
+        get() = sp.getBoolean("start_most", false)
+        set(v) = sp.edit().putBoolean("start_most", v).apply()
+
+    var sectionRecent: Boolean
+        get() = sp.getBoolean("start_recent", false)
+        set(v) = sp.edit().putBoolean("start_recent", v).apply()
+
+    var sectionClosed: Boolean
+        get() = sp.getBoolean("start_closed", false)
+        set(v) = sp.edit().putBoolean("start_closed", v).apply()
+
     /** Inactive tabs are closed after this many days of being inactive (0: never). */
     var inactiveCloseDays: Int
         get() = sp.getInt("inactive_close", 3)
@@ -451,6 +482,50 @@ class Prefs(context: Context) {
             sp.edit().putString(k("shortcuts", splitShortcuts), a.toString()).apply()
         }
 
+    /** Start page collections: your own named sets of sites (kept like the shortcuts). */
+    var collections: List<SiteCollection>
+        get() {
+            val raw = sp.getString(k("collections", splitShortcuts), null) ?: return emptyList()
+            return runCatching {
+                val a = JSONArray(raw)
+                List(a.length()) { i ->
+                    val o = a.getJSONObject(i)
+                    val sites = o.optJSONArray("s") ?: JSONArray()
+                    SiteCollection(
+                        o.getString("n"),
+                        List(sites.length()) { j -> sites.getJSONObject(j).let { Shortcut(it.getString("u"), it.optString("t")) } },
+                    )
+                }
+            }.getOrDefault(emptyList())
+        }
+        set(v) {
+            val a = JSONArray()
+            v.forEach { c ->
+                val sites = JSONArray()
+                c.sites.forEach { sites.put(JSONObject().put("u", it.url).put("t", it.title)) }
+                a.put(JSONObject().put("n", c.name).put("s", sites))
+            }
+            sp.edit().putString(k("collections", splitShortcuts), a.toString()).apply()
+        }
+
+    /** Recently closed normal tabs (newest first), for the start page. */
+    var closedTabs: List<ClosedTab>
+        get() {
+            val raw = sp.getString("closed_tabs", null) ?: return emptyList()
+            return runCatching {
+                val a = JSONArray(raw)
+                List(a.length()) { i ->
+                    val o = a.getJSONObject(i)
+                    ClosedTab(o.getString("u"), o.optString("t"), o.optString("p"))
+                }
+            }.getOrDefault(emptyList())
+        }
+        set(v) {
+            val a = JSONArray()
+            v.forEach { a.put(JSONObject().put("u", it.url).put("t", it.title).put("p", it.profile)) }
+            sp.edit().putString("closed_tabs", a.toString()).apply()
+        }
+
     companion object {
         val defaultShortcuts = emptyList<Shortcut>()
     }
@@ -459,3 +534,8 @@ class Prefs(context: Context) {
 data class Place(val name: String, val lat: Double, val lon: Double)
 
 data class Shortcut(val url: String, val title: String)
+
+data class SiteCollection(val name: String, val sites: List<Shortcut>)
+
+/** A closed normal tab kept for the start page: its address, title and profile. */
+data class ClosedTab(val url: String, val title: String, val profile: String)

@@ -232,6 +232,7 @@ fun HistoryScreen(ui: UiState) {
     if (confirm) {
         ConfirmDialog("Clear all history?", "Bookmarks and open tabs stay.", "Clear", { confirm = false }) {
             Browser.db.clearHistory()
+            Browser.forgetClosed()
             version++
         }
     }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -388,6 +389,8 @@ private fun StartPageBody(ui: UiState, preview: com.verisonder.sonderweb.browser
                         version++
                     },
                 )
+                // Settings › Start page › Advanced: collections, bookmarks, most visited, recent, closed.
+                if (preview == null) StartSections(ui, tab)
                 Spacer(Modifier.height(32.dp))
             }
         }
@@ -670,6 +673,8 @@ private fun ShortcutDialog(
     onDismiss: () -> Unit,
     onSave: (Shortcut) -> Unit,
     onRemove: (() -> Unit)?,
+    removeLabel: String = "Remove from start page",
+    kind: String = "shortcut",
 ) {
     val p = LocalPalette.current
     var name by remember { mutableStateOf(existing?.title ?: "") }
@@ -694,7 +699,7 @@ private fun ShortcutDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = p.card,
-        title = { Text(if (existing == null) "Add shortcut" else "Edit shortcut", color = p.text) },
+        title = { Text(if (existing == null) "Add $kind" else "Edit $kind", color = p.text) },
         text = {
             Column(Modifier.heightIn(min = 10.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, colors = colors)
@@ -703,7 +708,7 @@ private fun ShortcutDialog(
                 if (onRemove != null) {
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        "Remove from start page",
+                        removeLabel,
                         color = p.danger,
                         fontSize = 14.sp,
                         modifier = Modifier
@@ -899,5 +904,138 @@ private fun ShortcutMenuRow(
         Icon(icon, null, tint = p.mute, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(14.dp))
         Text(label, color = color, fontSize = 15.sp)
+    }
+}
+
+/** The start page's extra rows (Settings › Start page › Advanced), each only when switched on. */
+@Composable
+private fun StartSections(ui: UiState, tab: com.verisonder.sonderweb.browser.Tab) {
+    val prefs = Browser.prefs
+    val profile = com.verisonder.sonderweb.data.Profiles.current
+    var version by remember { mutableIntStateOf(0) }
+    val keys = arrayOf<Any?>(ui.themeVersion, profile, com.verisonder.sonderweb.data.Profiles.changes, tab.id)
+    val collections = remember(version, *keys) { if (prefs.sectionCollections) prefs.collections else emptyList() }
+    val bookmarks = remember(*keys) {
+        if (prefs.sectionBookmarks) Browser.marks.bookmarks().take(12).map { Shortcut(it.url, it.title) } else emptyList()
+    }
+    val most = remember(*keys) {
+        if (prefs.sectionMostVisited) Browser.db.mostVisited(12).map { Shortcut(it.first, it.second) } else emptyList()
+    }
+    val recent = remember(*keys) {
+        if (prefs.sectionRecent) {
+            Browser.db.history("", 200).distinctBy { UrlText.host(it.url) }.take(12).map { Shortcut(it.url, it.title) }
+        } else {
+            emptyList()
+        }
+    }
+    val closed = remember(Browser.closedVersion, *keys) { if (prefs.sectionClosed) Browser.recentlyClosed() else emptyList() }
+    val open: (Shortcut) -> Unit = { Browser.load(tab, it.url) }
+    // Adding to a collection (site -1) or editing one of its sites.
+    var editing by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+
+    collections.forEachIndexed { ci, c ->
+        SiteRow(c.name, c.sites, onOpen = open, onHold = { si -> editing = ci to si }, onAdd = { editing = ci to -1 })
+    }
+    if (bookmarks.isNotEmpty()) SiteRow("Bookmarks", bookmarks, onOpen = open)
+    if (most.isNotEmpty()) SiteRow("Most visited", most, onOpen = open)
+    if (recent.isNotEmpty()) SiteRow("Recently visited", recent, onOpen = open)
+    if (closed.isNotEmpty()) {
+        SiteRow("Recently closed", closed.map { Shortcut(it.url, it.title) }) { s ->
+            closed.firstOrNull { it.url == s.url }?.let { Browser.reopenClosed(it, tab) }
+        }
+    }
+
+    editing?.let { (ci, si) ->
+        val c = collections.getOrNull(ci) ?: return@let
+        val save = { sites: List<Shortcut> ->
+            prefs.collections = collections.mapIndexed { i, old -> if (i == ci) old.copy(sites = sites) else old }
+            version++
+            editing = null
+        }
+        ShortcutDialog(
+            existing = c.sites.getOrNull(si),
+            onDismiss = { editing = null },
+            onSave = { s ->
+                SiteIcons.forget(UrlText.host(s.url))
+                save(if (si in c.sites.indices) c.sites.mapIndexed { i, old -> if (i == si) s else old } else c.sites + s)
+            },
+            onRemove = if (si in c.sites.indices) {
+                { save(c.sites.filterIndexed { i, _ -> i != si }) }
+            } else {
+                null
+            },
+            removeLabel = "Remove from " + c.name,
+            kind = "site",
+        )
+    }
+}
+
+/** A titled row of sites that scrolls sideways (a collection, bookmarks, most visited…). */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SiteRow(
+    title: String,
+    sites: List<Shortcut>,
+    onHold: ((Int) -> Unit)? = null,
+    onAdd: (() -> Unit)? = null,
+    onOpen: (Shortcut) -> Unit,
+) {
+    val p = LocalPalette.current
+    val ctx = LocalContext.current
+    Column(Modifier.fillMaxWidth().padding(top = 18.dp)) {
+        Text(
+            title,
+            color = p.mute,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 10.dp, bottom = 4.dp),
+        )
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+            sites.forEachIndexed { i, s ->
+                val host = UrlText.host(s.url)
+                LaunchedEffect(host) { SiteIcons.load(ctx, host) }
+                Column(
+                    Modifier
+                        .width(76.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .combinedClickable(onClick = { onOpen(s) }, onLongClick = onHold?.let { hold -> { hold(i) } })
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    SiteTile(host, s.title)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        s.title.ifBlank { host },
+                        color = p.mute,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+                }
+            }
+            if (onAdd != null) {
+                Column(
+                    Modifier
+                        .width(76.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable(onClick = onAdd)
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        Modifier.size(52.dp).clip(RoundedCornerShape(15.dp)).background(p.field),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Outlined.Add, "Add to $title", tint = p.mute, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text("Add", color = p.faint, fontSize = 11.sp)
+                }
+            }
+        }
     }
 }

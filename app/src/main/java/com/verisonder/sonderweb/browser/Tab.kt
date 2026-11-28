@@ -23,6 +23,9 @@ class Tab(val id: Long, val isPrivate: Boolean, val profile: String = "") {
     )
 
     var url by mutableStateOf("")
+
+    /** The tab's back/forward pages and where it was, from the engine: brought back by Undo. */
+    var state: GeckoSession.SessionState? = null
     var title by mutableStateOf("")
     var progress by mutableIntStateOf(0)
     var loading by mutableStateOf(false)

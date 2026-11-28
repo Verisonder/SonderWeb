@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -16,6 +17,7 @@ import com.verisonder.sonderweb.data.Profiles
 import com.verisonder.sonderweb.data.Prefs
 import org.mozilla.geckoview.ContentBlocking
 import org.mozilla.geckoview.GeckoRuntime
+import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoRuntimeSettings
 import org.mozilla.geckoview.StorageController
 
@@ -253,6 +255,7 @@ object Browser {
         open: Boolean = true,
         lazy: Boolean = false,
         profile: String = Profiles.current,
+        state: GeckoSession.SessionState? = null,
     ): Tab {
         val tab = Tab(nextId++, isPrivate, if (isPrivate) "" else profile)
         tab.openerId = opener?.id
@@ -262,7 +265,12 @@ object Browser {
         if (open) {
             tab.session.open(runtime)
             tab.ready = true
-            if (!url.isNullOrBlank()) {
+            if (state != null && !url.isNullOrBlank()) {
+                // A closed tab coming back: its pages back and forward too.
+                tab.loading = true
+                tab.session.restoreState(state)
+                tab.url = url
+            } else if (!url.isNullOrBlank()) {
                 if (lazy) {
                     tab.pendingUrl = url
                 } else {
@@ -348,6 +356,82 @@ object Browser {
         if (tab.session.isOpen) tab.session.close()
         if (tabs.isEmpty()) newTab(null, isPrivate = false)
         saveTabs()
+    }
+
+    // ---- Closing with Undo, and recently closed tabs ----
+
+    /** A tab you closed: enough to bring it back where it was. */
+    class Closed(
+        val url: String,
+        val title: String,
+        val isPrivate: Boolean,
+        val profile: String,
+        val index: Int,
+        val openerId: Long?,
+        val state: GeckoSession.SessionState?,
+        val wasCurrent: Boolean,
+    )
+
+    /** Changes whenever the recently closed list does (the start page follows it). */
+    var closedVersion by mutableIntStateOf(0)
+        private set
+
+    private fun closedOf(tab: Tab) = Closed(
+        tab.pendingUrl ?: tab.url, tab.title, tab.isPrivate, tab.profile, tabs.indexOf(tab),
+        tab.openerId, tab.state, tab === current,
+    )
+
+    /** Keeps a closed normal tab for the start page's "Recently closed" (newest first, 12 at most). */
+    private fun keepClosed(c: Closed) {
+        if (c.isPrivate || !UrlText.isWeb(c.url)) return
+        val list = prefs.closedTabs.filterNot { it.url == c.url && it.profile == c.profile }
+        prefs.closedTabs = (listOf(com.verisonder.sonderweb.data.ClosedTab(c.url, c.title, c.profile)) + list).take(12)
+        closedVersion++
+    }
+
+    /** Recently closed normal tabs of the profile in use. */
+    fun recentlyClosed(): List<com.verisonder.sonderweb.data.ClosedTab> =
+        prefs.closedTabs.filter { it.profile == Profiles.current }
+
+    fun forgetClosed() {
+        prefs.closedTabs = emptyList()
+        closedVersion++
+    }
+
+    /** You closed tabs (tab list, swipe, Close all): they close, and a notice offers Undo. */
+    fun closeByUser(closing: List<Tab>) {
+        val gone = closing.filter { it in tabs && !it.isBlank }.map { closedOf(it) }
+        closing.forEach { close(it) }
+        if (gone.isEmpty()) return
+        gone.forEach { keepClosed(it) }
+        val text = if (gone.size == 1) "Tab closed" else "${gone.size} tabs closed"
+        host?.toast(text, "Undo") {
+            // Back in their old places, in order; the one you were on is selected again.
+            gone.sortedBy { it.index }.forEach { reopen(it) }
+        }
+    }
+
+    fun reopen(c: Closed) {
+        val tab = newTab(c.url, c.isPrivate, select = c.wasCurrent, profile = c.profile, state = c.state)
+        tab.openerId = c.openerId?.takeIf { id -> tabs.any { it.id == id } }
+        val from = tabs.indexOf(tab)
+        val to = c.index.coerceIn(0, tabs.size - 1)
+        if (from >= 0 && from != to) {
+            tabs.removeAt(from)
+            tabs.add(to, tab)
+        }
+        if (!c.isPrivate) {
+            prefs.closedTabs = prefs.closedTabs.filterNot { it.url == c.url && it.profile == c.profile }
+            closedVersion++
+        }
+        saveTabs()
+    }
+
+    /** From the start page's "Recently closed": opens it in the tab on screen (the start page). */
+    fun reopenClosed(t: com.verisonder.sonderweb.data.ClosedTab, into: Tab) {
+        prefs.closedTabs = prefs.closedTabs.filterNot { it.url == t.url && it.profile == t.profile }
+        closedVersion++
+        load(into, t.url)
     }
 
     /** The site a tab is on (example.com for www.example.com). */
@@ -781,6 +865,7 @@ object Browser {
     /** Every trace of browsing: history, downloads list, cookies, cache and site data. */
     fun clearEverything(done: () -> Unit) {
         Profiles.list.forEach { dbOf(it.id).clearHistory() }
+        forgetClosed()
         mainDb.clearDownloads()
         clearData(StorageController.ClearFlags.ALL, done)
     }

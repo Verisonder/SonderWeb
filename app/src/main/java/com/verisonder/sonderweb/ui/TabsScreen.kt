@@ -35,6 +35,8 @@ import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -92,8 +94,11 @@ fun TabsScreen(ui: UiState) {
     val list = Browser.tabs.filter { it.isPrivate == privateMode && !it.isBlank && it !in inactive }
     val accent = if (privateMode) PrivatePalette.accent else p.accent
     // Settings › Tabs › Tab list: cards or rows, and whether a short list sits at the bottom.
-    val asList = remember { Browser.prefs.tabsAsList }
+    var asList by remember { mutableStateOf(Browser.prefs.tabsAsList) }
     val atBottom = remember { Browser.prefs.tabsAtBottom }
+    // Optional (Settings › Tabs › Tab list): a grid / list switch up here, and × instead of Done.
+    val layoutSwitch = remember { Browser.prefs.tabsLayoutSwitch }
+    val closeX = remember { Browser.prefs.tabsCloseX }
 
     // Opens at the bottom, where the newest tabs are (and again on switching normal / private).
     val grid = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
@@ -130,16 +135,35 @@ fun TabsScreen(ui: UiState) {
                 accent,
             ) { privateMode = it == 1 }
             Spacer(Modifier.weight(1f))
-            Text(
-                "Done",
-                color = p.text,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 15.sp,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { ui.panel = Panel.None }
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            )
+            if (layoutSwitch) {
+                LayoutSwitch(asList, accent) {
+                    asList = it
+                    Browser.prefs.tabsAsList = it
+                }
+                Spacer(Modifier.width(if (closeX) 2.dp else 4.dp))
+            }
+            if (closeX) {
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .clickable { ui.panel = Panel.None },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Outlined.Close, "Close", tint = p.text, modifier = Modifier.size(22.dp))
+                }
+            } else {
+                Text(
+                    "Done",
+                    color = p.text,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { ui.panel = Panel.None }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+            }
         }
 
         Box(Modifier.weight(1f)) {
@@ -203,7 +227,7 @@ fun TabsScreen(ui: UiState) {
                 fontSize = 15.sp,
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .clickable(enabled = list.isNotEmpty()) { Browser.closeAll(privateMode) }
+                    .clickable(enabled = list.isNotEmpty()) { Browser.closeByUser(Browser.tabs.filter { it.isPrivate == privateMode }) }
                     .padding(horizontal = 10.dp, vertical = 10.dp),
             )
             Spacer(Modifier.weight(1f))
@@ -395,7 +419,7 @@ private fun InactiveTabs(ui: UiState, tabs: List<Tab>, onBack: () -> Unit) {
                         Text(UrlText.host(url), color = p.faint, fontSize = 12.sp, maxLines = 1)
                     }
                     Box(
-                        Modifier.size(40.dp).clip(CircleShape).clickable { Browser.close(t) },
+                        Modifier.size(40.dp).clip(CircleShape).clickable { Browser.closeByUser(listOf(t)) },
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(Icons.Outlined.Close, "Close tab", tint = p.mute, modifier = Modifier.size(16.dp))
@@ -414,7 +438,7 @@ private fun InactiveTabs(ui: UiState, tabs: List<Tab>, onBack: () -> Unit) {
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
                     .clickable(enabled = tabs.isNotEmpty()) {
-                        tabs.forEach { Browser.close(it) }
+                        Browser.closeByUser(tabs)
                         onBack()
                     }
                     .padding(horizontal = 10.dp, vertical = 10.dp),
@@ -457,7 +481,7 @@ private fun TabCard(ui: UiState, tab: Tab, selected: Boolean, accent: Color, mod
                 Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .clickable { Browser.close(tab) },
+                    .clickable { Browser.closeByUser(listOf(tab)) },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(Icons.Outlined.Close, "Close tab", tint = p.mute, modifier = Modifier.size(16.dp))
@@ -543,7 +567,7 @@ private fun SwipeToClose(tab: Tab, modifier: Modifier, content: @Composable () -
                             if (gone) {
                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 dx.animateTo(if (moved > 0f) width * 1.1f else -width * 1.1f, tween(170))
-                                Browser.close(tab)
+                                Browser.closeByUser(listOf(tab))
                                 dx.snapTo(0f)
                             } else {
                                 dx.animateTo(0f, back)
@@ -593,7 +617,7 @@ private fun TabRow(tab: Tab, selected: Boolean, accent: Color, onClick: () -> Un
             Text(UrlText.host(url), color = p.faint, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Box(
-            Modifier.size(40.dp).clip(CircleShape).clickable { Browser.close(tab) },
+            Modifier.size(40.dp).clip(CircleShape).clickable { Browser.closeByUser(listOf(tab)) },
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Outlined.Close, "Close tab", tint = p.mute, modifier = Modifier.size(16.dp))
@@ -649,6 +673,32 @@ fun Segmented(options: List<String>, selected: Int, accent: Color, onSelect: (In
                     .clickable { onSelect(i) }
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             )
+        }
+    }
+}
+
+/** Grid or list, as two small icons in the same pill as Tabs · Private (kept in step with Settings). */
+@Composable
+private fun LayoutSwitch(asList: Boolean, accent: Color, onChange: (Boolean) -> Unit) {
+    val p = LocalPalette.current
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(p.field)
+            .padding(3.dp),
+    ) {
+        listOf(false to Icons.Outlined.GridView, true to Icons.Outlined.ViewAgenda).forEach { (list, icon) ->
+            val on = list == asList
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(17.dp))
+                    .background(if (on) accent else Color.Transparent)
+                    .clickable { onChange(list) }
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, if (list) "List" else "Grid", tint = if (on) p.onAccent else p.mute, modifier = Modifier.size(16.dp))
+            }
         }
     }
 }

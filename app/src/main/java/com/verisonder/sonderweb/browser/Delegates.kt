@@ -184,6 +184,10 @@ object Delegates {
         override fun onSecurityChange(session: GeckoSession, securityInfo: ProgressDelegate.SecurityInformation) {
             tab.secure = securityInfo.isSecure
         }
+
+        override fun onSessionStateChange(session: GeckoSession, sessionState: GeckoSession.SessionState) {
+            tab.state = sessionState
+        }
     }
 
     /** Pixels at the bottom of the page view that the bar covers (set by the screen). */
