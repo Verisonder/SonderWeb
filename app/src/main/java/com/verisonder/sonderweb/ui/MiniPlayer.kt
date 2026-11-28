@@ -6,7 +6,14 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
@@ -58,7 +65,7 @@ import org.mozilla.geckoview.GeckoView
 import kotlin.math.roundToInt
 
 /**
- * The floating video window inside the app. Drag it anywhere. Top left opens the video full
+ * The floating video window inside the app. Drag it anywhere; pinch it bigger or smaller. Top left opens the video full
  * size, top right stops it; a tap shows play/pause.
  *
  * It is a second engine view showing that tab's page (drawn as a texture, so it can float, be
@@ -73,8 +80,13 @@ fun MiniPlayer(tab: Tab, main: GeckoView, bottomGap: androidx.compose.ui.unit.Dp
             .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = bottomGap),
     ) {
         val d = LocalDensity.current
-        val width = 200.dp
-        val height = width / tab.videoRatio.coerceIn(0.5f, 2.4f)
+        val ratio = tab.videoRatio.coerceIn(0.5f, 2.4f)
+        // Pinch it bigger or smaller (kept for next time): from 140 dp up to the whole width,
+        // and never taller than most of the screen.
+        val widest = minOf(maxWidth, maxHeight * 0.7f * ratio).coerceAtLeast(140.dp)
+        var widthDp by remember { mutableFloatStateOf(Browser.prefs.miniWidth) }
+        val width = widthDp.dp.coerceIn(140.dp, widest)
+        val height = width / ratio
         val maxX = with(d) { (maxWidth - width).toPx() }.coerceAtLeast(0f)
         val maxY = with(d) { (maxHeight - height).toPx() }.coerceAtLeast(0f)
         // Starts in the bottom-right corner, above the bar.
@@ -83,10 +95,25 @@ fun MiniPlayer(tab: Tab, main: GeckoView, bottomGap: androidx.compose.ui.unit.Dp
         var onRight by remember { mutableStateOf(true) }
         val scope = rememberCoroutineScope()
         val decay = rememberSplineBasedDecay<Float>()
+        // While pinching the window is only drawn bigger or smaller (smooth, the page doesn't
+        // reflow); its new size is set when you let go.
+        var pinchScale by remember { mutableFloatStateOf(1f) }
+        var pinchPan by remember { mutableStateOf(Offset.Zero) }
+        var settling by remember { mutableStateOf(false) }
+        var settleTick by remember { mutableIntStateOf(0) }
         // The space changed (bar, turning the phone): it stays on its side, inside the screen.
         LaunchedEffect(maxX, maxY) {
+            if (settling) return@LaunchedEffect
             if (!x.isRunning) x.snapTo(if (onRight) maxX else 0f)
             if (!y.isRunning) y.snapTo(y.value.coerceIn(0f, maxY))
+        }
+        // After a pinch: it glides back against the nearest side, inside the screen.
+        LaunchedEffect(settleTick) {
+            if (settleTick == 0) return@LaunchedEffect
+            onRight = x.value > maxX / 2
+            launch { x.animateTo(if (onRight) maxX else 0f, spring(dampingRatio = 0.82f, stiffness = 380f)) }
+            y.animateTo(y.value.coerceIn(0f, maxY), spring(dampingRatio = 0.85f, stiffness = 380f))
+            settling = false
         }
         // Thrown like the phone's own picture-in-picture: it glides on with the speed of your
         // finger, then settles against the nearest side, at the height it was heading for.
@@ -96,6 +123,24 @@ fun MiniPlayer(tab: Tab, main: GeckoView, bottomGap: androidx.compose.ui.unit.Dp
             onRight = px > maxX / 2
             scope.launch { x.animateTo(if (onRight) maxX else 0f, spring(dampingRatio = 0.78f, stiffness = 320f), vx) }
             scope.launch { y.animateTo(py.coerceIn(0f, maxY), spring(dampingRatio = 0.85f, stiffness = 320f), vy) }
+        }
+        // Let go of a pinch: the window takes its new size, centred where it was drawn.
+        fun commitPinch() {
+            val wPx = with(d) { width.toPx() }
+            val hPx = with(d) { height.toPx() }
+            val cx = x.value + wPx / 2 + pinchPan.x
+            val cy = y.value + hPx / 2 + pinchPan.y
+            val newW = (width * pinchScale).coerceIn(140.dp, widest)
+            val newWPx = with(d) { newW.toPx() }
+            val newHPx = newWPx / ratio
+            settling = true
+            widthDp = newW.value
+            Browser.prefs.miniWidth = newW.value
+            scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { x.snapTo(cx - newWPx / 2) }
+            scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { y.snapTo(cy - newHPx / 2) }
+            pinchScale = 1f
+            pinchPan = Offset.Zero
+            settleTick++
         }
         var controls by remember { mutableStateOf(false) }
         var paused by remember(tab) { mutableStateOf(false) }
@@ -109,35 +154,62 @@ fun MiniPlayer(tab: Tab, main: GeckoView, bottomGap: androidx.compose.ui.unit.Dp
         Box(
             Modifier
                 .offset { IntOffset(x.value.roundToInt(), y.value.roundToInt()) }
+                .graphicsLayer {
+                    scaleX = pinchScale
+                    scaleY = pinchScale
+                    translationX = pinchPan.x
+                    translationY = pinchPan.y
+                }
                 .size(width, height)
                 .shadow(12.dp, RoundedCornerShape(14.dp))
                 .clip(RoundedCornerShape(14.dp))
                 .background(Color.Black)
-                .pointerInput(maxX, maxY) {
+                .pointerInput(maxX, maxY, width) {
+                    // One finger drags (and throws) it; two fingers pinch it bigger or smaller.
                     // The window moves with the finger, so its speed is measured from how far it
                     // has been dragged, not from where the finger is on it.
                     val tracker = VelocityTracker()
-                    var moved = Offset.Zero
-                    detectDragGestures(
-                        onDragStart = {
-                            tracker.resetTracking()
-                            moved = Offset.Zero
-                            scope.launch { x.stop() }
-                            scope.launch { y.stop() }
-                        },
-                        onDragEnd = {
-                            val v = tracker.calculateVelocity()
-                            throwTo(v.x, v.y)
-                        },
-                        onDragCancel = { throwTo(0f, 0f) },
-                    ) { change, drag ->
-                        change.consume()
-                        moved += drag
-                        tracker.addPosition(change.uptimeMillis, moved)
-                        scope.launch {
-                            // A little give past the edges while dragging, like a rubber band.
-                            x.snapTo(rubber(x.value + drag.x, maxX))
-                            y.snapTo(rubber(y.value + drag.y, maxY))
+                    val minScale = 140.dp.toPx() / width.toPx()
+                    val maxScale = widest.toPx() / width.toPx()
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        tracker.resetTracking()
+                        var moved = Offset.Zero
+                        var dragging = false
+                        var pinching = false
+                        scope.launch { x.stop() }
+                        scope.launch { y.stop() }
+                        while (true) {
+                            val e = awaitPointerEvent()
+                            val pressed = e.changes.filter { it.pressed }
+                            if (pressed.isEmpty()) break
+                            if (pressed.size >= 2) {
+                                pinching = true
+                                pinchScale = (pinchScale * e.calculateZoom()).coerceIn(minScale, maxScale)
+                                pinchPan += e.calculatePan()
+                                e.changes.forEach { it.consume() }
+                            } else if (!pinching) {
+                                val c = pressed.first()
+                                val delta = c.positionChange()
+                                moved += delta
+                                if (!dragging && moved.getDistance() > viewConfiguration.touchSlop) dragging = true
+                                if (dragging) {
+                                    c.consume()
+                                    tracker.addPosition(c.uptimeMillis, moved)
+                                    scope.launch {
+                                        // A little give past the edges while dragging, like a rubber band.
+                                        x.snapTo(rubber(x.value + delta.x, maxX))
+                                        y.snapTo(rubber(y.value + delta.y, maxY))
+                                    }
+                                }
+                            } else {
+                                // One finger left after a pinch: nothing until it lifts too.
+                                pressed.forEach { it.consume() }
+                            }
+                        }
+                        when {
+                            pinching -> commitPinch()
+                            dragging -> tracker.calculateVelocity().let { v -> throwTo(v.x, v.y) }
                         }
                     }
                 },

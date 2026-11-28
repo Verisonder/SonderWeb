@@ -305,6 +305,11 @@ class Prefs(context: Context) {
         get() = sp.getString("clock_font", "") ?: ""
         set(v) = sp.edit().putString("clock_font", v).apply()
 
+    /** The floating video window's width (dp), as you last pinched it. */
+    var miniWidth: Float
+        get() = sp.getFloat("mini_width", 200f)
+        set(v) = sp.edit().putFloat("mini_width", v).apply()
+
     /** The tab list as a list of rows instead of the grid of cards. */
     var tabsAsList: Boolean
         get() = sp.getBoolean("tabs_list", false)
