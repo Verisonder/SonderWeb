@@ -310,9 +310,9 @@ class Prefs(context: Context) {
         get() = sp.getFloat("mini_width", 200f)
         set(v) = sp.edit().putFloat("mini_width", v).apply()
 
-    /** The phone's time and battery (status bar) over the start page. Off: hidden there only. */
+    /** The phone's time and battery (status bar) over the start page. Off by default: hidden there only. */
     var startStatusBar: Boolean
-        get() = sp.getBoolean("start_status", true)
+        get() = sp.getBoolean("start_status", false)
         set(v) = sp.edit().putBoolean("start_status", v).apply()
 
     /** The tab list as a list of rows instead of the grid of cards. */
