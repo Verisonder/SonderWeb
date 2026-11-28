@@ -15,6 +15,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -136,15 +140,24 @@ fun PrivateAvatar(size: Dp, modifier: Modifier = Modifier) {
     }
 }
 
-/** In the bar, where Home was: tap to switch profiles, hold for the start page. In private tabs
- *  (profiles don't apply there) a tap asks before going to the start page: a stray tap must not
- *  lose the page you're on. */
-@OptIn(ExperimentalFoundationApi::class)
+/** In the bar, where Home was: tap to switch profiles; hold and a Home pops out above it (below
+ *  with the bar on top): slide onto it and let go for the start page, like the address's "+".
+ *  In private tabs (profiles don't apply there) a tap asks before going to the start page: a
+ *  stray tap must not lose the page you're on. */
 @Composable
-fun ProfileHomeButton(ui: UiState, tab: Tab) {
+fun ProfileHomeButton(ui: UiState, tab: Tab, top: Boolean) {
     val haptics = LocalHapticFeedback.current
     val p = LocalPalette.current
     var askHome by remember { mutableStateOf(false) }
+    val pop = remember { NewTabPop() }
+    val reach = with(androidx.compose.ui.platform.LocalDensity.current) { 44.dp.toPx() }
+    val onTap by androidx.compose.runtime.rememberUpdatedState {
+        if (!tab.isPrivate) {
+            ui.profiles = true
+        } else if (!tab.isBlank) {
+            askHome = true
+        }
+    }
     // A grey ring in the address field's colour, as tall as the field (40 dp), so the two line up.
     // 4 dp more on the left: the ring then sits as far from the bar's side (4 + 2 + 4 = 10 dp) as
     // from its top (the 2 dp loading line + 8 dp).
@@ -155,22 +168,35 @@ fun ProfileHomeButton(ui: UiState, tab: Tab) {
             .padding(2.dp)
             .clip(CircleShape)
             .background(p.field)
-            .combinedClickable(
-                onLongClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    Browser.goHome(tab)
-                },
-                onClick = {
-                    if (!tab.isPrivate) {
-                        ui.profiles = true
-                    } else if (!tab.isBlank) {
-                        askHome = true
+            .pointerInput(tab, top) {
+                val slop = viewConfiguration.touchSlop
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    var moved = false
+                    var released = false
+                    withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        while (true) {
+                            val c = awaitPointerEvent().changes.first()
+                            if ((c.position - down.position).getDistance() > slop) moved = true
+                            if (!c.pressed) {
+                                released = true
+                                break
+                            }
+                        }
                     }
-                },
-            ),
+                    if (released) {
+                        if (!moved) onTap()
+                        return@awaitEachGesture
+                    }
+                    if (moved) return@awaitEachGesture
+                    // Held: Home pops out; let go on it for the start page, anywhere else to cancel.
+                    slideToNewTab(pop, top, reach, down.position.y, haptics) { Browser.goHome(tab) }
+                }
+            },
         contentAlignment = Alignment.Center,
     ) {
         if (tab.isPrivate) PrivateAvatar(30.dp) else ProfileAvatar(Profiles.active, 30.dp)
+        NewTabBubble(pop, top, androidx.compose.material.icons.Icons.Outlined.Home, "Start page")
     }
     if (askHome) {
         AlertDialog(

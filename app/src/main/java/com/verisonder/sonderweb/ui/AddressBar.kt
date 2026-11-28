@@ -203,8 +203,9 @@ private fun BarBody(ui: UiState, tab: Tab?, top: Boolean) {
                     Spacer(Modifier.weight(1f))
                 } else {
                     if (com.verisonder.sonderweb.data.Profiles.enabled) {
-                        // Your profile's picture: tap to switch profiles, hold for the start page.
-                        ProfileHomeButton(ui, tab)
+                        // Your profile's picture: tap to switch profiles; hold, slide onto the
+                        // Home that pops out and let go for the start page.
+                        ProfileHomeButton(ui, tab, top)
                     } else {
                         IconButtonSmall(Icons.Outlined.Home, "Home", size = 44, tint = p.mute) { Browser.goHome(tab) }
                     }
@@ -490,7 +491,7 @@ class NewTabPop {
 }
 
 /** The held part of the gesture: slide up (down when the bar is on top) onto the "+"; elsewhere cancels. */
-private suspend fun AwaitPointerEventScope.slideToNewTab(
+internal suspend fun AwaitPointerEventScope.slideToNewTab(
     pop: NewTabPop,
     top: Boolean,
     reach: Float,
@@ -516,9 +517,10 @@ private suspend fun AwaitPointerEventScope.slideToNewTab(
     pop.holding = false
 }
 
-/** The "+" that pops out above the address (below it when the bar is on top). */
+/** The "+" that pops out above the address (below it when the bar is on top); the profile
+ *  picture's Home uses the same bubble. */
 @Composable
-fun NewTabBubble(pop: NewTabPop, top: Boolean) {
+fun NewTabBubble(pop: NewTabPop, top: Boolean, icon: ImageVector = Icons.Outlined.Add, label: String = "New tab") {
     val p = LocalPalette.current
     val density = LocalDensity.current
     val shown by animateFloatAsState(if (pop.holding) 1f else 0f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "pop")
@@ -544,7 +546,7 @@ fun NewTabBubble(pop: NewTabPop, top: Boolean) {
                 .background(lerp(p.field, p.accent, lit)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Outlined.Add, "New tab", tint = lerp(p.text, p.onAccent, lit), modifier = Modifier.size(24.dp))
+            Icon(icon, label, tint = lerp(p.text, p.onAccent, lit), modifier = Modifier.size(24.dp))
         }
     }
 }
