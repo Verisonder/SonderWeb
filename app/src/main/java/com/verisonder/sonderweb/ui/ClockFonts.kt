@@ -19,6 +19,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
@@ -95,7 +97,7 @@ fun ClockFontPicker(time: String, selected: String, onPick: (String) -> Unit, on
     val p = LocalPalette.current
     val density = androidx.compose.ui.platform.LocalDensity.current
     // Read here: a popup window doesn't get the screen's insets itself.
-    val navBottom = with(density) { androidx.compose.foundation.layout.WindowInsets.navigationBars.getBottom(this).toDp() }
+    val navBottom = with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
     val screenH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
     val shown = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
     var closing by remember { mutableStateOf(false) }
