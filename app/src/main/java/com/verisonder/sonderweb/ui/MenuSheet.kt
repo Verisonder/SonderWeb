@@ -130,8 +130,10 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                 Spacer(Modifier.height(6.dp))
             }
 
+            // Settings › Tabs › Menu as a grid: the same options as icons, four to a row.
+            androidx.compose.runtime.CompositionLocalProvider(LocalMenuGrid provides remember(ui.menu) { Browser.prefs.menuGrid }) {
             // Private tabs stay apart: no way into your normal history, downloads or bookmarks from here.
-            if (!tab.isPrivate) {
+            if (!tab.isPrivate) ItemGroup {
                 Item("History", Icons.Outlined.History) {
                     ui.panel = Panel.History
                     close()
@@ -147,6 +149,7 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
             }
             if (web) {
                 if (!tab.isPrivate) Divider()
+                ItemGroup {
                 Item("Find in page", Icons.Outlined.FindInPage) {
                     ui.findQuery = ""
                     ui.findResult = ""
@@ -189,20 +192,25 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                         close()
                     }
                 }
-                DropdownMenuItem(
-                    text = { Text("Desktop site", fontSize = 16.sp, color = p.text) },
-                    onClick = { Browser.setDesktop(tab, !tab.desktop) },
-                    leadingIcon = { Icon(Icons.Outlined.Computer, null, tint = p.mute, modifier = Modifier.size(22.dp)) },
-                    trailingIcon = {
-                        Checkbox(
-                            tab.desktop,
-                            { Browser.setDesktop(tab, it) },
-                            colors = CheckboxDefaults.colors(checkedColor = p.accent, uncheckedColor = p.mute),
-                        )
-                    },
-                    contentPadding = PaddingValues(start = 20.dp, end = 8.dp),
-                    modifier = Modifier.height(54.dp),
-                )
+                if (LocalMenuGrid.current) {
+                    // In the grid: a tile that lights up while the desktop site is on.
+                    Tile("Desktop site", Icons.Outlined.Computer, selected = tab.desktop) { Browser.setDesktop(tab, !tab.desktop) }
+                } else {
+                    DropdownMenuItem(
+                        text = { Text("Desktop site", fontSize = 16.sp, color = p.text) },
+                        onClick = { Browser.setDesktop(tab, !tab.desktop) },
+                        leadingIcon = { Icon(Icons.Outlined.Computer, null, tint = p.mute, modifier = Modifier.size(22.dp)) },
+                        trailingIcon = {
+                            Checkbox(
+                                tab.desktop,
+                                { Browser.setDesktop(tab, it) },
+                                colors = CheckboxDefaults.colors(checkedColor = p.accent, uncheckedColor = p.mute),
+                            )
+                        },
+                        contentPadding = PaddingValues(start = 20.dp, end = 8.dp),
+                        modifier = Modifier.height(54.dp),
+                    )
+                }
                 // Like Brave's "Shred site data" (private tabs forget everything anyway).
                 if (!tab.isPrivate) {
                     Item("Shred site data", ShredIcon) {
@@ -210,8 +218,10 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                         close()
                     }
                 }
+                }
             }
             Divider()
+            ItemGroup {
             Item("Extensions", Icons.Outlined.Extension) {
                 ui.panel = Panel.Extensions
                 close()
@@ -228,6 +238,8 @@ fun BrowserMenu(ui: UiState, tab: Tab, top: Boolean) {
                     (ctx as? android.app.Activity)?.finishAndRemoveTask()
                 }
             }
+            }
+            }
             if (!top) actions()
         }
     }
@@ -238,8 +250,65 @@ private fun Divider() {
     HorizontalDivider(color = LocalPalette.current.line, modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp))
 }
 
+/** Settings › Tabs › Menu as a grid. */
+private val LocalMenuGrid = androidx.compose.runtime.staticCompositionLocalOf { false }
+
+/** A run of menu options: rows in the list, or four to a row in the grid. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ItemGroup(content: @Composable () -> Unit) {
+    if (LocalMenuGrid.current) {
+        androidx.compose.foundation.layout.FlowRow(
+            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
+            maxItemsInEachRow = 4,
+        ) { content() }
+    } else {
+        content()
+    }
+}
+
+/** One option in the grid: its icon on a rounded tile, its name under it. */
+@Composable
+private fun Tile(label: String, icon: ImageVector, dot: Boolean = false, selected: Boolean = false, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    androidx.compose.foundation.layout.Column(
+        Modifier
+            .width(67.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(top = 8.dp, bottom = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier
+                .size(46.dp)
+                .clip(RoundedCornerShape(15.dp))
+                .background(if (selected) p.accent.copy(alpha = 0.22f) else p.bg),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, null, tint = if (selected) p.accent else p.text, modifier = Modifier.size(22.dp))
+            if (dot) UpdateDot(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp))
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(
+            label,
+            color = if (selected) p.accent else p.mute,
+            fontSize = 11.sp,
+            lineHeight = 13.sp,
+            maxLines = 2,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 2.dp),
+        )
+    }
+}
+
 @Composable
 private fun Item(label: String, icon: ImageVector, dot: Boolean = false, onClick: () -> Unit) {
+    if (LocalMenuGrid.current) {
+        Tile(label, icon, dot, onClick = onClick)
+        return
+    }
     val p = LocalPalette.current
     DropdownMenuItem(
         text = {

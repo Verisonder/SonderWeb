@@ -922,7 +922,17 @@ private fun TabsPage() {
     Hint("Counted from when a tab became inactive. Inactive tabs aren't in the tab count.")
     Spacer(Modifier.height(16.dp))
     var exit by remember { mutableStateOf(prefs.menuExit) }
+    var grid by remember { mutableStateOf(prefs.menuGrid) }
+    var swipeTabs by remember { mutableStateOf(prefs.swipeUpTabs) }
     Group {
+        Toggle("Swipe up for tabs", "Swipe the address bar up to open the tab list (bar at the bottom).", swipeTabs) {
+            swipeTabs = it
+            prefs.swipeUpTabs = it
+        }
+        Toggle("Menu as a grid", "The ⋮ menu shows its options as icons, four to a row, instead of a list.", grid) {
+            grid = it
+            prefs.menuGrid = it
+        }
         Toggle("Exit button", "Exit at the end of the ⋮ menu closes the app. Your tabs are kept.", exit) {
             exit = it
             prefs.menuExit = it

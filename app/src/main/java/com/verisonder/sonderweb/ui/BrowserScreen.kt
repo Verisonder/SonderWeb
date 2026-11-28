@@ -643,6 +643,8 @@ private fun BoxScope.BarArea(
     } else {
         // Bottom bar, slide mode: swipe it down and it stays down until you tap its handle.
         val canPutDown = !barTop && hideMode == Bar.SLIDE && !ui.editing && !ui.finding
+        // Settings › Tabs › Swipe up for tabs: up opens the tab list (down still puts it away).
+        val swipeTabs = !barTop && !ui.editing && !ui.finding && remember(ui.themeVersion, ui.panel) { Browser.prefs.swipeUpTabs }
         val pull = remember { androidx.compose.animation.core.Animatable(0f) }
         Box(
             Modifier
@@ -650,7 +652,18 @@ private fun BoxScope.BarArea(
                 .onSizeChanged { onBarSize(it.height) }
                 .graphicsLayer { translationY = if (barTop) -barOffset() else barOffset() + pull.value },
         ) {
-            SwipeDownToHide(canPutDown, pull) {
+            SwipeDownToHide(
+                canPutDown,
+                pull,
+                onSwipeUp = if (swipeTabs) {
+                    {
+                        tab?.let { Delegates.capture(it) }
+                        ui.panel = Panel.Tabs
+                    }
+                } else {
+                    null
+                },
+            ) {
                 SwipeToCompact(!ui.editing && !ui.finding && hideMode != Bar.ALWAYS) { Scaled(barScale) { AddressBar(ui, tab, barTop) } }
             }
         }
@@ -666,18 +679,24 @@ private fun BoxScope.BarArea(
 private fun SwipeDownToHide(
     enabled: Boolean,
     pull: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    onSwipeUp: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
+    val swipeUp by androidx.compose.runtime.rememberUpdatedState(onSwipeUp)
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val threshold = with(LocalDensity.current) { 40.dp.toPx() }
     val back = spring<Float>(dampingRatio = 0.8f, stiffness = 420f)
     Box(
-        Modifier.pointerInput(enabled) {
-            if (!enabled) return@pointerInput
+        Modifier.pointerInput(enabled, onSwipeUp != null) {
+            if (!enabled && onSwipeUp == null) return@pointerInput
             detectVerticalDragGestures(
                 onDragEnd = {
-                    if (pull.value > threshold || pull.value < -threshold) {
+                    val up = swipeUp
+                    if (up != null && pull.value < -threshold) {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        up()
+                    } else if (enabled && (pull.value > threshold || pull.value < -threshold)) {
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         Bar.putDown()
                     }
@@ -689,7 +708,9 @@ private fun SwipeDownToHide(
                 change.consume()
                 // Down follows the finger; up a little more stiffly, then it drops away the same.
                 val next = pull.value + if (pull.value + amount > 0f) amount else amount * 0.6f
-                scope.launch { pull.snapTo(next.coerceAtLeast(-threshold * 2.5f)) }
+                // Without putting it away, only up moves it (for the tab list).
+                val most = if (enabled) Float.MAX_VALUE else 0f
+                scope.launch { pull.snapTo(next.coerceIn(-threshold * 2.5f, most)) }
             }
         },
     ) { content() }

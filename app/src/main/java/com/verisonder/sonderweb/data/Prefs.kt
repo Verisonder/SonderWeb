@@ -315,6 +315,16 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("start_status", false)
         set(v) = sp.edit().putBoolean("start_status", v).apply()
 
+    /** The ⋮ menu as a grid of icons (four to a row) instead of a list. */
+    var menuGrid: Boolean
+        get() = sp.getBoolean("menu_grid", false)
+        set(v) = sp.edit().putBoolean("menu_grid", v).apply()
+
+    /** Swipe the bottom bar up to open the tab list (instead of putting the bar away). */
+    var swipeUpTabs: Boolean
+        get() = sp.getBoolean("swipe_tabs", false)
+        set(v) = sp.edit().putBoolean("swipe_tabs", v).apply()
+
     /** The tab list as a list of rows instead of the grid of cards. */
     var tabsAsList: Boolean
         get() = sp.getBoolean("tabs_list", false)
