@@ -346,6 +346,27 @@ private fun Setup(
             max = Handoff.MAX_DELAY,
             onChange = onDelay,
         )
+        // Both back as they came: the glow at 1.1 s, no delay.
+        val changed = intro != Handoff.INTRO_DEFAULT || delay != 0
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(Card)
+                .clickable(enabled = changed) {
+                    onIntro(Handoff.INTRO_DEFAULT)
+                    onDelay(0)
+                }
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Reset to default", color = if (changed) Text1 else Text2, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(3.dp))
+                Text("Opening animation 1.1 s, no delay", color = Text2, fontSize = 13.sp, lineHeight = 18.sp)
+            }
+        }
 
         Section("Updates")
         UpdateRow(version, onCheck, onUpdate)
